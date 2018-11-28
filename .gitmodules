@@ -1,0 +1,21 @@
+[submodule "src/vendor/github.com/satori/go.uuid"]
+	path = src/vendor/github.com/satori/go.uuid
+	url = https://github.com/satori/go.uuid.git
+[submodule "src/github.com/alecthomas/gometalinter"]
+	path = src/github.com/alecthomas/gometalinter
+	url = https://github.com/alecthomas/gometalinter
+[submodule "src/vendor/golang.org/x/crypto"]
+	path = src/vendor/golang.org/x/crypto
+	url = https://go.googlesource.com/crypto
+[submodule "src/vendor/gopkg.in/yaml.v2"]
+	path = src/vendor/gopkg.in/yaml.v2
+	url = https://gopkg.in/yaml.v2
+[submodule "src/vendor/github.com/derekparker/trie"]
+	path = src/vendor/github.com/derekparker/trie
+	url = https://github.com/derekparker/trie.git
+[submodule "src/vendor/github.com/mitchellh/go-wordwrap"]
+	path = src/vendor/github.com/mitchellh/go-wordwrap
+	url = https://github.com/mitchellh/go-wordwrap
+[submodule "src/vendor/github.com/gorilla/websocket"]
+	path = src/vendor/github.com/gorilla/websocket
+	url = https://github.com/gorilla/websocket.git
