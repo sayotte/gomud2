@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-type intentLogger interface {
+type IntentLogger interface {
 	Open(func(redo, undo []Event) error) error
 	Close()
 	WriteIntent(redo, undo []Event) (uuid.UUID, error)
@@ -22,18 +22,21 @@ func NewWorld() *World {
 }
 
 type World struct {
-	FrontDoorZone     *Zone
-	FrontDoorLocation *Location
-	SnapshotHelper    SnapshotHelper
-	IntentLog         intentLogger
-	zones             []*Zone
-	zonesByID         map[uuid.UUID]*Zone
-	stopChan          chan struct{}
-	stopWG            *sync.WaitGroup
-	commandChan       chan rpc.Request
+	DataStore DataStore
+	IntentLog IntentLogger
+
+	frontDoorZone     *Zone
+	frontDoorLocation *Location
+
+	zones       []*Zone
+	zonesByID   map[uuid.UUID]*Zone
+	started     bool
+	stopChan    chan struct{}
+	stopWG      *sync.WaitGroup
+	commandChan chan rpc.Request
 }
 
-func (w *World) Start() error {
+func (w *World) start() error {
 	w.stopChan = make(chan struct{})
 	w.stopWG = &sync.WaitGroup{}
 	w.commandChan = make(chan rpc.Request)
@@ -132,9 +135,9 @@ func (w *World) AddActor(a *Actor) (*Actor, error) {
 }
 
 func (w *World) handleAddActor(a *Actor) (*Actor, error) {
-	a.location = w.FrontDoorLocation
-	a.zone = w.FrontDoorZone
-	return w.FrontDoorZone.AddActor(a)
+	a.location = w.frontDoorLocation
+	a.zone = w.frontDoorZone
+	return w.frontDoorZone.AddActor(a)
 }
 
 func (w *World) MigrateActor(a *Actor, fromZone *Zone, toZoneID, toLocID uuid.UUID, o Observer) (*Actor, error) {
@@ -240,7 +243,7 @@ func (w *World) handleSnapshot() error {
 	for zoneId, seqNum := range zoneIDToSeqNum {
 		zone := NewZone(nil)
 		zone.Id = zoneId
-		eChan, err := w.SnapshotHelper.RetrieveUpToSequenceNumsForZone(seqNum, zoneId)
+		eChan, err := w.DataStore.RetrieveUpToSequenceNumsForZone(seqNum, zoneId)
 		if err != nil {
 			return err
 		}
@@ -250,7 +253,7 @@ func (w *World) handleSnapshot() error {
 		}
 
 		snapEvents := zone.snapshot(seqNum)
-		err = w.SnapshotHelper.PersistSnapshot(zoneId, seqNum, snapEvents)
+		err = w.DataStore.PersistSnapshot(zoneId, seqNum, snapEvents)
 		if err != nil {
 			return err
 		}

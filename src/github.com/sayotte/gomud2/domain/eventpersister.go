@@ -18,12 +18,7 @@ type SnapshotPersister interface {
 	PersistSnapshot(uuid.UUID, uint64, []Event) error
 }
 
-type SnapshotHelper interface {
-	EventRetriever
-	SnapshotPersister
-}
-
-type DoEverythingStore interface {
+type DataStore interface {
 	EventRetriever
 	EventPersister
 	SnapshotPersister
