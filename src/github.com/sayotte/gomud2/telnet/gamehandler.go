@@ -125,14 +125,14 @@ func (gh *gameHandler) lookAtLocation(terminalWidth int, loc *core.Location) []b
 		exitClause = "\nObvious exits:\n"
 		exitMap := make(map[string]*core.LocationEdge)
 		for _, edge := range edges {
-			exitMap[edge.Direction] = edge
+			exitMap[edge.Direction()] = edge
 		}
 		for _, direction := range locationExitDisplayOrder {
 			edge, found := exitMap[direction]
 			if !found {
 				continue
 			}
-			exitClause += fmt.Sprintf("%s\t- %s\n", direction, edge.Description)
+			exitClause += fmt.Sprintf("%s\t- %s\n", direction, edge.Description())
 		}
 	}
 
@@ -216,7 +216,7 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMove
 		if outEdge == nil {
 			return []byte(fmt.Sprintf("%s departs to... somewhere.\n", actorName)), nil
 		}
-		return []byte(fmt.Sprintf("%s departs to the %s.\n", actorName, outEdge.Direction)), nil
+		return []byte(fmt.Sprintf("%s departs to the %s.\n", actorName, outEdge.Direction())), nil
 
 	} else if toID == gh.actor.Location().ID() {
 		// this is an arrival
@@ -224,7 +224,7 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMove
 		if outEdge == nil {
 			return []byte(fmt.Sprintf("%s arrives from... somewhere.\n", actorName)), nil
 		}
-		return []byte(fmt.Sprintf("%s arrives from the %s.\n", actorName, outEdge.Direction)), nil
+		return []byte(fmt.Sprintf("%s arrives from the %s.\n", actorName, outEdge.Direction())), nil
 	} else {
 		// the only way we can be getting this event is if we're subscribed to watching
 		// someone else's actions
@@ -241,7 +241,7 @@ var locationExitDisplayOrder = []string{
 
 func edgeRelativeToLocation(baseLoc, otherLoc *core.Location) *core.LocationEdge {
 	for _, edge := range baseLoc.OutEdges() {
-		if edge.Destination == otherLoc {
+		if edge.Destination() == otherLoc {
 			return edge
 		}
 	}

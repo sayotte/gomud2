@@ -122,7 +122,7 @@ func (l Location) OutEdges() LocationEdgeList {
 func (l *Location) removeOutEdge(edge *LocationEdge) error {
 	idx, err := l.outEdges.IndexOf(edge)
 	if err != nil {
-		return fmt.Errorf("cannot remove Edge %q from location %q: %s", edge.Id, l.id, err)
+		return fmt.Errorf("cannot remove Edge %q from location %q: %s", edge.ID(), l.id, err)
 	}
 	l.outEdges = append(l.outEdges[:idx], l.outEdges[idx+1:]...)
 	return nil
@@ -131,11 +131,11 @@ func (l *Location) removeOutEdge(edge *LocationEdge) error {
 func (l *Location) addOutEdge(edge *LocationEdge) error {
 	_, err := l.outEdges.IndexOf(edge)
 	if err == nil {
-		return fmt.Errorf("Edge %q already present at location %q", edge.Id, l.id)
+		return fmt.Errorf("Edge %q already present at location %q", edge.ID(), l.id)
 	}
 	for _, existingEdge := range l.outEdges {
-		if existingEdge.Direction == edge.Direction {
-			return fmt.Errorf("out-Edge from location %q in direction %s already present", l.id, edge.Direction)
+		if existingEdge.Direction() == edge.Direction() {
+			return fmt.Errorf("out-Edge from location %q in direction %s already present", l.id, edge.Direction())
 		}
 	}
 	l.outEdges = append(l.outEdges, edge)

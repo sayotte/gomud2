@@ -80,7 +80,7 @@ func (a *Actor) Move(from, to *Location) error {
 	}
 	exitExists := false
 	for _, edge := range from.OutEdges() {
-		if edge.Destination == to {
+		if edge.Destination() == to {
 			exitExists = true
 			break
 		}

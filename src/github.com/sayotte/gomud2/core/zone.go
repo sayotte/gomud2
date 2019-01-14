@@ -409,7 +409,7 @@ func (z *Zone) applyLocationEdgeAddToZoneEvent(e LocationEdgeAddToZoneEvent) (*L
 	if err != nil {
 		return nil, err
 	}
-	z.edgesById[edge.Id] = edge
+	z.edgesById[edge.ID()] = edge
 	return edge, nil
 }
 

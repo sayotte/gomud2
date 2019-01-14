@@ -14,7 +14,6 @@ import (
 	"github.com/sayotte/gomud2/core"
 	"github.com/sayotte/gomud2/store"
 	"github.com/sayotte/gomud2/telnet"
-	"github.com/sayotte/gomud2/uuid"
 )
 
 const (
@@ -124,7 +123,7 @@ func initStartingWorld(worldConfigFile string) error {
 	}
 
 	edge1Prim := core.NewLocationEdge(
-		uuid.NewId(),
+		gouuid.Nil,
 		"Elm Street",
 		core.EdgeDirectionWest,
 		loc1,
@@ -139,7 +138,7 @@ func initStartingWorld(worldConfigFile string) error {
 	}
 
 	edge2Prim := core.NewLocationEdge(
-		uuid.NewId(),
+		gouuid.Nil,
 		"Elm Street",
 		core.EdgeDirectionEast,
 		loc2,
@@ -184,7 +183,7 @@ func initStartingWorld(worldConfigFile string) error {
 	}
 
 	edge3Prim := core.NewLocationEdge(
-		uuid.NewId(),
+		gouuid.Nil,
 		"in through the front door",
 		core.EdgeDirectionNorth,
 		loc2,
@@ -199,7 +198,7 @@ func initStartingWorld(worldConfigFile string) error {
 	}
 
 	edge4Prim := core.NewLocationEdge(
-		uuid.NewId(),
+		gouuid.Nil,
 		"out the front door",
 		core.EdgeDirectionSouth,
 		loc3,

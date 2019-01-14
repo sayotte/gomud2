@@ -2,8 +2,11 @@ package core
 
 import (
 	"fmt"
+
 	"github.com/satori/go.uuid"
+
 	"github.com/sayotte/gomud2/rpc"
+	myuuid "github.com/sayotte/gomud2/uuid"
 )
 
 const (
@@ -14,31 +17,59 @@ const (
 )
 
 func NewLocationEdge(id uuid.UUID, desc, direction string, src, dest *Location, zone *Zone, otherZoneID, otherLocID uuid.UUID) *LocationEdge {
+	newID := id
+	if uuid.Equal(id, uuid.Nil) {
+		newID = myuuid.NewId()
+	}
 	return &LocationEdge{
-		Id:             id,
-		Description:    desc,
-		Direction:      direction,
-		Source:         src,
-		Destination:    dest,
-		Zone:           zone,
-		OtherZoneID:    otherZoneID,
-		OtherZoneLocID: otherLocID,
+		id:             newID,
+		description:    desc,
+		direction:      direction,
+		source:         src,
+		destination:    dest,
+		zone:           zone,
+		otherZoneID:    otherZoneID,
+		otherZoneLocID: otherLocID,
 	}
 }
 
 type LocationEdge struct {
-	Id             uuid.UUID
-	Description    string // e.g. "a small door"
-	Direction      string // should become a new type, but e.g. "north" or "forward"
-	Source         *Location
-	Destination    *Location
-	Zone           *Zone
-	OtherZoneID    uuid.UUID
-	OtherZoneLocID uuid.UUID
+	id             uuid.UUID
+	description    string // e.g. "a small door"
+	direction      string // e.g. "north" or "forward"
+	source         *Location
+	destination    *Location
+	zone           *Zone
+	otherZoneID    uuid.UUID
+	otherZoneLocID uuid.UUID
 	// This is the channel where the Zone picks up new events related to this
 	// Edge. This should never be directly exposed by an accessor; public methods
 	// should create events and send them to the channel.
 	requestChan chan rpc.Request
+}
+
+func (le LocationEdge) ID() uuid.UUID {
+	return le.id
+}
+
+func (le LocationEdge) Description() string {
+	return le.description
+}
+
+func (le LocationEdge) Direction() string {
+	return le.direction
+}
+
+func (le LocationEdge) Destination() *Location {
+	return le.destination
+}
+
+func (le LocationEdge) OtherZoneID() uuid.UUID {
+	return le.otherZoneID
+}
+
+func (le LocationEdge) OtherZoneLocID() uuid.UUID {
+	return le.otherZoneLocID
 }
 
 func (le LocationEdge) syncRequestToZone(e Event) (interface{}, error) {
@@ -50,28 +81,28 @@ func (le LocationEdge) syncRequestToZone(e Event) (interface{}, error) {
 
 func (le LocationEdge) snapshot(sequenceNum uint64) Event {
 	var destID uuid.UUID
-	if le.Destination != nil {
-		destID = le.Destination.ID()
+	if le.destination != nil {
+		destID = le.destination.ID()
 	} else {
-		destID = le.OtherZoneLocID
+		destID = le.otherZoneLocID
 	}
 	e := NewLocationEdgeAddToZoneEvent(
-		le.Description,
-		le.Direction,
-		le.Id,
-		le.Source.ID(),
+		le.description,
+		le.direction,
+		le.id,
+		le.source.ID(),
 		destID,
-		le.Zone.ID(),
-		le.OtherZoneID,
+		le.zone.ID(),
+		le.otherZoneID,
 	)
 	e.SetSequenceNumber(sequenceNum)
 	return e
 }
 
 func (le LocationEdge) snapshotDependencies() []snapshottable {
-	deps := []snapshottable{le.Source}
-	if le.Destination != nil {
-		deps = append(deps, le.Destination)
+	deps := []snapshottable{le.source}
+	if le.destination != nil {
+		deps = append(deps, le.destination)
 	}
 	return deps
 }
@@ -84,7 +115,7 @@ func (lel LocationEdgeList) IndexOf(edge *LocationEdge) (int, error) {
 			return i, nil
 		}
 	}
-	return -1, fmt.Errorf("Edge %q not found in list", edge.Id)
+	return -1, fmt.Errorf("Edge %q not found in list", edge.id)
 }
 
 func (lel LocationEdgeList) Copy() LocationEdgeList {
