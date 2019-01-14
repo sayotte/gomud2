@@ -97,7 +97,7 @@ func initStartingWorld(worldConfigFile string) error {
 		Filename:       "store/events.dat",
 		UseCompression: true,
 	}
-	z := core.NewZone(eStore)
+	z := core.NewZone(gouuid.Nil, eStore)
 	z.StartEventProcessing()
 
 	shortDesc := "A nearby bar"
@@ -170,7 +170,7 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
-	z2 := core.NewZone(eStore)
+	z2 := core.NewZone(gouuid.Nil, eStore)
 	z2.StartEventProcessing()
 
 	shortDesc = "The Foxhunt Room"
@@ -190,7 +190,7 @@ func initStartingWorld(worldConfigFile string) error {
 		loc2,
 		nil,
 		z,
-		z2.Id,
+		z2.ID(),
 		loc3.ID(),
 	)
 	_, err = z.AddLocationEdge(edge3Prim)
@@ -205,7 +205,7 @@ func initStartingWorld(worldConfigFile string) error {
 		loc3,
 		nil,
 		z2,
-		z.Id,
+		z.ID(),
 		loc2.ID(),
 	)
 	_, err = z2.AddLocationEdge(edge4Prim)
@@ -215,11 +215,11 @@ func initStartingWorld(worldConfigFile string) error {
 
 	cfg := mudConfig{
 		World: worldConfig{
-			DefaultZoneID:     z.Id,
+			DefaultZoneID:     z.ID(),
 			DefaultLocationID: loc1.ID(),
 			ZonesToLoad: []gouuid.UUID{
-				z.Id,
-				z2.Id,
+				z.ID(),
+				z2.ID(),
 			},
 		},
 		Store: storeConfig{

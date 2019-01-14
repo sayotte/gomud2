@@ -61,7 +61,7 @@ func (le LocationEdge) snapshot(sequenceNum uint64) Event {
 		le.Id,
 		le.Source.ID(),
 		destID,
-		le.Zone.Id,
+		le.Zone.ID(),
 		le.OtherZoneID,
 	)
 	e.SetSequenceNumber(sequenceNum)

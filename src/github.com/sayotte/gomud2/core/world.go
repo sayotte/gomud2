@@ -50,8 +50,7 @@ func (w *World) LoadAndStart(zoneIDs []uuid.UUID, defaultZoneID, defaultLocID uu
 	}
 
 	for _, zoneID := range zoneIDs {
-		z := NewZone(nil)
-		z.Id = zoneID
+		z := NewZone(zoneID, nil)
 		err := w.AddZone(z)
 		if err != nil {
 			return err
@@ -66,7 +65,7 @@ func (w *World) LoadAndStart(zoneIDs []uuid.UUID, defaultZoneID, defaultLocID uu
 			return err
 		}
 
-		z.SetPersister(w.DataStore)
+		z.setPersister(w.DataStore)
 	}
 
 	defaultZone := w.ZoneByID(defaultZoneID)
@@ -205,8 +204,8 @@ func (w *World) MigrateActor(a *Actor, fromZone *Zone, toZoneID, toLocID uuid.UU
 	if !found {
 		return nil, fmt.Errorf("no such Zone %q", toZoneID)
 	}
-	toLoc, found := toZone.locationsById[toLocID]
-	if !found {
+	toLoc := toZone.LocationByID(toLocID)
+	if toLoc == nil {
 		return nil, fmt.Errorf("no such Location %q", toLocID)
 	}
 	cmd := worldMigrateActorCommand{
@@ -253,12 +252,12 @@ func (w *World) AddZone(z *Zone) error {
 }
 
 func (w *World) handleAddZone(z *Zone) error {
-	_, dupe := w.zonesByID[z.Id]
+	_, dupe := w.zonesByID[z.ID()]
 	if dupe {
 		return errors.New("zone already present in World")
 	}
 	w.zones = append(w.zones, z)
-	w.zonesByID[z.Id] = z
+	w.zonesByID[z.ID()] = z
 	z.setWorld(w)
 	return nil
 }
@@ -275,8 +274,8 @@ func (w *World) Zones() []*Zone {
 
 func (w *World) ActorByID(id uuid.UUID) *Actor {
 	for _, zone := range w.zones {
-		a, found := zone.actorsById[id]
-		if found {
+		a := zone.ActorByID(id)
+		if a != nil {
 			return a
 		}
 	}
@@ -296,15 +295,14 @@ func (w *World) handleSnapshot() error {
 	}
 	zoneIDToSeqNum := make(map[uuid.UUID]uint64)
 	for _, zone := range w.zones {
-		zoneIDToSeqNum[zone.Id] = zone.nextSequenceId - 1
+		zoneIDToSeqNum[zone.ID()] = zone.LastSequenceNum()
 		// restart processing events for each zone after getting its current
 		// sequence number
 		zone.StartEventProcessing()
 	}
 
 	for zoneId, seqNum := range zoneIDToSeqNum {
-		zone := NewZone(nil)
-		zone.Id = zoneId
+		zone := NewZone(zoneId, nil)
 		eChan, err := w.DataStore.RetrieveUpToSequenceNumsForZone(seqNum, zoneId)
 		if err != nil {
 			return err

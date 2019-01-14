@@ -92,7 +92,7 @@ func (a *Actor) Move(from, to *Location) error {
 		from.ID(),
 		to.ID(),
 		a.id,
-		a.zone.Id,
+		a.zone.ID(),
 	)
 	_, err := a.syncRequestToZone(e)
 
@@ -123,7 +123,7 @@ func (a Actor) snapshot(sequenceNum uint64) Event {
 		a.Name(),
 		a.id,
 		a.location.ID(),
-		a.zone.Id,
+		a.zone.ID(),
 	)
 	e.SetSequenceNumber(sequenceNum)
 	return e

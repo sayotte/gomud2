@@ -10,9 +10,13 @@ import (
 	"time"
 )
 
-func NewZone(persister EventPersister) *Zone {
+func NewZone(id uuid.UUID, persister EventPersister) *Zone {
+	newID := id
+	if uuid.Equal(id, uuid.Nil) {
+		newID = myuuid.NewId()
+	}
 	return &Zone{
-		Id:            myuuid.NewId(),
+		id:            newID,
 		actorsById:    make(map[uuid.UUID]*Actor),
 		locationsById: make(map[uuid.UUID]*Location),
 		edgesById:     make(map[uuid.UUID]*LocationEdge),
@@ -22,7 +26,7 @@ func NewZone(persister EventPersister) *Zone {
 }
 
 type Zone struct {
-	Id             uuid.UUID
+	id             uuid.UUID
 	world          *World
 	nextSequenceId uint64
 	actorsById     map[uuid.UUID]*Actor
@@ -38,7 +42,11 @@ type Zone struct {
 	persister           EventPersister
 }
 
-func (z *Zone) SetPersister(ep EventPersister) {
+func (z *Zone) ID() uuid.UUID {
+	return z.id
+}
+
+func (z *Zone) setPersister(ep EventPersister) {
 	z.persister = ep
 }
 
@@ -306,7 +314,7 @@ func (z *Zone) applyActorAddToZoneEvent(e ActorAddToZoneEvent) (*Actor, error) {
 }
 
 func (z *Zone) RemoveActor(a *Actor) error {
-	remEvent := NewActorRemoveFromZoneEvent(a.ID(), z.Id)
+	remEvent := NewActorRemoveFromZoneEvent(a.ID(), z.id)
 	_, err := z.syncRequestToSelf(remEvent)
 	return err
 }

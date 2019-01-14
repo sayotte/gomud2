@@ -40,7 +40,7 @@ func (o *Object) Move(from, to *Location) error {
 		from.ID(),
 		to.ID(),
 		o.Id,
-		o.Zone.Id,
+		o.Zone.ID(),
 	)
 	_, err := o.syncRequestToZone(e)
 	return err
@@ -58,7 +58,7 @@ func (o Object) snapshot(sequenceNum uint64) Event {
 		o.Name,
 		o.Id,
 		o.Location.ID(),
-		o.Zone.Id,
+		o.Zone.ID(),
 	)
 	e.SetSequenceNumber(sequenceNum)
 	return e

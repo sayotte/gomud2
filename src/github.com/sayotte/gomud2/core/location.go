@@ -158,7 +158,7 @@ func (l Location) snapshot(sequenceNum uint64) Event {
 		l.shortDescription,
 		l.description,
 		l.id,
-		l.zone.Id,
+		l.zone.ID(),
 	)
 	e.SetSequenceNumber(sequenceNum)
 	return e
