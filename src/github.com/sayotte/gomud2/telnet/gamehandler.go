@@ -103,7 +103,7 @@ func (gh *gameHandler) lookAtLocation(terminalWidth int, loc *core.Location) []b
 	if len(objects) > 0 {
 		objClause = "\nLaying on the ground, you see:\n"
 		for _, obj := range loc.Objects() {
-			objClause += fmt.Sprintf("%s\n", obj.Name)
+			objClause += fmt.Sprintf("%s\n", obj.Name())
 		}
 	}
 

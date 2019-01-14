@@ -436,7 +436,7 @@ func (z *Zone) applyObjectAddToZoneEvent(e ObjectAddToZoneEvent) (*Object, error
 		return nil, err
 	}
 	obj.setLocation(newLoc)
-	z.objectsById[obj.Id] = obj
+	z.objectsById[obj.ID()] = obj
 
 	z.sendEventToObservers(e, newLoc.Observers())
 

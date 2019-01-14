@@ -100,7 +100,7 @@ func (l Location) Objects() ObjectList {
 func (l *Location) removeObject(object *Object) error {
 	idx, err := l.objects.IndexOf(object)
 	if err != nil {
-		return fmt.Errorf("cannot remove Object %q from location %q", object.Id, l.id)
+		return fmt.Errorf("cannot remove Object %q from location %q", object.ID(), l.id)
 	}
 	l.objects = append(l.objects[:idx], l.objects[idx+1:]...)
 	return nil
@@ -109,7 +109,7 @@ func (l *Location) removeObject(object *Object) error {
 func (l *Location) addObject(object *Object) error {
 	_, err := l.objects.IndexOf(object)
 	if err == nil {
-		return fmt.Errorf("Object %q already present at location %q", object.Id, l.id)
+		return fmt.Errorf("Object %q already present at location %q", object.ID(), l.id)
 	}
 	l.objects = append(l.objects, object)
 	return nil

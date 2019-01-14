@@ -2,45 +2,60 @@ package core
 
 import (
 	"fmt"
+
 	"github.com/satori/go.uuid"
+
 	"github.com/sayotte/gomud2/rpc"
+	myuuid "github.com/sayotte/gomud2/uuid"
 )
 
 func NewObject(id uuid.UUID, name string, loc *Location, zone *Zone) *Object {
+	newID := id
+	if uuid.Equal(id, uuid.Nil) {
+		newID = myuuid.NewId()
+	}
 	return &Object{
-		Id:          id,
-		Name:        name,
-		Location:    loc,
-		Zone:        zone,
+		id:          newID,
+		name:        name,
+		location:    loc,
+		zone:        zone,
 		requestChan: make(chan rpc.Request),
 	}
 }
 
 type Object struct {
-	Id       uuid.UUID
-	Name     string
-	Location *Location
-	Zone     *Zone
+	id       uuid.UUID
+	name     string
+	location *Location
+	zone     *Zone
 	// This is the channel where the Zone picks up new events related to this
 	// Object. This should never be directly exposed by an accessor; public methods
 	// should create events and send them to the channel.
 	requestChan chan rpc.Request
 }
 
+func (o Object) ID() uuid.UUID {
+	return o.id
+}
+
+func (o Object) Name() string {
+	return o.name
+}
+
 func (o *Object) setLocation(loc *Location) {
-	o.Location = loc
+	o.location = loc
 }
 
 func (o *Object) Move(from, to *Location) error {
-	fmt.Printf("object %q, moving from %q to %q\n", o.Name, from.ShortDescription(), to.ShortDescription())
+	fmt.Printf("object %q, moving from %q to %q\n", o.name, from.ShortDescription(), to.ShortDescription())
 	if from.Zone() != to.Zone() {
 		return fmt.Errorf("cross-zone moves not yet supported")
 	}
 	e := NewObjectMoveEvent(
 		from.ID(),
 		to.ID(),
-		o.Id,
-		o.Zone.ID(),
+		o.id,
+		o.zone.ID(),
 	)
 	_, err := o.syncRequestToZone(e)
 	return err
@@ -55,17 +70,17 @@ func (o *Object) syncRequestToZone(e Event) (interface{}, error) {
 
 func (o Object) snapshot(sequenceNum uint64) Event {
 	e := NewObjectAddToZoneEvent(
-		o.Name,
-		o.Id,
-		o.Location.ID(),
-		o.Zone.ID(),
+		o.name,
+		o.id,
+		o.location.ID(),
+		o.zone.ID(),
 	)
 	e.SetSequenceNumber(sequenceNum)
 	return e
 }
 
 func (o Object) snapshotDependencies() []snapshottable {
-	return []snapshottable{o.Location}
+	return []snapshottable{o.location}
 }
 
 type ObjectList []*Object
@@ -76,7 +91,7 @@ func (ol ObjectList) IndexOf(obj *Object) (int, error) {
 			return i, nil
 		}
 	}
-	return -1, fmt.Errorf("Object %q not found in list", obj.Id)
+	return -1, fmt.Errorf("Object %q not found in list", obj.id)
 }
 
 func (ol ObjectList) Copy() ObjectList {
