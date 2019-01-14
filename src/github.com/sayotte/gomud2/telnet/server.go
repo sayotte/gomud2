@@ -16,6 +16,11 @@ type AuthService interface {
 	AddActorIDToAccountID(acctID, actorID uuid.UUID) error
 }
 
+const (
+	DefaultListenPort      = 4000
+	DefaultMessageQueueLen = 15
+)
+
 type Server struct {
 	ListenIP        string
 	ListenPort      int

@@ -16,11 +16,6 @@ import (
 	"github.com/sayotte/gomud2/telnet"
 )
 
-const (
-	TelnetServerEventQueueLen      = 15
-	WebsocketServerMessageQueueLen = 15
-)
-
 var version string
 
 type cliArgs struct {
@@ -81,7 +76,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = runWorld(world)
+	err = runWorld(world, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -227,11 +222,17 @@ func initStartingWorld(worldConfigFile string) error {
 			EventsFile:        "store/events.dat",
 			UseCompression:    true,
 		},
+		Telnet: telnetConfig{
+			ListenPort: telnet.DefaultListenPort,
+		},
+		WSAPI: wsAPIConfig{
+			ListenAddr: wsapi.DefaultListenAddr,
+		},
 	}
 	return cfg.SerializeToFile(worldConfigFile)
 }
 
-func runWorld(world *core.World) error {
+func runWorld(world *core.World, cfg mudConfig) error {
 	authServer := &auth.Server{
 		AccountDatabaseFile: "auth.db",
 	}
@@ -241,8 +242,8 @@ func runWorld(world *core.World) error {
 	}
 
 	telnetServer := telnet.Server{
-		ListenPort:      4000,
-		MessageQueueLen: TelnetServerEventQueueLen,
+		ListenPort:      cfg.Telnet.ListenPort,
+		MessageQueueLen: telnet.DefaultMessageQueueLen,
 		AuthService:     authServer,
 		World:           world,
 	}
@@ -252,9 +253,10 @@ func runWorld(world *core.World) error {
 	}
 
 	apiServer := wsapi.Server{
-		AuthService:      authServer,
-		ListenAddrString: ":4001",
-		World:            world,
+		ListenAddrString:    cfg.WSAPI.ListenAddr,
+		AuthService:         authServer,
+		MessageSendQueueLen: wsapi.DefaultMessageSendQueueLen,
+		World:               world,
 	}
 	err = apiServer.Start()
 	if err != nil {

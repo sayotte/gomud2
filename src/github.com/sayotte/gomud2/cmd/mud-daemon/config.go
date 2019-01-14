@@ -8,8 +8,10 @@ import (
 )
 
 type mudConfig struct {
-	World worldConfig `yaml:"world"`
-	Store storeConfig `yaml:"store"`
+	World  worldConfig  `yaml:"world"`
+	Store  storeConfig  `yaml:"store"`
+	Telnet telnetConfig `yaml:"telnet"`
+	WSAPI  wsAPIConfig  `yaml:"wsAPI"`
 }
 
 type worldConfig struct {
@@ -23,6 +25,14 @@ type storeConfig struct {
 	SnapshotDirectory string `yaml:"snapshotDirectory"`
 	IntentLogfile     string `yaml:"intentLogfile"`
 	EventsFile        string `yaml:"eventsFile"`
+}
+
+type telnetConfig struct {
+	ListenPort int `yaml:"listenPort"`
+}
+
+type wsAPIConfig struct {
+	ListenAddr string `yaml:"listenAddr"`
 }
 
 func (mc mudConfig) SerializeToFile(filename string) error {

@@ -15,7 +15,10 @@ type AuthService interface {
 	GetActorIDsForAccountID(accountID uuid.UUID) []uuid.UUID
 }
 
-const DefaultMessageSendQueueLen = 15
+const (
+	DefaultMessageSendQueueLen = 15
+	DefaultListenAddr          = ":4001"
+)
 
 type Server struct {
 	ListenAddrString    string
@@ -36,6 +39,9 @@ func (s *Server) Start() error {
 
 	if s.MessageSendQueueLen == 0 {
 		s.MessageSendQueueLen = DefaultMessageSendQueueLen
+	}
+	if s.ListenAddrString == "" {
+		s.ListenAddrString = DefaultListenAddr
 	}
 	s.httpServer = &http.Server{
 		Addr:    s.ListenAddrString,
