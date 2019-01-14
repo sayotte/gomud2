@@ -297,7 +297,7 @@ func (z *Zone) applyActorAddToZoneEvent(e ActorAddToZoneEvent) (*Actor, error) {
 		return nil, err
 	}
 	actor.setLocation(newLoc)
-	z.actorsById[actor.id] = actor
+	z.actorsById[actor.ID()] = actor
 
 	oList := newLoc.Observers()
 	z.sendEventToObservers(e, oList)
@@ -306,7 +306,7 @@ func (z *Zone) applyActorAddToZoneEvent(e ActorAddToZoneEvent) (*Actor, error) {
 }
 
 func (z *Zone) RemoveActor(a *Actor) error {
-	remEvent := NewActorRemoveFromZoneEvent(a.id, z.Id)
+	remEvent := NewActorRemoveFromZoneEvent(a.ID(), z.Id)
 	_, err := z.syncRequestToSelf(remEvent)
 	return err
 }

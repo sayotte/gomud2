@@ -195,8 +195,8 @@ func (w *World) AddActor(a *Actor) (*Actor, error) {
 }
 
 func (w *World) handleAddActor(a *Actor) (*Actor, error) {
-	a.location = w.frontDoorLocation
-	a.zone = w.frontDoorZone
+	a.setLocation(w.frontDoorLocation)
+	a.setZone(w.frontDoorZone)
 	return w.frontDoorZone.AddActor(a)
 }
 
@@ -234,8 +234,8 @@ func (w *World) handleMigrateActor(a *Actor, fromZone, toZone *Zone, toLoc *Loca
 	if err != nil {
 		return nil, err
 	}
-	a.location = toLoc
-	a.zone = toZone
+	a.setLocation(toLoc)
+	a.setZone(toZone)
 	newActor, err := toZone.MigrateInActor(a, o)
 	if err != nil {
 		return nil, err

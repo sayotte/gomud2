@@ -44,7 +44,7 @@ func (a *Actor) ID() uuid.UUID {
 func (a *Actor) Observers() []Observer {
 	a.rwlock.RLock()
 	defer a.rwlock.RUnlock()
-	return a.observers
+	return a.observers.Copy()
 }
 
 func (a *Actor) AddObserver(o Observer) {
