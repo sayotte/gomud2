@@ -3,13 +3,13 @@ package store
 import (
 	"fmt"
 	"github.com/satori/go.uuid"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 	myuuid "github.com/sayotte/gomud2/uuid"
 	"testing"
 )
 
 func TestLocationEdgeAddToZoneEvent_roundtrip(t *testing.T) {
-	cmpDomainLeatze := func(left, right domain.LocationEdgeAddToZoneEvent) (bool, string) {
+	cmpDomainLeatze := func(left, right core.LocationEdgeAddToZoneEvent) (bool, string) {
 		if left.Type() != right.Type() {
 			return false, fmt.Sprintf("Type(): %d != %d", left.Type(), right.Type())
 		}
@@ -48,7 +48,7 @@ func TestLocationEdgeAddToZoneEvent_roundtrip(t *testing.T) {
 		return true, ""
 	}
 
-	inEvent := domain.NewLocationEdgeAddToZoneEvent(
+	inEvent := core.NewLocationEdgeAddToZoneEvent(
 		"desc",
 		"direction",
 		myuuid.NewId(),
@@ -63,7 +63,7 @@ func TestLocationEdgeAddToZoneEvent_roundtrip(t *testing.T) {
 	leatze.FromDomain(inEvent)
 	outEvent := leatze.ToDomain()
 
-	same, why := cmpDomainLeatze(inEvent, outEvent.(domain.LocationEdgeAddToZoneEvent))
+	same, why := cmpDomainLeatze(inEvent, outEvent.(core.LocationEdgeAddToZoneEvent))
 	if !same {
 		t.Error(why)
 	}

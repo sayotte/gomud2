@@ -6,7 +6,7 @@ import (
 
 	"github.com/satori/go.uuid"
 
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 )
 
 const (
@@ -27,10 +27,10 @@ type Event struct {
 }
 
 type populateFromDomainer interface {
-	populateFromDomain(e domain.Event)
+	populateFromDomain(e core.Event)
 }
 
-func eventFromDomainEvent(from domain.Event) (Event, error) {
+func eventFromDomainEvent(from core.Event) (Event, error) {
 	var e Event
 	var frommer populateFromDomainer
 
@@ -41,19 +41,19 @@ func eventFromDomainEvent(from domain.Event) (Event, error) {
 	e.Version = from.Version()
 
 	switch from.Type() {
-	case domain.EventTypeActorMove:
+	case core.EventTypeActorMove:
 		e.EventType = EventTypeActorMove
 		frommer = &ActorMoveEventBody{}
-	case domain.EventTypeActorAddToZone:
+	case core.EventTypeActorAddToZone:
 		e.EventType = EventTypeActorAddToZone
 		frommer = &ActorAddToZoneEventBody{}
-	case domain.EventTypeActorRemoveFromZone:
+	case core.EventTypeActorRemoveFromZone:
 		e.EventType = EventTypeActorRemoveFromZone
 		frommer = &ActorRemoveFromZoneEventBody{}
-	case domain.EventTypeObjectAddToZone:
+	case core.EventTypeObjectAddToZone:
 		e.EventType = EventTypeObjectAddToZone
 		frommer = &ObjectAddToZoneEventBody{}
-	case domain.EventTypeObjectMove:
+	case core.EventTypeObjectMove:
 		e.EventType = EventTypeObjectMove
 		frommer = &ObjectMoveEventBody{}
 	default:
@@ -76,8 +76,8 @@ type ActorMoveEventBody struct {
 	ActorID        uuid.UUID `json:"actorID"`
 }
 
-func (ameb *ActorMoveEventBody) populateFromDomain(e domain.Event) {
-	typedEvent := e.(*domain.ActorMoveEvent)
+func (ameb *ActorMoveEventBody) populateFromDomain(e core.Event) {
+	typedEvent := e.(*core.ActorMoveEvent)
 	ameb.FromLocationID, ameb.ToLocationID, ameb.ActorID = typedEvent.FromToActorIDs()
 }
 
@@ -87,8 +87,8 @@ type ActorAddToZoneEventBody struct {
 	StartingLocationID uuid.UUID `json:"startingLocationID"`
 }
 
-func (aatzeb *ActorAddToZoneEventBody) populateFromDomain(e domain.Event) {
-	typedEvent := e.(domain.ActorAddToZoneEvent)
+func (aatzeb *ActorAddToZoneEventBody) populateFromDomain(e core.Event) {
+	typedEvent := e.(core.ActorAddToZoneEvent)
 	aatzeb.ActorID = typedEvent.ActorID()
 	aatzeb.Name = typedEvent.Name()
 	aatzeb.StartingLocationID = typedEvent.StartingLocationID()
@@ -98,8 +98,8 @@ type ActorRemoveFromZoneEventBody struct {
 	ActorID uuid.UUID `json:"actorID"`
 }
 
-func (arfzeb *ActorRemoveFromZoneEventBody) populateFromDomain(e domain.Event) {
-	typedEvent := e.(domain.ActorRemoveFromZoneEvent)
+func (arfzeb *ActorRemoveFromZoneEventBody) populateFromDomain(e core.Event) {
+	typedEvent := e.(core.ActorRemoveFromZoneEvent)
 	arfzeb.ActorID = typedEvent.ActorID()
 }
 
@@ -109,8 +109,8 @@ type ObjectAddToZoneEventBody struct {
 	StartingLocationID uuid.UUID `json:"startingLocationID"`
 }
 
-func (oatzeb *ObjectAddToZoneEventBody) populateFromDomain(e domain.Event) {
-	typedEvent := e.(domain.ObjectAddToZoneEvent)
+func (oatzeb *ObjectAddToZoneEventBody) populateFromDomain(e core.Event) {
+	typedEvent := e.(core.ObjectAddToZoneEvent)
 	oatzeb.ObjectID = typedEvent.ObjectID()
 	oatzeb.Name = typedEvent.Name()
 	oatzeb.StartingLocationID = typedEvent.StartingLocationID()
@@ -122,8 +122,8 @@ type ObjectMoveEventBody struct {
 	ObjectID       uuid.UUID `json:"objectID"`
 }
 
-func (omeb *ObjectMoveEventBody) populateFromDomain(e domain.Event) {
-	typedEvent := e.(domain.ObjectMoveEvent)
+func (omeb *ObjectMoveEventBody) populateFromDomain(e core.Event) {
+	typedEvent := e.(core.ObjectMoveEvent)
 	omeb.FromLocationID = typedEvent.FromLocationID()
 	omeb.ToLocationID = typedEvent.ToLocationID()
 	omeb.ObjectID = typedEvent.ObjectID()

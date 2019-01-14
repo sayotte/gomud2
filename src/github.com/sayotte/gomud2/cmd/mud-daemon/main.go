@@ -11,7 +11,7 @@ import (
 	gouuid "github.com/satori/go.uuid"
 
 	"github.com/sayotte/gomud2/auth"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 	"github.com/sayotte/gomud2/store"
 	"github.com/sayotte/gomud2/telnet"
 	"github.com/sayotte/gomud2/uuid"
@@ -68,7 +68,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	world := domain.NewWorld()
+	world := core.NewWorld()
 	world.DataStore = &store.EventStore{
 		Filename:          cfg.Store.EventsFile,
 		UseCompression:    cfg.Store.UseCompression,
@@ -97,7 +97,7 @@ func initStartingWorld(worldConfigFile string) error {
 		Filename:       "store/events.dat",
 		UseCompression: true,
 	}
-	z := domain.NewZone(eStore)
+	z := core.NewZone(eStore)
 	z.StartEventProcessing()
 
 	shortDesc := "A nearby bar"
@@ -106,7 +106,7 @@ func initStartingWorld(worldConfigFile string) error {
 	longDesc += "at the bar looking desperate to talk to somebody, another at the far end of the bar "
 	longDesc += "who appears to be an off-duty cook trying to avoid conversation with anyone, and "
 	longDesc += "a female bartender who was probably crazy-hot 15 years ago but is now just crazy."
-	loc1Prim := domain.NewLocation(z, shortDesc, longDesc)
+	loc1Prim := core.NewLocation(z, shortDesc, longDesc)
 	loc1, err := z.AddLocation(loc1Prim)
 	if err != nil {
 		panic(err)
@@ -117,16 +117,16 @@ func initStartingWorld(worldConfigFile string) error {
 	longDesc += "slope, this house's cute blue shutters and the whimsical "
 	longDesc += "flamingoes in the yard give off a cheerful, playful sense "
 	longDesc += "of welcoming."
-	loc2Prim := domain.NewLocation(z, shortDesc, longDesc)
+	loc2Prim := core.NewLocation(z, shortDesc, longDesc)
 	loc2, err := z.AddLocation(loc2Prim)
 	if err != nil {
 		panic(err)
 	}
 
-	edge1Prim := domain.NewLocationEdge(
+	edge1Prim := core.NewLocationEdge(
 		uuid.NewId(),
 		"Elm Street",
-		domain.EdgeDirectionWest,
+		core.EdgeDirectionWest,
 		loc1,
 		loc2,
 		z,
@@ -138,10 +138,10 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
-	edge2Prim := domain.NewLocationEdge(
+	edge2Prim := core.NewLocationEdge(
 		uuid.NewId(),
 		"Elm Street",
-		domain.EdgeDirectionEast,
+		core.EdgeDirectionEast,
 		loc2,
 		loc1,
 		z,
@@ -153,13 +153,13 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
-	actorPrim := domain.NewActor("A man", loc1, z)
+	actorPrim := core.NewActor("A man", loc1, z)
 	_, err = z.AddActor(actorPrim)
 	if err != nil {
 		panic(err)
 	}
 
-	objPrim := domain.NewObject(
+	objPrim := core.NewObject(
 		uuid.NewId(),
 		"a crumpled up napkin",
 		loc1,
@@ -170,23 +170,23 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
-	z2 := domain.NewZone(eStore)
+	z2 := core.NewZone(eStore)
 	z2.StartEventProcessing()
 
 	shortDesc = "The Foxhunt Room"
 	longDesc = "A small room with wood paneled walls, standing here you "
 	longDesc += "feel as though you be sitting, sipping tea and making "
 	longDesc += "conversation with friends."
-	loc3Prim := domain.NewLocation(z2, shortDesc, longDesc)
+	loc3Prim := core.NewLocation(z2, shortDesc, longDesc)
 	loc3, err := z2.AddLocation(loc3Prim)
 	if err != nil {
 		panic(err)
 	}
 
-	edge3Prim := domain.NewLocationEdge(
+	edge3Prim := core.NewLocationEdge(
 		uuid.NewId(),
 		"in through the front door",
-		domain.EdgeDirectionNorth,
+		core.EdgeDirectionNorth,
 		loc2,
 		nil,
 		z,
@@ -198,10 +198,10 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
-	edge4Prim := domain.NewLocationEdge(
+	edge4Prim := core.NewLocationEdge(
 		uuid.NewId(),
 		"out the front door",
-		domain.EdgeDirectionSouth,
+		core.EdgeDirectionSouth,
 		loc3,
 		nil,
 		z2,
@@ -232,7 +232,7 @@ func initStartingWorld(worldConfigFile string) error {
 	return cfg.SerializeToFile(worldConfigFile)
 }
 
-func runWorld(world *domain.World) error {
+func runWorld(world *core.World) error {
 	authServer := &auth.Server{
 		AccountDatabaseFile: "auth.db",
 	}

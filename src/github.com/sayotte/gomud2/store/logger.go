@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/satori/go.uuid"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 	uuid2 "github.com/sayotte/gomud2/uuid"
 	"io"
 	"io/ioutil"
@@ -58,7 +58,7 @@ type IntentLogger struct {
 // WriteIntent writes the given redo/undo content to the log, and returns
 // an ID for that entry which must later be passed to ConfirmIntentCompletion()
 // to mark the entry as completed.
-func (il IntentLogger) WriteIntent(redo, undo []domain.Event) (uuid.UUID, error) {
+func (il IntentLogger) WriteIntent(redo, undo []core.Event) (uuid.UUID, error) {
 	if il.fd == nil {
 		return uuid.Nil, errors.New("IntentLogger.WriteIntent on non-open IntentLogger")
 	}
@@ -128,7 +128,7 @@ func (il IntentLogger) writeEntry(le logEntry) error {
 // not return an error, it writes a new completion-marker to the log to prevent
 // the same entry from being handled if IntentLogger.Open() is called multiple times
 // on the same logfile.
-func (il *IntentLogger) Open(handler func(redo, undo []domain.Event) error) error {
+func (il *IntentLogger) Open(handler func(redo, undo []core.Event) error) error {
 	if il.fd != nil {
 		return errors.New("IntentLogger.Open() on already-open IntentLogger")
 	}
@@ -187,7 +187,7 @@ func (il *IntentLogger) Open(handler func(redo, undo []domain.Event) error) erro
 		if handler == nil {
 			return errors.New("IntentLogger.Open() needs to call handler, but handler is nil")
 		}
-		var redoEvents []domain.Event
+		var redoEvents []core.Event
 		redoBuf := bytes.NewBuffer(we.RedoContent)
 		for {
 			newRedo, err := readEvent(redoBuf)
@@ -199,7 +199,7 @@ func (il *IntentLogger) Open(handler func(redo, undo []domain.Event) error) erro
 			}
 			redoEvents = append(redoEvents, newRedo)
 		}
-		var undoEvents []domain.Event
+		var undoEvents []core.Event
 		undoBuf := bytes.NewBuffer(we.UndoContent)
 		for {
 			newRedo, err := readEvent(undoBuf)

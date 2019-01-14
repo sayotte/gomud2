@@ -6,7 +6,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/satori/go.uuid"
 	"github.com/sayotte/gomud2/auth"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 	"net/http"
 )
 
@@ -21,7 +21,7 @@ type Server struct {
 	ListenAddrString    string
 	AuthService         AuthService
 	MessageSendQueueLen int
-	World               *domain.World
+	World               *core.World
 	httpServer          *http.Server
 	upgrader            *websocket.Upgrader
 }

@@ -2,7 +2,7 @@ package store
 
 import (
 	"github.com/satori/go.uuid"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 )
 
 type objectAddToZoneEvent struct {
@@ -12,8 +12,8 @@ type objectAddToZoneEvent struct {
 	StartingLocationId uuid.UUID
 }
 
-func (oatze *objectAddToZoneEvent) FromDomain(e domain.Event) {
-	from := e.(domain.ObjectAddToZoneEvent)
+func (oatze *objectAddToZoneEvent) FromDomain(e core.Event) {
+	from := e.(core.ObjectAddToZoneEvent)
 	*oatze = objectAddToZoneEvent{
 		header: eventHeader{
 			EventType:      from.Type(),
@@ -27,8 +27,8 @@ func (oatze *objectAddToZoneEvent) FromDomain(e domain.Event) {
 	}
 }
 
-func (oatze objectAddToZoneEvent) ToDomain() domain.Event {
-	e := domain.NewObjectAddToZoneEvent(
+func (oatze objectAddToZoneEvent) ToDomain() core.Event {
+	e := core.NewObjectAddToZoneEvent(
 		oatze.Name,
 		oatze.ObjectId,
 		oatze.StartingLocationId,
@@ -53,8 +53,8 @@ type objectMoveEvent struct {
 	ObjectID       uuid.UUID
 }
 
-func (ome *objectMoveEvent) FromDomain(e domain.Event) {
-	from := e.(domain.ObjectMoveEvent)
+func (ome *objectMoveEvent) FromDomain(e core.Event) {
+	from := e.(core.ObjectMoveEvent)
 	*ome = objectMoveEvent{
 		header:         eventHeaderFromDomainEvent(from),
 		FromLocationId: from.FromLocationID(),
@@ -63,8 +63,8 @@ func (ome *objectMoveEvent) FromDomain(e domain.Event) {
 	}
 }
 
-func (ome objectMoveEvent) ToDomain() domain.Event {
-	e := domain.NewObjectMoveEvent(
+func (ome objectMoveEvent) ToDomain() core.Event {
+	e := core.NewObjectMoveEvent(
 		ome.FromLocationId,
 		ome.ToLocationID,
 		ome.ObjectID,

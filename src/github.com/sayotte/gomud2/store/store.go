@@ -3,7 +3,7 @@ package store
 import (
 	"fmt"
 	"github.com/satori/go.uuid"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 	"github.com/sayotte/gomud2/rpc"
 	"io"
 	"io/ioutil"
@@ -21,7 +21,7 @@ type EventStore struct {
 	outStream         io.Writer
 }
 
-func (es *EventStore) PersistEvent(e domain.Event) error {
+func (es *EventStore) PersistEvent(e core.Event) error {
 	if es.outStream == nil {
 		dir := filepath.Dir(es.Filename)
 		if !pathExists(dir) {
@@ -117,7 +117,7 @@ func (es *EventStore) RetrieveUpToSequenceNumsForZone(endNum uint64, zoneID uuid
 				close(outChan)
 				return
 			}
-			e := res.Value.(domain.Event)
+			e := res.Value.(core.Event)
 			if e.AggregateId() != zoneID {
 				continue
 			}
@@ -135,7 +135,7 @@ func (es *EventStore) RetrieveUpToSequenceNumsForZone(endNum uint64, zoneID uuid
 	return retChan, nil
 }
 
-func (es *EventStore) PersistSnapshot(zoneID uuid.UUID, seqNum uint64, snapEvents []domain.Event) error {
+func (es *EventStore) PersistSnapshot(zoneID uuid.UUID, seqNum uint64, snapEvents []core.Event) error {
 	if _, err := os.Stat(es.SnapshotDirectory); os.IsNotExist(err) {
 		err = os.MkdirAll(es.SnapshotDirectory, 0755)
 		if err != nil {

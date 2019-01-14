@@ -10,7 +10,7 @@ import (
 
 	"github.com/sayotte/gomud2/auth"
 	"github.com/sayotte/gomud2/commands"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 )
 
 type session struct {
@@ -20,7 +20,7 @@ type session struct {
 	accountID   uuid.UUID
 	authZDesc   *auth.AuthZDescriptor
 
-	eventChan    chan domain.Event
+	eventChan    chan core.Event
 	sendChan     chan []byte
 	sendQueueLen int
 	receiveChan  chan Message
@@ -28,14 +28,14 @@ type session struct {
 	stopWG       *sync.WaitGroup
 	stopOnce     *sync.Once
 
-	world *domain.World
-	actor *domain.Actor
+	world *core.World
+	actor *core.Actor
 }
 
 func (s *session) start() {
 	s.stopOnce = &sync.Once{}
 	s.stopChan = make(chan struct{})
-	s.eventChan = make(chan domain.Event, s.sendQueueLen)
+	s.eventChan = make(chan core.Event, s.sendQueueLen)
 	s.sendChan = make(chan []byte, s.sendQueueLen)
 	s.receiveChan = make(chan Message)
 	go s.receiveLoop()
@@ -62,7 +62,7 @@ func (s *session) stop() {
 }
 
 // SendEvent implements the domain.Observer interface
-func (s *session) SendEvent(e domain.Event) {
+func (s *session) SendEvent(e core.Event) {
 	s.eventChan <- e
 }
 

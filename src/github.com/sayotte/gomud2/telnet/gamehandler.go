@@ -6,7 +6,7 @@ import (
 	"github.com/mitchellh/go-wordwrap"
 	"github.com/sayotte/gomud2/auth"
 	"github.com/sayotte/gomud2/commands"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 	"sort"
 	"strings"
 )
@@ -17,8 +17,8 @@ type gameHandler struct {
 	authZDesc *auth.AuthZDescriptor
 	session   *session
 
-	actor *domain.Actor
-	world *domain.World
+	actor *core.Actor
+	world *core.World
 
 	cmdTrie *trie.Trie
 }
@@ -32,26 +32,26 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 		return gh.handleCommandLook(terminalWidth)
 	}))
 
-	gh.cmdTrie.Add(domain.EdgeDirectionNorth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
-		return gh.handleCommandMoveGeneric(terminalWidth, domain.EdgeDirectionNorth)
+	gh.cmdTrie.Add(core.EdgeDirectionNorth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
+		return gh.handleCommandMoveGeneric(terminalWidth, core.EdgeDirectionNorth)
 	}))
-	gh.cmdTrie.Add(domain.EdgeDirectionSouth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
-		return gh.handleCommandMoveGeneric(terminalWidth, domain.EdgeDirectionSouth)
+	gh.cmdTrie.Add(core.EdgeDirectionSouth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
+		return gh.handleCommandMoveGeneric(terminalWidth, core.EdgeDirectionSouth)
 	}))
-	gh.cmdTrie.Add(domain.EdgeDirectionEast, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
-		return gh.handleCommandMoveGeneric(terminalWidth, domain.EdgeDirectionEast)
+	gh.cmdTrie.Add(core.EdgeDirectionEast, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
+		return gh.handleCommandMoveGeneric(terminalWidth, core.EdgeDirectionEast)
 	}))
-	gh.cmdTrie.Add(domain.EdgeDirectionWest, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
-		return gh.handleCommandMoveGeneric(terminalWidth, domain.EdgeDirectionWest)
+	gh.cmdTrie.Add(core.EdgeDirectionWest, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
+		return gh.handleCommandMoveGeneric(terminalWidth, core.EdgeDirectionWest)
 	}))
 
 	return gh.lookAtLocation(terminalWidth, gh.actor.Location())
 }
 
-func (gh *gameHandler) handleEvent(e domain.Event, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+func (gh *gameHandler) handleEvent(e core.Event, terminalWidth, terminalHeight int) ([]byte, handler, error) {
 	switch e.Type() {
-	case domain.EventTypeActorMove:
-		typedE := e.(*domain.ActorMoveEvent)
+	case core.EventTypeActorMove:
+		typedE := e.(*core.ActorMoveEvent)
 		out, err := gh.handleEventActorMove(terminalWidth, typedE)
 		return out, gh, err
 	default:
@@ -87,7 +87,7 @@ func (gh *gameHandler) handleCommandLook(terminalWidth int) ([]byte, error) {
 	return gh.lookAtLocation(terminalWidth, gh.actor.Location()), nil
 }
 
-func (gh *gameHandler) lookAtLocation(terminalWidth int, loc *domain.Location) []byte {
+func (gh *gameHandler) lookAtLocation(terminalWidth int, loc *core.Location) []byte {
 	// short location description
 	// long location description
 	//
@@ -123,7 +123,7 @@ func (gh *gameHandler) lookAtLocation(terminalWidth int, loc *domain.Location) [
 	edges := loc.OutEdges
 	if len(edges) > 0 {
 		exitClause = "\nObvious exits:\n"
-		exitMap := make(map[string]*domain.LocationEdge)
+		exitMap := make(map[string]*core.LocationEdge)
 		for _, edge := range edges {
 			exitMap[edge.Direction] = edge
 		}
@@ -194,7 +194,7 @@ func (gh *gameHandler) handleCommandMoveGeneric(terminalWidth int, direction str
 	//return gh.lookAtLocation(terminalWidth, gh.actor.Location()), nil
 }
 
-func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *domain.ActorMoveEvent) ([]byte, error) {
+func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMoveEvent) ([]byte, error) {
 	fromID, toID, actorID := e.FromToActorIDs()
 
 	from := gh.actor.Zone().LocationByID(fromID)
@@ -233,13 +233,13 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *domain.ActorMo
 }
 
 var locationExitDisplayOrder = []string{
-	domain.EdgeDirectionNorth,
-	domain.EdgeDirectionSouth,
-	domain.EdgeDirectionEast,
-	domain.EdgeDirectionWest,
+	core.EdgeDirectionNorth,
+	core.EdgeDirectionSouth,
+	core.EdgeDirectionEast,
+	core.EdgeDirectionWest,
 }
 
-func edgeRelativeToLocation(baseLoc, otherLoc *domain.Location) *domain.LocationEdge {
+func edgeRelativeToLocation(baseLoc, otherLoc *core.Location) *core.LocationEdge {
 	for _, edge := range baseLoc.OutEdges {
 		if edge.Destination == otherLoc {
 			return edge

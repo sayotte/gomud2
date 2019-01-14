@@ -2,11 +2,11 @@ package commands
 
 import (
 	"errors"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 )
 
-func MoveActor(actor *domain.Actor, direction string, observer domain.Observer) (*domain.Actor, error) {
-	var outEdge *domain.LocationEdge
+func MoveActor(actor *core.Actor, direction string, observer core.Observer) (*core.Actor, error) {
+	var outEdge *core.LocationEdge
 	for _, edge := range actor.Location().OutEdges {
 		if edge.Direction == direction {
 			outEdge = edge

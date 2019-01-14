@@ -4,12 +4,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/satori/go.uuid"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 )
 
 const eventHeaderByteLen = 33
 
-func eventHeaderFromDomainEvent(from domain.Event) eventHeader {
+func eventHeaderFromDomainEvent(from core.Event) eventHeader {
 	return eventHeader{
 		EventType:      from.Type(),
 		Version:        from.Version(),

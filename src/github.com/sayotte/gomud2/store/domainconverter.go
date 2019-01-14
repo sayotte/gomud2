@@ -5,37 +5,37 @@ import (
 	"compress/flate"
 	"encoding/json"
 	"fmt"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 	"io"
 	"io/ioutil"
 )
 
 type FromDomainer interface {
-	FromDomain(domain.Event)
+	FromDomain(core.Event)
 	Header() eventHeader
 }
 
 type ToDomainer interface {
-	ToDomain() domain.Event
+	ToDomain() core.Event
 	SetHeader(eventHeader)
 }
 
-func writeEvent(e domain.Event, outStream io.Writer, useCompression bool) error {
+func writeEvent(e core.Event, outStream io.Writer, useCompression bool) error {
 	var frommer FromDomainer
 	switch e.Type() {
-	case domain.EventTypeActorAddToZone:
+	case core.EventTypeActorAddToZone:
 		frommer = &actorAddToZoneEvent{}
-	case domain.EventTypeActorMove:
+	case core.EventTypeActorMove:
 		frommer = &actorMoveEvent{}
-	case domain.EventTypeActorRemoveFromZone:
+	case core.EventTypeActorRemoveFromZone:
 		frommer = &actorRemoveFromZoneEvent{}
-	case domain.EventTypeLocationAddToZone:
+	case core.EventTypeLocationAddToZone:
 		frommer = &locationAddToZoneEvent{}
-	case domain.EventTypeLocationEdgeAddToZone:
+	case core.EventTypeLocationEdgeAddToZone:
 		frommer = &locationEdgeAddToZoneEvent{}
-	case domain.EventTypeObjectAddToZone:
+	case core.EventTypeObjectAddToZone:
 		frommer = &objectAddToZoneEvent{}
-	case domain.EventTypeObjectMove:
+	case core.EventTypeObjectMove:
 		frommer = &objectMoveEvent{}
 	default:
 		return fmt.Errorf("unhandled event type %T", e)
@@ -81,7 +81,7 @@ func writeEvent(e domain.Event, outStream io.Writer, useCompression bool) error 
 	return nil
 }
 
-func readEvent(inStream io.Reader) (domain.Event, error) {
+func readEvent(inStream io.Reader) (core.Event, error) {
 	buf, err := ioutil.ReadAll(io.LimitReader(inStream, eventHeaderByteLen))
 	if err != nil {
 		return nil, fmt.Errorf("ioutil.ReadAll(header): %s", err)
@@ -108,19 +108,19 @@ func readEvent(inStream io.Reader) (domain.Event, error) {
 	}
 	var toEr ToDomainer
 	switch hdr.EventType {
-	case domain.EventTypeActorAddToZone:
+	case core.EventTypeActorAddToZone:
 		toEr = &actorAddToZoneEvent{}
-	case domain.EventTypeActorMove:
+	case core.EventTypeActorMove:
 		toEr = &actorMoveEvent{}
-	case domain.EventTypeActorRemoveFromZone:
+	case core.EventTypeActorRemoveFromZone:
 		toEr = &actorRemoveFromZoneEvent{}
-	case domain.EventTypeLocationAddToZone:
+	case core.EventTypeLocationAddToZone:
 		toEr = &locationAddToZoneEvent{}
-	case domain.EventTypeLocationEdgeAddToZone:
+	case core.EventTypeLocationEdgeAddToZone:
 		toEr = &locationEdgeAddToZoneEvent{}
-	case domain.EventTypeObjectAddToZone:
+	case core.EventTypeObjectAddToZone:
 		toEr = &objectAddToZoneEvent{}
-	case domain.EventTypeObjectMove:
+	case core.EventTypeObjectMove:
 		toEr = &objectMoveEvent{}
 	}
 	err = json.Unmarshal(buf, toEr)

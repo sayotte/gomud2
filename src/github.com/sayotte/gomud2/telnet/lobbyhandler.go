@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/satori/go.uuid"
 	"github.com/sayotte/gomud2/auth"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 )
 
 const (
@@ -26,20 +26,20 @@ const (
 
 type lobbyHandler struct {
 	authService  AuthService
-	world        *domain.World
+	world        *core.World
 	session      *session
 	accountID    uuid.UUID
 	authZDesc    *auth.AuthZDescriptor
 	currentMenu  *menu
 	state        int
-	actorsByName map[string]*domain.Actor
+	actorsByName map[string]*core.Actor
 }
 
 func (lh *lobbyHandler) init(terminalWidth, terminalHeight int) []byte {
 	return lh.gotoMainMenu(terminalWidth, terminalHeight)
 }
 
-func (lh *lobbyHandler) handleEvent(e domain.Event, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+func (lh *lobbyHandler) handleEvent(e core.Event, terminalWidth, terminalHeight int) ([]byte, handler, error) {
 	return nil, lh, nil
 }
 
@@ -110,7 +110,7 @@ func (lh *lobbyHandler) handleGetCharacterNameState(line []byte) ([]byte, handle
 		return []byte("We need a non-empty name, try again.\nCharacter name?: "), lh, nil
 	}
 
-	actorPre := domain.NewActor(name, nil, nil)
+	actorPre := core.NewActor(name, nil, nil)
 	actorPre.Name = name
 	actor, err := lh.world.AddActor(actorPre)
 	if err != nil {
@@ -126,7 +126,7 @@ func (lh *lobbyHandler) handleGetCharacterNameState(line []byte) ([]byte, handle
 
 func (lh *lobbyHandler) gotoActorSelectMenu(terminalWidth, terminalHeight int) []byte {
 	lh.state = lobbyHandlerStateSelectExistingActor
-	lh.actorsByName = make(map[string]*domain.Actor)
+	lh.actorsByName = make(map[string]*core.Actor)
 	var menuOptions []string
 	actorIDs := lh.authService.GetActorIDsForAccountID(lh.accountID)
 	for _, actorID := range actorIDs {
@@ -164,7 +164,7 @@ func (lh *lobbyHandler) handleActorSelectState(line []byte, terminalWidth, termi
 	return lh.gotoGameHandler(selectedActor)
 }
 
-func (lh *lobbyHandler) gotoGameHandler(actor *domain.Actor) ([]byte, handler, error) {
+func (lh *lobbyHandler) gotoGameHandler(actor *core.Actor) ([]byte, handler, error) {
 	actor.AddObserver(lh.session)
 	gameHandler := &gameHandler{
 		authZDesc: lh.authZDesc,

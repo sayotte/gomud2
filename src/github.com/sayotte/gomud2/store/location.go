@@ -2,7 +2,7 @@ package store
 
 import (
 	"github.com/satori/go.uuid"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 )
 
 type locationAddToZoneEvent struct {
@@ -11,8 +11,8 @@ type locationAddToZoneEvent struct {
 	ShortDesc, Desc string
 }
 
-func (latze *locationAddToZoneEvent) FromDomain(e domain.Event) {
-	from := e.(domain.LocationAddToZoneEvent)
+func (latze *locationAddToZoneEvent) FromDomain(e core.Event) {
+	from := e.(core.LocationAddToZoneEvent)
 	*latze = locationAddToZoneEvent{
 		header:     eventHeaderFromDomainEvent(from),
 		LocationID: from.LocationID(),
@@ -21,8 +21,8 @@ func (latze *locationAddToZoneEvent) FromDomain(e domain.Event) {
 	}
 }
 
-func (latze locationAddToZoneEvent) ToDomain() domain.Event {
-	e := domain.NewLocationAddToZoneEvent(
+func (latze locationAddToZoneEvent) ToDomain() core.Event {
+	e := core.NewLocationAddToZoneEvent(
 		latze.ShortDesc,
 		latze.Desc,
 		latze.LocationID,

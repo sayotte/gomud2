@@ -2,7 +2,7 @@ package store
 
 import (
 	"github.com/satori/go.uuid"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 )
 
 type locationEdgeAddToZoneEvent struct {
@@ -11,8 +11,8 @@ type locationEdgeAddToZoneEvent struct {
 	EdgeID, SourceLocationID, DestLocationID, DestZoneID uuid.UUID
 }
 
-func (leatze locationEdgeAddToZoneEvent) ToDomain() domain.Event {
-	e := domain.NewLocationEdgeAddToZoneEvent(
+func (leatze locationEdgeAddToZoneEvent) ToDomain() core.Event {
+	e := core.NewLocationEdgeAddToZoneEvent(
 		leatze.Description,
 		leatze.Direction,
 		leatze.EdgeID,
@@ -25,8 +25,8 @@ func (leatze locationEdgeAddToZoneEvent) ToDomain() domain.Event {
 	return e
 }
 
-func (leatze *locationEdgeAddToZoneEvent) FromDomain(e domain.Event) {
-	from := e.(domain.LocationEdgeAddToZoneEvent)
+func (leatze *locationEdgeAddToZoneEvent) FromDomain(e core.Event) {
+	from := e.(core.LocationEdgeAddToZoneEvent)
 	*leatze = locationEdgeAddToZoneEvent{
 		header:           eventHeaderFromDomainEvent(from),
 		Description:      from.Description,

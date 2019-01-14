@@ -3,15 +3,15 @@ package telnet
 import (
 	"fmt"
 	"github.com/satori/go.uuid"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 )
 
 type session struct {
 	lastSeenEventSequenceNumMap map[uuid.UUID]uint64
 
 	authService   AuthService
-	world         *domain.World
-	eventChan     chan domain.Event
+	world         *core.World
+	eventChan     chan core.Event
 	eventQueueLen int
 
 	terminalWidth  int
@@ -25,13 +25,13 @@ type session struct {
 	stopChan chan struct{}
 }
 
-func (s *session) SendEvent(e domain.Event) {
+func (s *session) SendEvent(e core.Event) {
 	s.eventChan <- e
 }
 
 func (s *session) Start() {
 	s.lastSeenEventSequenceNumMap = make(map[uuid.UUID]uint64)
-	s.eventChan = make(chan domain.Event, s.eventQueueLen)
+	s.eventChan = make(chan core.Event, s.eventQueueLen)
 	s.stopChan = make(chan struct{})
 
 	go s.handleLoop()

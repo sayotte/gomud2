@@ -2,7 +2,7 @@ package store
 
 import (
 	"github.com/satori/go.uuid"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 )
 
 type actorMoveEvent struct {
@@ -10,8 +10,8 @@ type actorMoveEvent struct {
 	FromLocationID, ToLocationID, ActorID uuid.UUID
 }
 
-func (ame *actorMoveEvent) FromDomain(e domain.Event) {
-	from := e.(*domain.ActorMoveEvent)
+func (ame *actorMoveEvent) FromDomain(e core.Event) {
+	from := e.(*core.ActorMoveEvent)
 	fromID, toID, actorID := from.FromToActorIDs()
 	*ame = actorMoveEvent{
 		header:         eventHeaderFromDomainEvent(from),
@@ -21,8 +21,8 @@ func (ame *actorMoveEvent) FromDomain(e domain.Event) {
 	}
 }
 
-func (ame actorMoveEvent) ToDomain() domain.Event {
-	e := domain.NewActorMoveEvent(
+func (ame actorMoveEvent) ToDomain() core.Event {
+	e := core.NewActorMoveEvent(
 		ame.FromLocationID,
 		ame.ToLocationID,
 		ame.ActorID,
@@ -46,8 +46,8 @@ type actorAddToZoneEvent struct {
 	Name                        string
 }
 
-func (aatze *actorAddToZoneEvent) FromDomain(e domain.Event) {
-	from := e.(domain.ActorAddToZoneEvent)
+func (aatze *actorAddToZoneEvent) FromDomain(e core.Event) {
+	from := e.(core.ActorAddToZoneEvent)
 	*aatze = actorAddToZoneEvent{
 		header:             eventHeaderFromDomainEvent(from),
 		ActorID:            from.ActorID(),
@@ -56,8 +56,8 @@ func (aatze *actorAddToZoneEvent) FromDomain(e domain.Event) {
 	}
 }
 
-func (aatze actorAddToZoneEvent) ToDomain() domain.Event {
-	e := domain.NewActorAddToZoneEvent(
+func (aatze actorAddToZoneEvent) ToDomain() core.Event {
+	e := core.NewActorAddToZoneEvent(
 		aatze.Name,
 		aatze.ActorID,
 		aatze.StartingLocationID,
@@ -80,16 +80,16 @@ type actorRemoveFromZoneEvent struct {
 	ActorID uuid.UUID
 }
 
-func (arfze *actorRemoveFromZoneEvent) FromDomain(e domain.Event) {
-	from := e.(domain.ActorRemoveFromZoneEvent)
+func (arfze *actorRemoveFromZoneEvent) FromDomain(e core.Event) {
+	from := e.(core.ActorRemoveFromZoneEvent)
 	*arfze = actorRemoveFromZoneEvent{
 		header:  eventHeaderFromDomainEvent(from),
 		ActorID: from.ActorID(),
 	}
 }
 
-func (arfze actorRemoveFromZoneEvent) ToDomain() domain.Event {
-	e := domain.NewActorRemoveFromZoneEvent(arfze.ActorID, arfze.header.AggregateId)
+func (arfze actorRemoveFromZoneEvent) ToDomain() core.Event {
+	e := core.NewActorRemoveFromZoneEvent(arfze.ActorID, arfze.header.AggregateId)
 	e.SetSequenceNumber(arfze.header.SequenceNumber)
 	return e
 }

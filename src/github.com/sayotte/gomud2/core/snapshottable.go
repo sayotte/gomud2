@@ -1,4 +1,4 @@
-package domain
+package core
 
 // ALGORITHM FOR SNAPSHOTS
 // The network of all items known to a Zone (all snapshottable things) is a

@@ -2,7 +2,7 @@ package telnet
 
 import (
 	"github.com/sayotte/gomud2/auth"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 
 type loginHandler struct {
 	authService AuthService
-	world       *domain.World
+	world       *core.World
 	session     *session
 	currentMenu *menu
 	state       int
@@ -33,7 +33,7 @@ func (lh *loginHandler) init(terminalWidth, terminalHeight int) []byte {
 	return []byte("Pausing here to probe your terminal/client. Please hit <enter> to continue.\n")
 }
 
-func (lh *loginHandler) handleEvent(e domain.Event, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+func (lh *loginHandler) handleEvent(e core.Event, terminalWidth, terminalHeight int) ([]byte, handler, error) {
 	return nil, lh, nil
 }
 

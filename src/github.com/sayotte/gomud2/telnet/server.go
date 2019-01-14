@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/satori/go.uuid"
 	"github.com/sayotte/gomud2/auth"
-	"github.com/sayotte/gomud2/domain"
+	"github.com/sayotte/gomud2/core"
 	"net"
 )
 
@@ -21,7 +21,7 @@ type Server struct {
 	ListenPort      int
 	MessageQueueLen int
 	AuthService     AuthService
-	World           *domain.World
+	World           *core.World
 	started         bool
 	listener        *net.TCPListener
 	stopChan        chan struct{}
