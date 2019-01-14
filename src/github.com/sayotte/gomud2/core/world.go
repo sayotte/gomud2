@@ -56,7 +56,7 @@ func (w *World) LoadAndStart(zoneIDs []uuid.UUID, defaultZoneID, defaultLocID uu
 			return err
 		}
 
-		eChan, err := w.DataStore.RetrieveAllForZone(zoneID)
+		eChan, err := w.DataStore.RetrieveAllEventsForZone(zoneID)
 		if err != nil {
 			return err
 		}
@@ -303,7 +303,7 @@ func (w *World) handleSnapshot() error {
 
 	for zoneId, seqNum := range zoneIDToSeqNum {
 		zone := NewZone(zoneId, nil)
-		eChan, err := w.DataStore.RetrieveUpToSequenceNumsForZone(seqNum, zoneId)
+		eChan, err := w.DataStore.RetrieveEventsUpToSequenceNumForZone(seqNum, zoneId)
 		if err != nil {
 			return err
 		}

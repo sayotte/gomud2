@@ -81,11 +81,11 @@ func (es *EventStore) retrieveAllFromFile(filename string) (<-chan rpc.Response,
 	return inOutChan, nil
 }
 
-func (es *EventStore) RetrieveAllForZone(zoneID uuid.UUID) (<-chan rpc.Response, error) {
-	return es.RetrieveUpToSequenceNumsForZone(math.MaxUint64, zoneID)
+func (es *EventStore) RetrieveAllEventsForZone(zoneID uuid.UUID) (<-chan rpc.Response, error) {
+	return es.RetrieveEventsUpToSequenceNumForZone(math.MaxUint64, zoneID)
 }
 
-func (es *EventStore) RetrieveUpToSequenceNumsForZone(endNum uint64, zoneID uuid.UUID) (<-chan rpc.Response, error) {
+func (es *EventStore) RetrieveEventsUpToSequenceNumForZone(endNum uint64, zoneID uuid.UUID) (<-chan rpc.Response, error) {
 	retChan := make(chan rpc.Response)
 	var startNum uint64
 	// first check for a snapshot, and return that if possible
