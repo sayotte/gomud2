@@ -120,7 +120,7 @@ func (gh *gameHandler) lookAtLocation(terminalWidth int, loc *core.Location) []b
 	}
 
 	var exitClause string
-	edges := loc.OutEdges
+	edges := loc.OutEdges()
 	if len(edges) > 0 {
 		exitClause = "\nObvious exits:\n"
 		exitMap := make(map[string]*core.LocationEdge)
@@ -138,8 +138,8 @@ func (gh *gameHandler) lookAtLocation(terminalWidth int, loc *core.Location) []b
 
 	lookOutput := fmt.Sprintf(
 		lookFmt,
-		loc.ShortDescription,
-		wordwrap.WrapString(loc.Description, uint(terminalWidth)),
+		loc.ShortDescription(),
+		wordwrap.WrapString(loc.Description(), uint(terminalWidth)),
 		objClause,
 		actClause,
 		exitClause,
@@ -210,7 +210,7 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMove
 		return gh.lookAtLocation(terminalWidth, to), nil
 	}
 
-	if fromID == gh.actor.Location().Id {
+	if fromID == gh.actor.Location().ID() {
 		// this is a departure
 		outEdge := edgeRelativeToLocation(from, to)
 		if outEdge == nil {
@@ -218,7 +218,7 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMove
 		}
 		return []byte(fmt.Sprintf("%s departs to the %s.\n", actorName, outEdge.Direction)), nil
 
-	} else if toID == gh.actor.Location().Id {
+	} else if toID == gh.actor.Location().ID() {
 		// this is an arrival
 		outEdge := edgeRelativeToLocation(to, from)
 		if outEdge == nil {
@@ -228,7 +228,7 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMove
 	} else {
 		// the only way we can be getting this event is if we're subscribed to watching
 		// someone else's actions
-		return []byte(fmt.Sprintf("%s moves to %s.\n", actorName, to.ShortDescription)), nil
+		return []byte(fmt.Sprintf("%s moves to %s.\n", actorName, to.ShortDescription())), nil
 	}
 }
 
@@ -240,7 +240,7 @@ var locationExitDisplayOrder = []string{
 }
 
 func edgeRelativeToLocation(baseLoc, otherLoc *core.Location) *core.LocationEdge {
-	for _, edge := range baseLoc.OutEdges {
+	for _, edge := range baseLoc.OutEdges() {
 		if edge.Destination == otherLoc {
 			return edge
 		}

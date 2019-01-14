@@ -51,7 +51,7 @@ func (le LocationEdge) syncRequestToZone(e Event) (interface{}, error) {
 func (le LocationEdge) snapshot(sequenceNum uint64) Event {
 	var destID uuid.UUID
 	if le.Destination != nil {
-		destID = le.Destination.Id
+		destID = le.Destination.ID()
 	} else {
 		destID = le.OtherZoneLocID
 	}
@@ -59,7 +59,7 @@ func (le LocationEdge) snapshot(sequenceNum uint64) Event {
 		le.Description,
 		le.Direction,
 		le.Id,
-		le.Source.Id,
+		le.Source.ID(),
 		destID,
 		le.Zone.Id,
 		le.OtherZoneID,
@@ -85,6 +85,12 @@ func (lel LocationEdgeList) IndexOf(edge *LocationEdge) (int, error) {
 		}
 	}
 	return -1, fmt.Errorf("Edge %q not found in list", edge.Id)
+}
+
+func (lel LocationEdgeList) Copy() LocationEdgeList {
+	out := make(LocationEdgeList, len(lel))
+	copy(out, lel)
+	return out
 }
 
 func NewLocationEdgeAddToZoneEvent(desc, direction string, edgeId, sourceId, destLocId, srcZoneId, destZoneID uuid.UUID) LocationEdgeAddToZoneEvent {

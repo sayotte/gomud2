@@ -106,7 +106,7 @@ func initStartingWorld(worldConfigFile string) error {
 	longDesc += "at the bar looking desperate to talk to somebody, another at the far end of the bar "
 	longDesc += "who appears to be an off-duty cook trying to avoid conversation with anyone, and "
 	longDesc += "a female bartender who was probably crazy-hot 15 years ago but is now just crazy."
-	loc1Prim := core.NewLocation(z, shortDesc, longDesc)
+	loc1Prim := core.NewLocation(gouuid.Nil, z, shortDesc, longDesc)
 	loc1, err := z.AddLocation(loc1Prim)
 	if err != nil {
 		panic(err)
@@ -117,7 +117,7 @@ func initStartingWorld(worldConfigFile string) error {
 	longDesc += "slope, this house's cute blue shutters and the whimsical "
 	longDesc += "flamingoes in the yard give off a cheerful, playful sense "
 	longDesc += "of welcoming."
-	loc2Prim := core.NewLocation(z, shortDesc, longDesc)
+	loc2Prim := core.NewLocation(gouuid.Nil, z, shortDesc, longDesc)
 	loc2, err := z.AddLocation(loc2Prim)
 	if err != nil {
 		panic(err)
@@ -177,7 +177,7 @@ func initStartingWorld(worldConfigFile string) error {
 	longDesc = "A small room with wood paneled walls, standing here you "
 	longDesc += "feel as though you be sitting, sipping tea and making "
 	longDesc += "conversation with friends."
-	loc3Prim := core.NewLocation(z2, shortDesc, longDesc)
+	loc3Prim := core.NewLocation(gouuid.Nil, z2, shortDesc, longDesc)
 	loc3, err := z2.AddLocation(loc3Prim)
 	if err != nil {
 		panic(err)
@@ -191,7 +191,7 @@ func initStartingWorld(worldConfigFile string) error {
 		nil,
 		z,
 		z2.Id,
-		loc3.Id,
+		loc3.ID(),
 	)
 	_, err = z.AddLocationEdge(edge3Prim)
 	if err != nil {
@@ -206,7 +206,7 @@ func initStartingWorld(worldConfigFile string) error {
 		nil,
 		z2,
 		z.Id,
-		loc2.Id,
+		loc2.ID(),
 	)
 	_, err = z2.AddLocationEdge(edge4Prim)
 	if err != nil {
@@ -216,7 +216,7 @@ func initStartingWorld(worldConfigFile string) error {
 	cfg := mudConfig{
 		World: worldConfig{
 			DefaultZoneID:     z.Id,
-			DefaultLocationID: loc1.Id,
+			DefaultLocationID: loc1.ID(),
 			ZonesToLoad: []gouuid.UUID{
 				z.Id,
 				z2.Id,

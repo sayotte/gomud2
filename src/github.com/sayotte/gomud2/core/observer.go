@@ -24,3 +24,9 @@ func (ol ObserverList) Remove(o Observer) ObserverList {
 	}
 	return append(ol[:idx], ol[idx+1:]...)
 }
+
+func (ol ObserverList) Copy() ObserverList {
+	out := make(ObserverList, len(ol))
+	copy(out, ol)
+	return out
+}

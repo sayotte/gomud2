@@ -32,13 +32,13 @@ func (o *Object) setLocation(loc *Location) {
 }
 
 func (o *Object) Move(from, to *Location) error {
-	fmt.Printf("object %q, moving from %q to %q\n", o.Name, from.ShortDescription, to.ShortDescription)
-	if from.Zone != to.Zone {
+	fmt.Printf("object %q, moving from %q to %q\n", o.Name, from.ShortDescription(), to.ShortDescription())
+	if from.Zone() != to.Zone() {
 		return fmt.Errorf("cross-zone moves not yet supported")
 	}
 	e := NewObjectMoveEvent(
-		from.Id,
-		to.Id,
+		from.ID(),
+		to.ID(),
 		o.Id,
 		o.Zone.Id,
 	)
@@ -57,7 +57,7 @@ func (o Object) snapshot(sequenceNum uint64) Event {
 	e := NewObjectAddToZoneEvent(
 		o.Name,
 		o.Id,
-		o.Location.Id,
+		o.Location.ID(),
 		o.Zone.Id,
 	)
 	e.SetSequenceNumber(sequenceNum)
@@ -77,6 +77,12 @@ func (ol ObjectList) IndexOf(obj *Object) (int, error) {
 		}
 	}
 	return -1, fmt.Errorf("Object %q not found in list", obj.Id)
+}
+
+func (ol ObjectList) Copy() ObjectList {
+	out := make(ObjectList, len(ol))
+	copy(out, ol)
+	return out
 }
 
 func NewObjectAddToZoneEvent(name string, objectId, startingLocationId, zoneId uuid.UUID) ObjectAddToZoneEvent {

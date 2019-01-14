@@ -346,13 +346,13 @@ func (z *Zone) applyLocationAddToZoneEvent(e LocationAddToZoneEvent) (*Location,
 	if duplicate {
 		return nil, fmt.Errorf("location with ID %q already present in zone", e.locationId)
 	}
-	loc := &Location{
-		Id:               e.locationId,
-		ShortDescription: e.shortDesc,
-		Description:      e.desc,
-	}
+	loc := NewLocation(
+		e.locationId,
+		z,
+		e.shortDesc,
+		e.desc,
+	)
 	z.locationsById[e.locationId] = loc
-	loc.setZone(z)
 	return loc, nil
 }
 

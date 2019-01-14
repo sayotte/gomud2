@@ -30,7 +30,7 @@ func TestLocationEdgeAddToZoneEvent_roundtrip(t *testing.T) {
 			return false, fmt.Sprintf("EdgeID: %q != %q", left.EdgeId, right.EdgeId)
 		}
 		if left.Description != right.Description {
-			return false, fmt.Sprintf("Description: %q != %q", left.Description, right.Description)
+			return false, fmt.Sprintf("description: %q != %q", left.Description, right.Description)
 		}
 		if left.Direction != right.Direction {
 			return false, fmt.Sprintf("Direction: %s != %s", left.Direction, right.Direction)

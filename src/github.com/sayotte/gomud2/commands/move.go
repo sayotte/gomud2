@@ -7,7 +7,7 @@ import (
 
 func MoveActor(actor *core.Actor, direction string, observer core.Observer) (*core.Actor, error) {
 	var outEdge *core.LocationEdge
-	for _, edge := range actor.Location().OutEdges {
+	for _, edge := range actor.Location().OutEdges() {
 		if edge.Direction == direction {
 			outEdge = edge
 			break

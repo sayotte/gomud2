@@ -74,23 +74,23 @@ func (a *Actor) setLocation(loc *Location) {
 }
 
 func (a *Actor) Move(from, to *Location) error {
-	fmt.Printf("actor %q, moving from %q to %q\n", a.Name(), from.ShortDescription, to.ShortDescription)
-	if from.Zone != to.Zone {
+	fmt.Printf("actor %q, moving from %q to %q\n", a.Name(), from.ShortDescription(), to.ShortDescription())
+	if from.Zone() != to.Zone() {
 		return fmt.Errorf("cross-zone moves should use the World.MigrateZone() API call")
 	}
 	exitExists := false
-	for _, edge := range from.OutEdges {
+	for _, edge := range from.OutEdges() {
 		if edge.Destination == to {
 			exitExists = true
 			break
 		}
 	}
 	if !exitExists {
-		return fmt.Errorf("no exit to that destination from location %q", from.Id)
+		return fmt.Errorf("no exit to that destination from location %q", from.ID())
 	}
 	e := NewActorMoveEvent(
-		from.Id,
-		to.Id,
+		from.ID(),
+		to.ID(),
 		a.id,
 		a.zone.Id,
 	)
@@ -122,7 +122,7 @@ func (a Actor) snapshot(sequenceNum uint64) Event {
 	e := NewActorAddToZoneEvent(
 		a.Name(),
 		a.id,
-		a.location.Id,
+		a.location.ID(),
 		a.zone.Id,
 	)
 	e.SetSequenceNumber(sequenceNum)
@@ -142,6 +142,12 @@ func (al ActorList) IndexOf(actor *Actor) (int, error) {
 		}
 	}
 	return -1, fmt.Errorf("Actor %q not found in list", actor.id)
+}
+
+func (al ActorList) Copy() ActorList {
+	out := make(ActorList, len(al))
+	copy(out, al)
+	return out
 }
 
 func NewActorMoveEvent(fromLocationId, toLocationId, actorId, zoneId uuid.UUID) *ActorMoveEvent {
