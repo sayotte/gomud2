@@ -68,13 +68,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	eStore := &store.EventStore{
+	world := domain.NewWorld()
+	world.DataStore = &store.EventStore{
 		Filename:          cfg.Store.EventsFile,
 		UseCompression:    cfg.Store.UseCompression,
 		SnapshotDirectory: filepath.Clean(cfg.Store.SnapshotDirectory),
 	}
-
-	world, err := loadWorld(cfg, eStore)
+	world.IntentLog = &store.IntentLogger{
+		Filename: cfg.Store.IntentLogfile,
+	}
+	err = world.LoadAndStart(cfg.World.ZonesToLoad, cfg.World.DefaultZoneID, cfg.World.DefaultLocationID)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -227,60 +230,6 @@ func initStartingWorld(worldConfigFile string) error {
 		},
 	}
 	return cfg.SerializeToFile(worldConfigFile)
-}
-
-func loadWorld(cfg mudConfig, eStore domain.DoEverythingStore) (*domain.World, error) {
-	world := domain.NewWorld()
-	world.SnapshotHelper = eStore
-	world.IntentLog = &store.IntentLogger{
-		Filename: cfg.Store.IntentLogfile,
-	}
-	err := world.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, zoneID := range cfg.World.ZonesToLoad {
-		z := domain.NewZone(nil)
-		z.Id = zoneID
-		err := world.AddZone(z)
-		if err != nil {
-			return nil, err
-		}
-
-		eChan, err := eStore.RetrieveAllForZone(zoneID)
-		if err != nil {
-			return nil, err
-		}
-		err = z.ReplayEvents(eChan)
-		if err != nil {
-			return nil, err
-		}
-
-		z.SetPersister(eStore)
-	}
-
-	defaultZone := world.ZoneByID(cfg.World.DefaultZoneID)
-	if defaultZone == nil {
-		return nil, fmt.Errorf("default Zone %q not found in World", cfg.World.DefaultZoneID)
-	}
-	defaultLoc := defaultZone.LocationByID(cfg.World.DefaultLocationID)
-	if defaultLoc == nil {
-		return nil, fmt.Errorf("default Location %q not found in default Zone", cfg.World.DefaultLocationID)
-	}
-	world.FrontDoorZone = defaultZone
-	world.FrontDoorLocation = defaultLoc
-
-	for _, zone := range world.Zones() {
-		zone.StartEventProcessing()
-	}
-
-	err = world.ReplayIntentLog()
-	if err != nil {
-		return nil, err
-	}
-
-	return world, nil
 }
 
 func runWorld(world *domain.World) error {

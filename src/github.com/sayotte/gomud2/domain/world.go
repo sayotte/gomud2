@@ -36,11 +36,72 @@ type World struct {
 	commandChan chan rpc.Request
 }
 
+func (w *World) LoadAndStart(zoneIDs []uuid.UUID, defaultZoneID, defaultLocID uuid.UUID) error {
+	if w.DataStore == nil {
+		return errors.New("World.DataStore must be non-nil")
+	}
+	if w.IntentLog == nil {
+		return errors.New("World.IntentLog must be non-nil")
+	}
+
+	err := w.start()
+	if err != nil {
+		return err
+	}
+
+	for _, zoneID := range zoneIDs {
+		z := NewZone(nil)
+		z.Id = zoneID
+		err := w.AddZone(z)
+		if err != nil {
+			return err
+		}
+
+		eChan, err := w.DataStore.RetrieveAllForZone(zoneID)
+		if err != nil {
+			return err
+		}
+		err = z.ReplayEvents(eChan)
+		if err != nil {
+			return err
+		}
+
+		z.SetPersister(w.DataStore)
+	}
+
+	defaultZone := w.ZoneByID(defaultZoneID)
+	if defaultZone == nil {
+		return fmt.Errorf("default Zone %q not found in World", defaultZoneID)
+	}
+	defaultLoc := defaultZone.LocationByID(defaultLocID)
+	if defaultLoc == nil {
+		return fmt.Errorf("default Location %q not found in default Zone", defaultLocID)
+	}
+	w.frontDoorZone = defaultZone
+	w.frontDoorLocation = defaultLoc
+
+	for _, zone := range w.Zones() {
+		zone.StartEventProcessing()
+	}
+
+	err = w.ReplayIntentLog()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (w *World) start() error {
+	if w.started {
+		return errors.New("World already started")
+	}
+
 	w.stopChan = make(chan struct{})
 	w.stopWG = &sync.WaitGroup{}
 	w.commandChan = make(chan rpc.Request)
 
+	w.started = true
 	go w.processCommandsLoop()
 	return nil
 }
