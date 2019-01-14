@@ -121,8 +121,7 @@ func (w *World) handleIncompleteTransactions(redo, undo []Event) error {
 			return fmt.Errorf("no such Location with ID %q", readdEvent.startingLocationId)
 		}
 
-		actor := NewActor(readdEvent.Name(), oldLoc, oldZone)
-		actor.Id = readdEvent.actorId
+		actor := NewActor(readdEvent.actorId, readdEvent.Name(), oldLoc, oldZone)
 		_, err := oldZone.AddActor(actor)
 		if err != nil {
 			return err

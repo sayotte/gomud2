@@ -56,7 +56,7 @@ func (l *Location) Actors() ActorList {
 func (l *Location) removeActor(actor *Actor) error {
 	idx, err := l.actors.IndexOf(actor)
 	if err != nil {
-		return fmt.Errorf("cannot remove Actor %q from location %q", actor.Id, l.Id)
+		return fmt.Errorf("cannot remove Actor %q from location %q", actor.id, l.Id)
 	}
 	l.actors = append(l.actors[:idx], l.actors[idx+1:]...)
 	return nil
@@ -65,7 +65,7 @@ func (l *Location) removeActor(actor *Actor) error {
 func (l *Location) addActor(actor *Actor) error {
 	_, err := l.actors.IndexOf(actor)
 	if err == nil {
-		return fmt.Errorf("Actor %q already present at location %q", actor.Id, l.Id)
+		return fmt.Errorf("Actor %q already present at location %q", actor.id, l.Id)
 	}
 	l.actors = append(l.actors, actor)
 	return nil

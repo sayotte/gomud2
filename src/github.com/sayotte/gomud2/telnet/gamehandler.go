@@ -115,7 +115,7 @@ func (gh *gameHandler) lookAtLocation(terminalWidth int, loc *core.Location) []b
 			if actor == gh.actor {
 				continue
 			}
-			actClause += actor.Name + " is here.\n"
+			actClause += actor.Name() + " is here.\n"
 		}
 	}
 
@@ -202,10 +202,10 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMove
 	actor := gh.actor.Zone().ActorByID(actorID)
 	actorName := "Someone"
 	if actor != nil {
-		actorName = actor.Name
+		actorName = actor.Name()
 	}
 
-	if actorID == gh.actor.Id {
+	if actorID == gh.actor.ID() {
 		// auto-look upon arriving at a new destination
 		return gh.lookAtLocation(terminalWidth, to), nil
 	}

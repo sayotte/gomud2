@@ -290,15 +290,14 @@ func (z *Zone) applyActorAddToZoneEvent(e ActorAddToZoneEvent) (*Actor, error) {
 	if duplicate {
 		return nil, fmt.Errorf("Actor %q already present in zone", e.actorId)
 	}
-	actor := NewActor(e.name, newLoc, z)
-	actor.Id = e.ActorID()
+	actor := NewActor(e.ActorID(), e.name, newLoc, z)
 
 	err := newLoc.addActor(actor)
 	if err != nil {
 		return nil, err
 	}
 	actor.setLocation(newLoc)
-	z.actorsById[actor.Id] = actor
+	z.actorsById[actor.id] = actor
 
 	oList := newLoc.Observers()
 	z.sendEventToObservers(e, oList)
@@ -307,7 +306,7 @@ func (z *Zone) applyActorAddToZoneEvent(e ActorAddToZoneEvent) (*Actor, error) {
 }
 
 func (z *Zone) RemoveActor(a *Actor) error {
-	remEvent := NewActorRemoveFromZoneEvent(a.Id, z.Id)
+	remEvent := NewActorRemoveFromZoneEvent(a.id, z.Id)
 	_, err := z.syncRequestToSelf(remEvent)
 	return err
 }

@@ -153,7 +153,7 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
-	actorPrim := core.NewActor("A man", loc1, z)
+	actorPrim := core.NewActor(gouuid.Nil, "A man", loc1, z)
 	_, err = z.AddActor(actorPrim)
 	if err != nil {
 		panic(err)

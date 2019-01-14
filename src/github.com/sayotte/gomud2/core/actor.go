@@ -9,10 +9,14 @@ import (
 	"sync"
 )
 
-func NewActor(name string, location *Location, zone *Zone) *Actor {
+func NewActor(id uuid.UUID, name string, location *Location, zone *Zone) *Actor {
+	newID := id
+	if uuid.Equal(id, uuid.Nil) {
+		newID = myuuid.NewId()
+	}
 	return &Actor{
-		Id:          myuuid.NewId(),
-		Name:        name,
+		id:          newID,
+		name:        name,
 		location:    location,
 		zone:        zone,
 		rwlock:      &sync.RWMutex{},
@@ -21,8 +25,8 @@ func NewActor(name string, location *Location, zone *Zone) *Actor {
 }
 
 type Actor struct {
-	Id        uuid.UUID
-	Name      string
+	id        uuid.UUID
+	name      string
 	location  *Location
 	zone      *Zone
 	observers ObserverList
@@ -31,6 +35,10 @@ type Actor struct {
 	// actor. This should never be directly exposed by an accessor; public methods
 	// should create events and send them to the channel.
 	requestChan chan rpc.Request
+}
+
+func (a *Actor) ID() uuid.UUID {
+	return a.id
 }
 
 func (a *Actor) Observers() []Observer {
@@ -51,6 +59,10 @@ func (a *Actor) RemoveObserver(o Observer) {
 	a.observers = a.observers.Remove(o)
 }
 
+func (a *Actor) Name() string {
+	return a.name
+}
+
 func (a *Actor) Location() *Location {
 	a.rwlock.RLock()
 	defer a.rwlock.RUnlock()
@@ -62,7 +74,7 @@ func (a *Actor) setLocation(loc *Location) {
 }
 
 func (a *Actor) Move(from, to *Location) error {
-	fmt.Printf("actor %q, moving from %q to %q\n", a.Name, from.ShortDescription, to.ShortDescription)
+	fmt.Printf("actor %q, moving from %q to %q\n", a.Name(), from.ShortDescription, to.ShortDescription)
 	if from.Zone != to.Zone {
 		return fmt.Errorf("cross-zone moves should use the World.MigrateZone() API call")
 	}
@@ -79,7 +91,7 @@ func (a *Actor) Move(from, to *Location) error {
 	e := NewActorMoveEvent(
 		from.Id,
 		to.Id,
-		a.Id,
+		a.id,
 		a.zone.Id,
 	)
 	_, err := a.syncRequestToZone(e)
@@ -108,8 +120,8 @@ func (a *Actor) syncRequestToZone(e Event) (interface{}, error) {
 
 func (a Actor) snapshot(sequenceNum uint64) Event {
 	e := NewActorAddToZoneEvent(
-		a.Name,
-		a.Id,
+		a.Name(),
+		a.id,
 		a.location.Id,
 		a.zone.Id,
 	)
@@ -129,7 +141,7 @@ func (al ActorList) IndexOf(actor *Actor) (int, error) {
 			return i, nil
 		}
 	}
-	return -1, fmt.Errorf("Actor %q not found in list", actor.Id)
+	return -1, fmt.Errorf("Actor %q not found in list", actor.id)
 }
 
 func NewActorMoveEvent(fromLocationId, toLocationId, actorId, zoneId uuid.UUID) *ActorMoveEvent {

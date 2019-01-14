@@ -110,13 +110,12 @@ func (lh *lobbyHandler) handleGetCharacterNameState(line []byte) ([]byte, handle
 		return []byte("We need a non-empty name, try again.\nCharacter name?: "), lh, nil
 	}
 
-	actorPre := core.NewActor(name, nil, nil)
-	actorPre.Name = name
+	actorPre := core.NewActor(uuid.Nil, name, nil, nil)
 	actor, err := lh.world.AddActor(actorPre)
 	if err != nil {
 		return nil, nil, fmt.Errorf("world.AddActor: %s", err)
 	}
-	err = lh.authService.AddActorIDToAccountID(lh.accountID, actor.Id)
+	err = lh.authService.AddActorIDToAccountID(lh.accountID, actor.ID())
 	if err != nil {
 		return nil, nil, fmt.Errorf("authService.AddActorIDtoAccountID(): %s", err)
 	}
@@ -132,7 +131,7 @@ func (lh *lobbyHandler) gotoActorSelectMenu(terminalWidth, terminalHeight int) [
 	for _, actorID := range actorIDs {
 		a := lh.world.ActorByID(actorID)
 		if a != nil {
-			nameString := fmt.Sprintf("%s/%s", a.Name, a.Id)
+			nameString := fmt.Sprintf("%s/%s", a.Name(), a.ID())
 			lh.actorsByName[nameString] = a
 			menuOptions = append(menuOptions, nameString)
 		}
