@@ -268,7 +268,9 @@ func (w *World) ZoneByID(id uuid.UUID) *Zone {
 }
 
 func (w *World) Zones() []*Zone {
-	return w.zones
+	out := make([]*Zone, len(w.zones))
+	copy(out, w.zones)
+	return out
 }
 
 func (w *World) ActorByID(id uuid.UUID) *Actor {
