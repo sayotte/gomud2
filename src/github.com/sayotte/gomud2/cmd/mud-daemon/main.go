@@ -223,7 +223,7 @@ func initStartingWorld(worldConfigFile string) error {
 			UseCompression:    true,
 		},
 		Telnet: telnetConfig{
-			ListenPort: telnet.DefaultListenPort,
+			ListenAddr: telnet.DefaultListenAddr,
 		},
 		WSAPI: wsAPIConfig{
 			ListenAddr: wsapi.DefaultListenAddr,
@@ -242,7 +242,7 @@ func runWorld(world *core.World, cfg mudConfig) error {
 	}
 
 	telnetServer := telnet.Server{
-		ListenPort:      cfg.Telnet.ListenPort,
+		ListenAddr:      cfg.Telnet.ListenAddr,
 		MessageQueueLen: telnet.DefaultMessageQueueLen,
 		AuthService:     authServer,
 		World:           world,

@@ -28,7 +28,7 @@ type storeConfig struct {
 }
 
 type telnetConfig struct {
-	ListenPort int `yaml:"listenPort"`
+	ListenAddr string `yaml:"listenAddr"`
 }
 
 type wsAPIConfig struct {

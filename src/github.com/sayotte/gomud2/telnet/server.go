@@ -17,18 +17,17 @@ type AuthService interface {
 }
 
 const (
-	DefaultListenPort      = 4000
+	DefaultListenAddr      = ":4000"
 	DefaultMessageQueueLen = 15
 )
 
 type Server struct {
-	ListenIP        string
-	ListenPort      int
+	ListenAddr      string
 	MessageQueueLen int
 	AuthService     AuthService
 	World           *core.World
 	started         bool
-	listener        *net.TCPListener
+	listener        net.Listener
 	stopChan        chan struct{}
 }
 
@@ -37,11 +36,10 @@ func (s *Server) Start() error {
 		return errors.New("already started")
 	}
 
-	listenAddr := &net.TCPAddr{
-		IP:   net.ParseIP(s.ListenIP),
-		Port: s.ListenPort,
+	if s.ListenAddr == "" {
+		s.ListenAddr = DefaultListenAddr
 	}
-	listener, err := net.ListenTCP("tcp", listenAddr)
+	listener, err := net.Listen("tcp", s.ListenAddr)
 	if err != nil {
 		return fmt.Errorf("net.ListenTCP(): %s", err)
 	}
@@ -71,7 +69,7 @@ func (s *Server) acceptLoop() {
 		default:
 		}
 
-		tcpConn, err := s.listener.AcceptTCP()
+		tcpConn, err := s.listener.Accept()
 		if err != nil {
 			fmt.Printf("DEBUG: Server.listener.AcceptTCP: %s\n", err)
 			continue
