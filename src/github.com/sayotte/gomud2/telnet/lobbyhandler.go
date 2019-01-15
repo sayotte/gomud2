@@ -164,6 +164,9 @@ func (lh *lobbyHandler) handleActorSelectState(line []byte, terminalWidth, termi
 }
 
 func (lh *lobbyHandler) gotoGameHandler(actor *core.Actor) ([]byte, handler, error) {
+	for _, o := range actor.Observers() {
+		o.Evict()
+	}
 	actor.AddObserver(lh.session)
 	gameHandler := &gameHandler{
 		authZDesc: lh.authZDesc,

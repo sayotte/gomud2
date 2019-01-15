@@ -4,6 +4,7 @@ import "fmt"
 
 type Observer interface {
 	SendEvent(e Event)
+	Evict()
 }
 
 type ObserverList []Observer

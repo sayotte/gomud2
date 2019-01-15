@@ -66,6 +66,11 @@ func (s *session) SendEvent(e core.Event) {
 	s.eventChan <- e
 }
 
+// Evict implements the domain.Observer interface
+func (s *session) Evict() {
+	s.sendCloseDetachAndStop(websocket.CloseGoingAway, "evicted from attached actor")
+}
+
 func (s *session) receiveLoop() {
 	for {
 		select {
@@ -218,6 +223,9 @@ func (s *session) handleCommandAttachActor(msg Message) {
 		errMsg := fmt.Sprintf("actor with ID %q does not exist", cmd.ActorID)
 		s.sendMessage(MessageTypeProcessingError, errMsg, msg.MessageID)
 		return
+	}
+	for _, o := range a.Observers() {
+		o.Evict()
 	}
 	a.AddObserver(s)
 

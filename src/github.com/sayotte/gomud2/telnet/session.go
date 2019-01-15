@@ -2,7 +2,10 @@ package telnet
 
 import (
 	"fmt"
+	"sync"
+
 	"github.com/satori/go.uuid"
+
 	"github.com/sayotte/gomud2/core"
 )
 
@@ -23,26 +26,36 @@ type session struct {
 	currentHandler handler
 
 	stopChan chan struct{}
+	stopOnce *sync.Once
 }
 
 func (s *session) SendEvent(e core.Event) {
 	s.eventChan <- e
 }
 
+func (s *session) Evict() {
+	s.bufferedConn.Send([]byte("Evicted from attached actor!\n"))
+	go s.Stop()
+}
+
 func (s *session) Start() {
 	s.lastSeenEventSequenceNumMap = make(map[uuid.UUID]uint64)
 	s.eventChan = make(chan core.Event, s.eventQueueLen)
 	s.stopChan = make(chan struct{})
+	s.stopOnce = &sync.Once{}
 
 	go s.handleLoop()
 }
 
 func (s *session) Stop() {
-	close(s.stopChan)
-	if s.currentHandler != nil {
-		s.currentHandler.deinit()
+	stopFunc := func() {
+		close(s.stopChan)
+		if s.currentHandler != nil {
+			s.currentHandler.deinit()
+		}
+		s.bufferedConn.Shutdown()
 	}
-	s.bufferedConn.Shutdown()
+	s.stopOnce.Do(stopFunc)
 }
 
 func (s *session) handleLoop() {
