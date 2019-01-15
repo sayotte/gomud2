@@ -77,22 +77,39 @@ func (s *session) receiveLoop() {
 
 		msgType, msgBytes, err := s.conn.ReadMessage()
 		if err != nil {
+			// we may be getting an error because we're reading from a closed
+			// Conn (there's a race condition in calling "go s.stop(); continue")
+			// but if not, it's a real error and we should emit it
 			if !isAnyWebsocketCloseErrorHelper(err) {
-				fmt.Printf("ERROR: s.conn.ReadMessage(): %s\n", err)
+				fmt.Printf("WSAPI ERROR: s.conn.ReadMessage(): %s\n", err)
 			}
 			go s.stop()
 			continue
 		}
-		if msgType != websocket.TextMessage {
-			// FIXME handle control / whatever messages here
+		switch msgType {
+		// Ping has a default handler, none needed here
+		// We don't send Pings, so we don't need to handle Pings (blow up in
+		//   the default case if we get one)
+		// We don't expect/want binary messages, so blow up in the default case
+		//   if we get one
+		// Respect close messages by shutting down gracefully
+		case websocket.CloseMessage:
+			go s.stop()
+			continue
+		// Specify a case for Text messages so they don't fall to the default
+		case websocket.TextMessage:
+			// ...
+		// Blow up if we get anything else as it's not RFC 6455 compliant
+		default:
+			s.sendCloseDetachAndStop(websocket.CloseUnsupportedData, fmt.Sprintf("unhandleable message type %d", msgType))
+			continue
 		}
 
 		var msg Message
 		err = json.Unmarshal(msgBytes, &msg)
 		if err != nil {
-			fmt.Printf("ERROR: json.Unmarshal(): %s\n", err)
-			// FIXME should probably send an error to the client...
-			go s.stop()
+			fmt.Printf("WSAPI ERROR: json.Unmarshal(): %s\n", err)
+			s.sendCloseDetachAndStop(websocket.ClosePolicyViolation, "message JSON data cannot be decoded")
 			continue
 		}
 		s.receiveChan <- msg
@@ -109,6 +126,7 @@ func (s *session) mainLoop() {
 			event, err := eventFromDomainEvent(e)
 			if err != nil {
 				fmt.Printf("WSAPI ERROR: %s\n", err)
+				s.sendCloseDetachAndStop(websocket.CloseInternalServerErr, "")
 				continue
 			}
 			s.sendMessage(MessageTypeEvent, event, uuid.Nil)
@@ -121,16 +139,31 @@ func (s *session) mainLoop() {
 			case MessageTypeMoveActorCommand:
 				s.handleCommandMoveActor(msg)
 			default:
-				fmt.Printf("WSAPI DEBUG: session received message of type %q\n", msg.Type)
+				fmt.Printf("WSAPI ERROR: session received message of type %q\n", msg.Type)
+				s.sendCloseDetachAndStop(websocket.CloseProtocolError, fmt.Sprintf("unhandleable API message type %q", msg.Type))
 			}
 		}
 	}
+}
+
+func (s *session) sendCloseDetachAndStop(closeCode int, closeText string) {
+	payload := websocket.FormatCloseMessage(closeCode, closeText)
+	_ = s.conn.WriteMessage(websocket.CloseMessage, payload)
+
+	if s.actor != nil {
+		s.actor.RemoveObserver(s)
+		s.actor = nil
+	}
+
+	go s.stop()
 }
 
 func (s *session) sendMessage(typ string, payload interface{}, id uuid.UUID) {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		fmt.Printf("WSAPI ERROR: json.Marshal(1): %s\n", err)
+		s.sendCloseDetachAndStop(websocket.CloseInternalServerErr, "")
+		return
 	}
 	msg := Message{
 		Type:      typ,
@@ -140,13 +173,17 @@ func (s *session) sendMessage(typ string, payload interface{}, id uuid.UUID) {
 	msgBytes, err := json.Marshal(msg)
 	if err != nil {
 		fmt.Printf("WSAPI ERROR: json.Marshal(2): %s\n", err)
+		s.sendCloseDetachAndStop(websocket.CloseInternalServerErr, "")
+		return
 	}
 	err = s.conn.WriteMessage(websocket.TextMessage, msgBytes)
 	if err != nil {
 		if !isAnyWebsocketCloseErrorHelper(err) {
 			fmt.Printf("WSAPI ERROR: s.conn.WriteMessage(): %s\n", err)
+			s.sendCloseDetachAndStop(websocket.CloseInternalServerErr, "")
+		} else {
+			go s.stop()
 		}
-		go s.stop()
 	}
 }
 
@@ -172,6 +209,7 @@ func (s *session) handleCommandAttachActor(msg Message) {
 	err := json.Unmarshal(msg.Payload, &cmd)
 	if err != nil {
 		fmt.Printf("WSAPI: ERROR: json.Unmarshal(): %s\n", err)
+		s.sendCloseDetachAndStop(websocket.ClosePolicyViolation, "message JSON data cannot be decoded")
 		return
 	}
 
@@ -195,6 +233,7 @@ func (s *session) handleCommandMoveActor(msg Message) {
 	err := json.Unmarshal(msg.Payload, &moveCmd)
 	if err != nil {
 		fmt.Printf("WSAPI: ERROR: json.Unmarshal(): %s\n", err)
+		s.sendCloseDetachAndStop(websocket.ClosePolicyViolation, "message JSON data cannot be decoded")
 		return
 	}
 
@@ -204,8 +243,8 @@ func (s *session) handleCommandMoveActor(msg Message) {
 			s.sendMessage(MessageTypeProcessingError, err.Error(), msg.MessageID)
 			return
 		}
-		s.sendMessage(MessageTypeProcessingError, "fatal internal error", msg.MessageID)
-		go s.stop()
+		fmt.Printf("WSAPI ERROR: commands.MoveActor(...): %s\n", err)
+		s.sendCloseDetachAndStop(websocket.CloseInternalServerErr, "")
 		return
 	}
 	s.actor = newActor
