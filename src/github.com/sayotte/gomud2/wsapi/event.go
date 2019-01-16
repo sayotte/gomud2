@@ -15,8 +15,9 @@ const (
 	EventTypeActorRemoveFromZone = "actor-remove-from-zone"
 	//EventTypeLocationAddToZone
 	//EventTypeLocationEdgeAddToZone
-	EventTypeObjectAddToZone = "object-add-to-zone"
-	EventTypeObjectMove      = "object-move"
+	EventTypeObjectAddToZone      = "object-add-to-zone"
+	EventTypeObjectRemoveFromZone = "object-remove-from-zone"
+	EventTypeObjectMove           = "object-move"
 )
 
 type Event struct {
@@ -53,6 +54,9 @@ func eventFromDomainEvent(from core.Event) (Event, error) {
 	case core.EventTypeObjectAddToZone:
 		e.EventType = EventTypeObjectAddToZone
 		frommer = &ObjectAddToZoneEventBody{}
+	case core.EventTypeObjectRemoveFromZone:
+		e.EventType = EventTypeObjectRemoveFromZone
+		frommer = &ObjectRemoveFromZoneEventBody{}
 	case core.EventTypeObjectMove:
 		e.EventType = EventTypeObjectMove
 		frommer = &ObjectMoveEventBody{}
@@ -114,6 +118,17 @@ func (oatzeb *ObjectAddToZoneEventBody) populateFromDomain(e core.Event) {
 	oatzeb.ObjectID = typedEvent.ObjectID()
 	oatzeb.Name = typedEvent.Name()
 	oatzeb.StartingLocationID = typedEvent.StartingLocationID()
+}
+
+type ObjectRemoveFromZoneEventBody struct {
+	ObjectID uuid.UUID `json:"objectID"`
+	Name     string    `json:"name"`
+}
+
+func (orfzeb *ObjectRemoveFromZoneEventBody) populateFromDomain(e core.Event) {
+	typedEvent := e.(core.ObjectRemoveFromZoneEvent)
+	orfzeb.ObjectID = typedEvent.ObjectID()
+	orfzeb.Name = typedEvent.Name()
 }
 
 type ObjectMoveEventBody struct {

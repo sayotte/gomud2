@@ -54,6 +54,10 @@ func (gh *gameHandler) handleEvent(e core.Event, terminalWidth, terminalHeight i
 		typedE := e.(*core.ActorMoveEvent)
 		out, err := gh.handleEventActorMove(terminalWidth, typedE)
 		return out, gh, err
+	case core.EventTypeObjectRemoveFromZone:
+		typedE := e.(core.ObjectRemoveFromZoneEvent)
+		out, err := gh.handleEventObjectRemoved(terminalWidth, typedE)
+		return out, gh, err
 	default:
 		return []byte(fmt.Sprintf("session: observed event of type %T\n", e)), gh, nil
 	}
@@ -230,6 +234,10 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMove
 		// someone else's actions
 		return []byte(fmt.Sprintf("%s moves to %s.\n", actorName, to.ShortDescription())), nil
 	}
+}
+
+func (gh *gameHandler) handleEventObjectRemoved(terminalWidth int, e core.ObjectRemoveFromZoneEvent) ([]byte, error) {
+	return []byte(fmt.Sprintf("%s finally crumbles into dust.\n", e.Name())), nil
 }
 
 var locationExitDisplayOrder = []string{

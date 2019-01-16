@@ -46,6 +46,35 @@ func (oatze *objectAddToZoneEvent) SetHeader(h eventHeader) {
 	oatze.header = h
 }
 
+type objectRemoveFromZoneEvent struct {
+	header   eventHeader
+	ObjectID uuid.UUID
+	Name     string
+}
+
+func (orfze *objectRemoveFromZoneEvent) FromDomain(e core.Event) {
+	from := e.(core.ObjectRemoveFromZoneEvent)
+	*orfze = objectRemoveFromZoneEvent{
+		header:   eventHeaderFromDomainEvent(e),
+		ObjectID: from.ObjectID(),
+		Name:     from.Name(),
+	}
+}
+
+func (orfze objectRemoveFromZoneEvent) ToDomain() core.Event {
+	e := core.NewObjectRemoveFromZoneEvent(orfze.Name, orfze.ObjectID, orfze.header.AggregateId)
+	e.SetSequenceNumber(orfze.header.SequenceNumber)
+	return e
+}
+
+func (orfze objectRemoveFromZoneEvent) Header() eventHeader {
+	return orfze.header
+}
+
+func (orfze *objectRemoveFromZoneEvent) SetHeader(h eventHeader) {
+	orfze.header = h
+}
+
 type objectMoveEvent struct {
 	header         eventHeader
 	FromLocationId uuid.UUID

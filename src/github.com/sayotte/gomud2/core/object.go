@@ -42,8 +42,16 @@ func (o Object) Name() string {
 	return o.name
 }
 
+func (o Object) Location() *Location {
+	return o.location
+}
+
 func (o *Object) setLocation(loc *Location) {
 	o.location = loc
+}
+
+func (o *Object) setZone(zone *Zone) {
+	o.zone = zone
 }
 
 func (o *Object) Move(from, to *Location) error {
@@ -131,6 +139,33 @@ func (oatze ObjectAddToZoneEvent) Name() string {
 
 func (oatze ObjectAddToZoneEvent) StartingLocationID() uuid.UUID {
 	return oatze.startingLocationId
+}
+
+func NewObjectRemoveFromZoneEvent(name string, objectID, zoneID uuid.UUID) ObjectRemoveFromZoneEvent {
+	return ObjectRemoveFromZoneEvent{
+		&eventGeneric{
+			eventType:     EventTypeObjectRemoveFromZone,
+			version:       1,
+			aggregateId:   zoneID,
+			shouldPersist: true,
+		},
+		objectID,
+		name,
+	}
+}
+
+type ObjectRemoveFromZoneEvent struct {
+	*eventGeneric
+	objectID uuid.UUID
+	name     string
+}
+
+func (orfze ObjectRemoveFromZoneEvent) ObjectID() uuid.UUID {
+	return orfze.objectID
+}
+
+func (orfze ObjectRemoveFromZoneEvent) Name() string {
+	return orfze.name
 }
 
 func NewObjectMoveEvent(fromLocationId, toLocationId, objectId, zoneId uuid.UUID) ObjectMoveEvent {

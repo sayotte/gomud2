@@ -178,6 +178,14 @@ func (z *Zone) ActorByID(id uuid.UUID) *Actor {
 	return z.actorsById[id]
 }
 
+func (z *Zone) Locations() LocationList {
+	out := make(LocationList, 0, len(z.locationsById))
+	for _, loc := range z.locationsById {
+		out = append(out, loc)
+	}
+	return out
+}
+
 func (z *Zone) LocationByID(id uuid.UUID) *Location {
 	return z.locationsById[id]
 }
@@ -220,6 +228,9 @@ func (z *Zone) apply(e Event) (interface{}, error) {
 	case EventTypeObjectAddToZone:
 		typedEvent := e.(ObjectAddToZoneEvent)
 		return z.applyObjectAddToZoneEvent(typedEvent)
+	case EventTypeObjectRemoveFromZone:
+		typedEvent := e.(ObjectRemoveFromZoneEvent)
+		return nil, z.applyObjectRemoveFromZoneEvent(typedEvent)
 	case EventTypeObjectMove:
 		typedEvent := e.(ObjectMoveEvent)
 		return nil, z.applyObjectMoveEvent(typedEvent)
@@ -441,6 +452,32 @@ func (z *Zone) applyObjectAddToZoneEvent(e ObjectAddToZoneEvent) (*Object, error
 	z.sendEventToObservers(e, newLoc.Observers())
 
 	return obj, nil
+}
+
+func (z *Zone) RemoveObject(o *Object) error {
+	e := NewObjectRemoveFromZoneEvent(o.Name(), o.ID(), z.id)
+	_, err := z.syncRequestToSelf(e)
+	return err
+}
+
+func (z *Zone) applyObjectRemoveFromZoneEvent(e ObjectRemoveFromZoneEvent) error {
+	object, found := z.objectsById[e.ObjectID()]
+	if !found {
+		return fmt.Errorf("Object %q not found in Zone", e.ObjectID())
+	}
+	oldLoc := object.Location()
+	err := oldLoc.removeObject(object)
+	if err != nil {
+		return err
+	}
+	object.setLocation(nil)
+	object.setZone(nil)
+	delete(z.objectsById, object.ID())
+
+	oList := oldLoc.Observers()
+	z.sendEventToObservers(e, oList)
+
+	return nil
 }
 
 func (z *Zone) applyObjectMoveEvent(e ObjectMoveEvent) error {
