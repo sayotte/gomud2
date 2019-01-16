@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/sayotte/gomud2/wsapi"
 	"log"
 	"path/filepath"
 	"sync"
@@ -12,8 +11,10 @@ import (
 
 	"github.com/sayotte/gomud2/auth"
 	"github.com/sayotte/gomud2/core"
+	"github.com/sayotte/gomud2/spawnreap"
 	"github.com/sayotte/gomud2/store"
 	"github.com/sayotte/gomud2/telnet"
+	"github.com/sayotte/gomud2/wsapi"
 )
 
 var version string
@@ -147,12 +148,6 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
-	actorPrim := core.NewActor(gouuid.Nil, "A man", loc1, z)
-	_, err = z.AddActor(actorPrim)
-	if err != nil {
-		panic(err)
-	}
-
 	objPrim := core.NewObject(
 		gouuid.Nil,
 		"a crumpled up napkin",
@@ -233,10 +228,20 @@ func initStartingWorld(worldConfigFile string) error {
 }
 
 func runWorld(world *core.World, cfg mudConfig) error {
+	spawnReapService := &spawnreap.Service{
+		World:       world,
+		ReapTicks:   2,
+		TickLengthS: 5,
+	}
+	err := spawnReapService.Start()
+	if err != nil {
+		return err
+	}
+
 	authServer := &auth.Server{
 		AccountDatabaseFile: "auth.db",
 	}
-	err := authServer.Start()
+	err = authServer.Start()
 	if err != nil {
 		return err
 	}
