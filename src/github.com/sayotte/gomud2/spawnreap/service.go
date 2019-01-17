@@ -3,6 +3,7 @@ package spawnreap
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -25,6 +26,8 @@ type Service struct {
 	ReapTicks int
 
 	zoneToLocToObjectAgeMap map[uuid.UUID]map[uuid.UUID]map[uuid.UUID]int
+	zoneToSpawnSpecsMap     map[uuid.UUID][]SpawnSpecification
+	rando                   *rand.Rand
 
 	tickChan chan struct{}
 	stopChan chan struct{}
@@ -35,6 +38,8 @@ func (s *Service) Start() error {
 	if s.World == nil {
 		return errors.New("uninitialized Service.World")
 	}
+
+	s.rando = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	s.zoneToLocToObjectAgeMap = make(map[uuid.UUID]map[uuid.UUID]map[uuid.UUID]int)
 	if s.TickLengthS == 0 {
@@ -131,4 +136,61 @@ func (s *Service) reapZone(zone *core.Zone) {
 		zoneMap[loc.ID()] = locMap
 	}
 	s.zoneToLocToObjectAgeMap[zone.ID()] = zoneMap
+}
+
+func (s *Service) spawnZone(zone *core.Zone) {
+	specList, found := s.zoneToSpawnSpecsMap[zone.ID()]
+	if !found {
+		return
+	}
+
+	zoneActors := zone.Actors()
+	for _, spec := range specList {
+		// determine if we should spawn anything at all
+		var currentCount int
+		for _, actor := range zoneActors {
+			if actor.Name() == spec.ActorProto.Name {
+				currentCount++
+			}
+		}
+		if currentCount >= spec.MaxCount {
+			continue
+		}
+		if s.rando.Float64() < spec.SpawnChancePerTick {
+			continue
+		}
+
+		// determine how many we should spawn
+		maxSpawnThisTick := spec.MaxCount - currentCount
+		spawnThisTick := s.rando.Intn(maxSpawnThisTick)
+		if spawnThisTick == 0 {
+			spawnThisTick = 1
+		}
+
+		// find a Location to spawn in
+		var targetLoc *core.Location
+		zoneLocs := zone.Locations()
+		for _, loc := range zoneLocs {
+			// first try to find a Location with no Actors, to help with immersion
+			// note that this includes non-player Actors; this will result in
+			// different specs' spawns being distributed around the Zone
+			if len(loc.Actors()) == 0 {
+				targetLoc = loc
+				break
+			}
+		}
+		if targetLoc == nil {
+			// failing any empty Locations, just spawn them in a random Location
+			idx := s.rando.Intn(len(zoneLocs) - 1)
+			targetLoc = zoneLocs[idx]
+		}
+
+		// spawn
+		for i := 0; i < spawnThisTick; i++ {
+			_, err := zone.AddActor(spec.ActorProto.ToActor(targetLoc))
+			if err != nil {
+				fmt.Printf("SpawnReap ERROR: zone.AddActor(...): %s\n", err)
+			}
+		}
+	}
 }

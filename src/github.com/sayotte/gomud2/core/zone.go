@@ -174,6 +174,14 @@ func (z *Zone) StopEventProcessing() {
 	z.stopWG.Wait()
 }
 
+func (z *Zone) Actors() ActorList {
+	out := make(ActorList, 0, len(z.actorsById))
+	for _, actor := range z.actorsById {
+		out = append(out, actor)
+	}
+	return out
+}
+
 func (z *Zone) ActorByID(id uuid.UUID) *Actor {
 	return z.actorsById[id]
 }
