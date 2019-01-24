@@ -194,6 +194,7 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 	weh.cmdTrie.Add("editlocation", weh.gotoEditLocationMenu())
 	weh.cmdTrie.Add("orphanlocations", weh.getOrphanLocationsHandler())
 	weh.cmdTrie.Add("editexit", weh.getEditExitHandler())
+	weh.cmdTrie.Add("remexit", weh.getRemExitHandler())
 	weh.cmdTrie.Add("commands", weh.getCommandsHandler())
 
 	return lookAtLocation(nil, terminalWidth, weh.locUnderEdit)
@@ -651,6 +652,36 @@ func (weh *worldEditHandler) handleGetExitDestState(line []byte, terminalWidth, 
 		}
 	}
 	return append([]byte("Done.\n"), weh.gotoEditExitState(weh.exitUnderEdit, terminalWidth, terminalHeight)...), weh, nil
+}
+
+func (weh *worldEditHandler) getRemExitHandler() worldEditCommandHandler {
+	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) == 0 {
+			return []byte("Usage: remexit <direction\n"), nil
+		}
+		direction := strings.ToLower(params[0])
+		if !core.ValidDirections[direction] {
+			return []byte(fmt.Sprintf("Invalid direction %q, need one of: %s\n", direction, strings.Join(orderedDirections, ", "))), nil
+		}
+
+		var exit *core.Exit
+		for _, maybeExit := range weh.locUnderEdit.OutExits() {
+			if maybeExit.Direction() == direction {
+				exit = maybeExit
+				break
+			}
+		}
+		if exit == nil {
+			return []byte(fmt.Sprintf("No exit in direction %q.\n", direction)), nil
+		}
+
+		err := weh.zoneUnderEdit.RemoveExit(exit)
+		if err != nil {
+			return []byte("Whoops..."), fmt.Errorf("Zone.RemoveExit(): %s\n", err)
+		}
+		return []byte("Done.\n"), nil
+	}
 }
 
 func invertDirection(inDir string) string {
