@@ -156,6 +156,7 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 	weh.cmdTrie.Add(core.EdgeDirectionWest, weh.getDirectionHandlerGeneric(core.EdgeDirectionWest))
 	weh.cmdTrie.Add("exit", weh.getExitHandler())
 	weh.cmdTrie.Add("look", weh.getLookHandler())
+	weh.cmdTrie.Add("inspect", weh.getInspectHandler())
 	weh.cmdTrie.Add("commands", weh.getCommandsHandler())
 
 	return lookAtLocation(nil, terminalWidth, weh.locUnderEdit)
@@ -233,6 +234,27 @@ func (weh *worldEditHandler) getDirectionHandlerGeneric(direction string) worldE
 func (weh *worldEditHandler) getExitHandler() worldEditCommandHandler {
 	return func(ignoredS string, terminalWidth, terminalHeight int) ([]byte, error) {
 		return weh.gotoMainMenu(terminalWidth, terminalHeight), nil
+	}
+}
+
+func (weh *worldEditHandler) getInspectHandler() worldEditCommandHandler {
+	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) == 0 {
+			return []byte("Inspect what? " + inspectNoSubcmdErr), nil
+		}
+		subcmd := strings.ToLower(params[0])
+		switch subcmd {
+		case inspectSubcmdLocation:
+			ilr := &inspectLocationReport{}
+			ilr.fromLocation(weh.locUnderEdit)
+			return ilr.bytes(), nil
+		case inspectSubcmdEdges:
+			ioer := inspectOutEdgesReport{location: weh.locUnderEdit}
+			return ioer.bytes(), nil
+		default:
+			return []byte(fmt.Sprintf("Don't know how to inspect %q. %s", subcmd, inspectNoSubcmdErr)), nil
+		}
 	}
 }
 

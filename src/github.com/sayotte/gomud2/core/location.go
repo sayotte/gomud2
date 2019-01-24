@@ -42,6 +42,10 @@ func (l Location) ID() uuid.UUID {
 	return l.id
 }
 
+func (l Location) Tag() string {
+	return fmt.Sprintf("%s/%s", l.shortDescription, l.id)
+}
+
 func (l Location) Zone() *Zone {
 	return l.zone
 }
