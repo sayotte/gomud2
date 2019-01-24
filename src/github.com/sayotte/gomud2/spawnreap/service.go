@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	DefaultConfigFile  = "spawnsCfg.yaml"
 	DefaultTickLengthS = 5
 	DefaultReapTicks   = 60 // 5 minutes @ 5-second ticks
 )
@@ -24,10 +25,13 @@ type Service struct {
 	TickLengthS int
 	// How many ticks to leave an object in-place before reaping it
 	ReapTicks int
+	// Full path to config file for Actor spawns
+	ConfigFile string
+	cfgdb      *spawnConfigDatabase
 
 	zoneToLocToObjectAgeMap map[uuid.UUID]map[uuid.UUID]map[uuid.UUID]int
-	zoneToSpawnSpecsMap     map[uuid.UUID][]SpawnSpecification
-	rando                   *rand.Rand
+
+	rando *rand.Rand
 
 	tickChan chan struct{}
 	stopChan chan struct{}
@@ -37,6 +41,15 @@ type Service struct {
 func (s *Service) Start() error {
 	if s.World == nil {
 		return errors.New("uninitialized Service.World")
+	}
+
+	if s.ConfigFile == "" {
+		s.ConfigFile = DefaultConfigFile
+	}
+	s.cfgdb = &spawnConfigDatabase{filename: s.ConfigFile}
+	err := s.cfgdb.load()
+	if err != nil {
+		return err
 	}
 
 	s.rando = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -91,6 +104,7 @@ func (s *Service) mainLoop() {
 func (s *Service) handleTick() {
 	for _, zone := range s.World.Zones() {
 		s.reapZone(zone)
+		s.spawnZone(zone)
 	}
 }
 
@@ -138,11 +152,16 @@ func (s *Service) reapZone(zone *core.Zone) {
 	s.zoneToLocToObjectAgeMap[zone.ID()] = zoneMap
 }
 
+func (s *Service) GetSpawnConfigForZone(zone *core.Zone) []SpawnSpecification {
+	return s.cfgdb.getEntryForZone(zone)
+}
+
+func (s *Service) PutSpawnConfigForZone(specList []SpawnSpecification, zone *core.Zone) error {
+	return s.cfgdb.putEntryForZone(specList, zone)
+}
+
 func (s *Service) spawnZone(zone *core.Zone) {
-	specList, found := s.zoneToSpawnSpecsMap[zone.ID()]
-	if !found {
-		return
-	}
+	specList := s.cfgdb.getEntryForZone(zone)
 
 	zoneActors := zone.Actors()
 	for _, spec := range specList {
@@ -156,7 +175,8 @@ func (s *Service) spawnZone(zone *core.Zone) {
 		if currentCount >= spec.MaxCount {
 			continue
 		}
-		if s.rando.Float64() < spec.SpawnChancePerTick {
+		diceRoll := s.rando.Float64()
+		if diceRoll >= spec.SpawnChancePerTick {
 			continue
 		}
 

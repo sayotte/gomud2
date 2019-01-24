@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"path/filepath"
 	"sync"
 
@@ -92,7 +93,7 @@ func initStartingWorld(worldConfigFile string) error {
 		Filename:       "store/events.dat",
 		UseCompression: true,
 	}
-	z := core.NewZone(gouuid.Nil, eStore)
+	z := core.NewZone(gouuid.Nil, "overworld", eStore)
 	z.StartEventProcessing()
 
 	shortDesc := "A nearby bar"
@@ -159,7 +160,7 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
-	z2 := core.NewZone(gouuid.Nil, eStore)
+	z2 := core.NewZone(gouuid.Nil, "123 Elm St", eStore)
 	z2.StartEventProcessing()
 
 	shortDesc = "The Foxhunt Room"
@@ -202,13 +203,39 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
+	spawnSpec := spawnreap.SpawnSpecification{
+		ActorProto: spawnreap.ActorPrototype{
+			Name: "a rabbit",
+		},
+		MaxCount:           30,
+		MaxSpawnAtOneTime:  10,
+		SpawnChancePerTick: 0.5,
+	}
+	spawnReapSvc := spawnreap.Service{
+		World:       &core.World{},
+		TickLengthS: int(math.MaxInt64),
+		ConfigFile:  spawnreap.DefaultConfigFile,
+	}
+	err = spawnReapSvc.Start()
+	if err != nil {
+		panic(err)
+	}
+	err = spawnReapSvc.PutSpawnConfigForZone(
+		[]spawnreap.SpawnSpecification{spawnSpec},
+		z,
+	)
+	if err != nil {
+		panic(err)
+	}
+	spawnReapSvc.Stop()
+
 	cfg := mudConfig{
 		World: worldConfig{
 			DefaultZoneID:     z.ID(),
 			DefaultLocationID: loc1.ID(),
-			ZonesToLoad: []gouuid.UUID{
-				z.ID(),
-				z2.ID(),
+			ZonesToLoad: []string{
+				z.Tag(),
+				z2.Tag(),
 			},
 		},
 		Store: storeConfig{
@@ -223,6 +250,11 @@ func initStartingWorld(worldConfigFile string) error {
 		WSAPI: wsAPIConfig{
 			ListenAddr: wsapi.DefaultListenAddr,
 		},
+		SpawnReap: spawnReapConfig{
+			SpawnsConfigFile:    spawnreap.DefaultConfigFile,
+			TicksUntilReap:      spawnreap.DefaultReapTicks,
+			TickLengthInSeconds: spawnreap.DefaultTickLengthS,
+		},
 	}
 	return cfg.SerializeToFile(worldConfigFile)
 }
@@ -230,8 +262,8 @@ func initStartingWorld(worldConfigFile string) error {
 func runWorld(world *core.World, cfg mudConfig) error {
 	spawnReapService := &spawnreap.Service{
 		World:       world,
-		ReapTicks:   2,
-		TickLengthS: 5,
+		ReapTicks:   cfg.SpawnReap.TicksUntilReap,
+		TickLengthS: cfg.SpawnReap.TickLengthInSeconds,
 	}
 	err := spawnReapService.Start()
 	if err != nil {

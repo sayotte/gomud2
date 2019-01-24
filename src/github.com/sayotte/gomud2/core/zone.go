@@ -1,22 +1,27 @@
 package core
 
 import (
+	"errors"
 	"fmt"
-	"github.com/satori/go.uuid"
-	"github.com/sayotte/gomud2/rpc"
-	myuuid "github.com/sayotte/gomud2/uuid"
 	"log"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/satori/go.uuid"
+
+	"github.com/sayotte/gomud2/rpc"
+	myuuid "github.com/sayotte/gomud2/uuid"
 )
 
-func NewZone(id uuid.UUID, persister EventPersister) *Zone {
+func NewZone(id uuid.UUID, nickname string, persister EventPersister) *Zone {
 	newID := id
 	if uuid.Equal(id, uuid.Nil) {
 		newID = myuuid.NewId()
 	}
 	return &Zone{
 		id:            newID,
+		nickname:      nickname,
 		actorsById:    make(map[uuid.UUID]*Actor),
 		locationsById: make(map[uuid.UUID]*Location),
 		edgesById:     make(map[uuid.UUID]*LocationEdge),
@@ -27,6 +32,7 @@ func NewZone(id uuid.UUID, persister EventPersister) *Zone {
 
 type Zone struct {
 	id             uuid.UUID
+	nickname       string
 	world          *World
 	nextSequenceId uint64
 	actorsById     map[uuid.UUID]*Actor
@@ -44,6 +50,14 @@ type Zone struct {
 
 func (z *Zone) ID() uuid.UUID {
 	return z.id
+}
+
+func (z *Zone) Nickname() string {
+	return z.nickname
+}
+
+func (z *Zone) Tag() string {
+	return strings.Join([]string{z.nickname, z.id.String()}, "/")
 }
 
 func (z *Zone) setPersister(ep EventPersister) {

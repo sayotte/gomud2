@@ -8,16 +8,17 @@ import (
 )
 
 type mudConfig struct {
-	World  worldConfig  `yaml:"world"`
-	Store  storeConfig  `yaml:"store"`
-	Telnet telnetConfig `yaml:"telnet"`
-	WSAPI  wsAPIConfig  `yaml:"wsAPI"`
+	World     worldConfig     `yaml:"world"`
+	Store     storeConfig     `yaml:"store"`
+	Telnet    telnetConfig    `yaml:"telnet"`
+	WSAPI     wsAPIConfig     `yaml:"wsAPI"`
+	SpawnReap spawnReapConfig `yaml:"spawnReap"`
 }
 
 type worldConfig struct {
-	DefaultZoneID     uuid.UUID   `yaml:"defaultZoneID"`
-	DefaultLocationID uuid.UUID   `yaml:"defaultLocationID"`
-	ZonesToLoad       []uuid.UUID `yaml:"zonesToLoad"`
+	DefaultZoneID     uuid.UUID `yaml:"defaultZoneID"`
+	DefaultLocationID uuid.UUID `yaml:"defaultLocationID"`
+	ZonesToLoad       []string  `yaml:"zonesToLoad"`
 }
 
 type storeConfig struct {
@@ -33,6 +34,12 @@ type telnetConfig struct {
 
 type wsAPIConfig struct {
 	ListenAddr string `yaml:"listenAddr"`
+}
+
+type spawnReapConfig struct {
+	SpawnsConfigFile    string `yaml:"spawnsConfigFile"`
+	TicksUntilReap      int    `yaml:"ticksUntilReap"`
+	TickLengthInSeconds int    `yaml:"tickLengthInSeconds"`
 }
 
 func (mc mudConfig) SerializeToFile(filename string) error {

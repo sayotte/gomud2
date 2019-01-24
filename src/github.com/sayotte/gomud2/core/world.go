@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/satori/go.uuid"
 	"github.com/sayotte/gomud2/rpc"
+	"strings"
 	"sync"
 )
 
@@ -36,7 +37,7 @@ type World struct {
 	commandChan chan rpc.Request
 }
 
-func (w *World) LoadAndStart(zoneIDs []uuid.UUID, defaultZoneID, defaultLocID uuid.UUID) error {
+func (w *World) LoadAndStart(zoneTags []string, defaultZoneID, defaultLocID uuid.UUID) error {
 	if w.DataStore == nil {
 		return errors.New("World.DataStore must be non-nil")
 	}
@@ -49,9 +50,14 @@ func (w *World) LoadAndStart(zoneIDs []uuid.UUID, defaultZoneID, defaultLocID uu
 		return err
 	}
 
-	for _, zoneID := range zoneIDs {
-		z := NewZone(zoneID, nil)
-		err := w.AddZone(z)
+	for _, zoneTag := range zoneTags {
+		tagParts := strings.Split(zoneTag, "/")
+		zoneID, err := uuid.FromString(tagParts[1])
+		if err != nil {
+			return fmt.Errorf("uuid.FromString(%q): %s", tagParts[1], err)
+		}
+		z := NewZone(zoneID, tagParts[0], nil)
+		err = w.AddZone(z)
 		if err != nil {
 			return err
 		}
@@ -294,15 +300,17 @@ func (w *World) handleSnapshot() error {
 		zone.StopEventProcessing()
 	}
 	zoneIDToSeqNum := make(map[uuid.UUID]uint64)
+	zoneIDToNickname := make(map[uuid.UUID]string)
 	for _, zone := range w.zones {
 		zoneIDToSeqNum[zone.ID()] = zone.LastSequenceNum()
+		zoneIDToNickname[zone.ID()] = zone.Nickname()
 		// restart processing events for each zone after getting its current
 		// sequence number
 		zone.StartEventProcessing()
 	}
 
 	for zoneId, seqNum := range zoneIDToSeqNum {
-		zone := NewZone(zoneId, nil)
+		zone := NewZone(zoneId, zoneIDToNickname[zoneId], nil)
 		eChan, err := w.DataStore.RetrieveEventsUpToSequenceNumForZone(seqNum, zoneId)
 		if err != nil {
 			return err
