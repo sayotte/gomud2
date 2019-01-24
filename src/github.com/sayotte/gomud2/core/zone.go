@@ -217,6 +217,16 @@ func (z *Zone) Exits() ExitList {
 	return out
 }
 
+func (z *Zone) ExitsToLocation(loc *Location) ExitList {
+	var out ExitList
+	for _, exit := range z.exitsById {
+		if exit.Destination() == loc {
+			out = append(out, exit)
+		}
+	}
+	return out
+}
+
 func (z *Zone) LocationByID(id uuid.UUID) *Location {
 	return z.locationsById[id]
 }

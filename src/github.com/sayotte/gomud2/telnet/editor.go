@@ -197,6 +197,7 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 	weh.cmdTrie.Add("inspect", weh.getInspectHandler())
 	weh.cmdTrie.Add("newlocation", weh.getNewlocationHandler())
 	weh.cmdTrie.Add("editlocation", weh.gotoEditLocationMenu())
+	weh.cmdTrie.Add("remlocation", weh.getRemLocationHandler())
 	weh.cmdTrie.Add("orphanlocations", weh.getOrphanLocationsHandler())
 	weh.cmdTrie.Add("setdefaultlocation", weh.getSetDefaultLocHandler())
 	weh.cmdTrie.Add("editexit", weh.getEditExitHandler())
@@ -496,6 +497,52 @@ func (weh *worldEditHandler) getSetDefaultLocHandler() worldEditCommandHandler {
 		if err != nil {
 			return []byte("Whoops...\n"), fmt.Errorf("Zone.SetDefaultLocation(): %s", err)
 		}
+		return []byte("Done.\n"), nil
+	}
+}
+
+func (weh *worldEditHandler) getRemLocationHandler() worldEditCommandHandler {
+	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) != 1 || (len(params) == 1 && params[0] == "") {
+			return []byte("Usage: remlocation <location ID>\n"), nil
+		}
+		locID, err := uuid.FromString(params[0])
+		if err != nil {
+			return []byte(fmt.Sprintf("Invalid Location ID: %s\n", err)), nil
+		}
+		loc := weh.zoneUnderEdit.LocationByID(locID)
+		if loc == nil {
+			return []byte(fmt.Sprintf("No Location with ID %q in Zone\n", locID)), nil
+		}
+		if loc == weh.zoneUnderEdit.DefaultLocation() {
+			return []byte("Cannot remove Zone's default location, use 'setdefaultlocation' to set another one first.\n"), nil
+		}
+
+		dstLoc := weh.zoneUnderEdit.DefaultLocation()
+		for _, actor := range loc.Actors() {
+			err = actor.AdminRelocate(dstLoc)
+			if err != nil {
+				return []byte("Whoops..."), fmt.Errorf("Actor.AdminRelocate(): %s", err)
+			}
+		}
+		for _, outExit := range loc.OutExits() {
+			err = weh.zoneUnderEdit.RemoveExit(outExit)
+			if err != nil {
+				return []byte("Whoops..."), fmt.Errorf("Zone.RemoveExit(out): %s", err)
+			}
+		}
+		for _, inExit := range weh.zoneUnderEdit.ExitsToLocation(loc) {
+			err = weh.zoneUnderEdit.RemoveExit(inExit)
+			if err != nil {
+				return []byte("Whoops..."), fmt.Errorf("Zone.RemoveExit(in): %s", err)
+			}
+		}
+		err = weh.zoneUnderEdit.RemoveLocation(loc)
+		if err != nil {
+			return []byte("Whoops..."), fmt.Errorf("Zone.RemoveLocation(): %s", err)
+		}
+
 		return []byte("Done.\n"), nil
 	}
 }
