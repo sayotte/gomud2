@@ -200,6 +200,7 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 	weh.cmdTrie.Add("remlocation", weh.getRemLocationHandler())
 	weh.cmdTrie.Add("orphanlocations", weh.getOrphanLocationsHandler())
 	weh.cmdTrie.Add("setdefaultlocation", weh.getSetDefaultLocHandler())
+	weh.cmdTrie.Add("newexit", weh.getNewExitHandler())
 	weh.cmdTrie.Add("editexit", weh.getEditExitHandler())
 	weh.cmdTrie.Add("remexit", weh.getRemExitHandler())
 	weh.cmdTrie.Add("commands", weh.getCommandsHandler())
@@ -543,6 +544,66 @@ func (weh *worldEditHandler) getRemLocationHandler() worldEditCommandHandler {
 			return []byte("Whoops..."), fmt.Errorf("Zone.RemoveLocation(): %s", err)
 		}
 
+		return []byte("Done.\n"), nil
+	}
+}
+
+func (weh *worldEditHandler) getNewExitHandler() worldEditCommandHandler {
+	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) != 2 || params[0] == "" || params[1] == "" {
+			return []byte("Usage: newexit <direction> <zone ID>/<location ID>\n"), nil
+		}
+		locParams := strings.Split(params[1], "/")
+		if len(locParams) != 2 {
+			return []byte("Usage: newexit <direction> <zone ID>/<location ID>\n"), nil
+		}
+		direction := strings.ToLower(params[0])
+		if !core.ValidDirections[direction] {
+			return []byte(fmt.Sprintf("Invalid direction %q, need one of: %s\n", direction, strings.Join(orderedDirections, ", "))), nil
+		}
+		zoneID, err := uuid.FromString(locParams[0])
+		if err != nil {
+			return []byte(fmt.Sprintf("Invalid Zone ID: %s\n", err)), nil
+		}
+		locID, err := uuid.FromString(locParams[1])
+		if err != nil {
+			return []byte(fmt.Sprintf("Invalid Location ID: %s\n", err)), nil
+		}
+		var exitPrim *core.Exit
+		if uuid.Equal(weh.zoneUnderEdit.ID(), zoneID) {
+			// internal zone link
+			dstLoc := weh.zoneUnderEdit.LocationByID(locID)
+			if dstLoc == nil {
+				return []byte(fmt.Sprintf("No Location with ID %q in Zone\n", locID)), nil
+			}
+			exitPrim = core.NewExit(
+				uuid.Nil,
+				fmt.Sprintf("To %s", dstLoc.Tag()),
+				direction,
+				weh.locUnderEdit,
+				dstLoc,
+				weh.zoneUnderEdit,
+				uuid.Nil,
+				uuid.Nil,
+			)
+		} else {
+			// cross-zone link
+			exitPrim = core.NewExit(
+				uuid.Nil,
+				fmt.Sprintf("To %s/%s", zoneID, locID),
+				direction,
+				weh.locUnderEdit,
+				nil,
+				weh.zoneUnderEdit,
+				zoneID,
+				locID,
+			)
+		}
+		_, err = weh.zoneUnderEdit.AddExit(exitPrim)
+		if err != nil {
+			return []byte("Whoops...\n"), fmt.Errorf("Zone.AddExit(): %s", err)
+		}
 		return []byte("Done.\n"), nil
 	}
 }
