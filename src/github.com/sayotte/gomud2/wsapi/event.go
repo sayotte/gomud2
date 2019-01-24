@@ -14,7 +14,7 @@ const (
 	EventTypeActorAddToZone      = "actor-add-to-zone"
 	EventTypeActorRemoveFromZone = "actor-remove-from-zone"
 	//EventTypeLocationAddToZone
-	//EventTypeLocationEdgeAddToZone
+	//EventTypeExitAddToZone
 	EventTypeObjectAddToZone      = "object-add-to-zone"
 	EventTypeObjectRemoveFromZone = "object-remove-from-zone"
 	EventTypeObjectMove           = "object-move"

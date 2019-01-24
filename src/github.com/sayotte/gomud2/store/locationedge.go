@@ -5,84 +5,84 @@ import (
 	"github.com/sayotte/gomud2/core"
 )
 
-type locationEdgeAddToZoneEvent struct {
+type exitAddToZoneEvent struct {
 	header                                               eventHeader
 	Description, Direction                               string
-	EdgeID, SourceLocationID, DestLocationID, DestZoneID uuid.UUID
+	ExitID, SourceLocationID, DestLocationID, DestZoneID uuid.UUID
 }
 
-func (leatze locationEdgeAddToZoneEvent) ToDomain() core.Event {
-	e := core.NewLocationEdgeAddToZoneEvent(
-		leatze.Description,
-		leatze.Direction,
-		leatze.EdgeID,
-		leatze.SourceLocationID,
-		leatze.DestLocationID,
-		leatze.header.AggregateId,
-		leatze.DestZoneID,
+func (eatze exitAddToZoneEvent) ToDomain() core.Event {
+	e := core.NewExitAddToZoneEvent(
+		eatze.Description,
+		eatze.Direction,
+		eatze.ExitID,
+		eatze.SourceLocationID,
+		eatze.DestLocationID,
+		eatze.header.AggregateId,
+		eatze.DestZoneID,
 	)
-	e.SetSequenceNumber(leatze.header.SequenceNumber)
+	e.SetSequenceNumber(eatze.header.SequenceNumber)
 	return e
 }
 
-func (leatze *locationEdgeAddToZoneEvent) FromDomain(e core.Event) {
-	from := e.(core.LocationEdgeAddToZoneEvent)
-	*leatze = locationEdgeAddToZoneEvent{
+func (eatze *exitAddToZoneEvent) FromDomain(e core.Event) {
+	from := e.(core.ExitAddToZoneEvent)
+	*eatze = exitAddToZoneEvent{
 		header:           eventHeaderFromDomainEvent(from),
 		Description:      from.Description,
 		Direction:        from.Direction,
-		EdgeID:           from.EdgeId,
+		ExitID:           from.ExitID,
 		SourceLocationID: from.SourceLocationId,
 		DestLocationID:   from.DestLocationId,
 		DestZoneID:       from.DestZoneID,
 	}
 }
 
-func (leatze locationEdgeAddToZoneEvent) Header() eventHeader {
-	return leatze.header
+func (eatze exitAddToZoneEvent) Header() eventHeader {
+	return eatze.header
 }
 
-func (leatze *locationEdgeAddToZoneEvent) SetHeader(h eventHeader) {
-	leatze.header = h
+func (eatze *exitAddToZoneEvent) SetHeader(h eventHeader) {
+	eatze.header = h
 }
 
-type locationEdgeUpdateEvent struct {
+type exitUpdateEvent struct {
 	header                                               eventHeader
 	Description, Direction                               string
-	EdgeID, SourceLocationID, DestLocationID, DestZoneID uuid.UUID
+	ExitID, SourceLocationID, DestLocationID, DestZoneID uuid.UUID
 }
 
-func (leue locationEdgeUpdateEvent) ToDomain() core.Event {
-	e := core.NewLocationEdgeUpdateEvent(
-		leue.Description,
-		leue.Direction,
-		leue.EdgeID,
-		leue.SourceLocationID,
-		leue.DestLocationID,
-		leue.header.AggregateId,
-		leue.DestZoneID,
+func (exue exitUpdateEvent) ToDomain() core.Event {
+	e := core.NewExitUpdateEvent(
+		exue.Description,
+		exue.Direction,
+		exue.ExitID,
+		exue.SourceLocationID,
+		exue.DestLocationID,
+		exue.header.AggregateId,
+		exue.DestZoneID,
 	)
-	e.SetSequenceNumber(leue.header.SequenceNumber)
+	e.SetSequenceNumber(exue.header.SequenceNumber)
 	return e
 }
 
-func (leue *locationEdgeUpdateEvent) FromDomain(e core.Event) {
-	from := e.(core.LocationEdgeUpdateEvent)
-	*leue = locationEdgeUpdateEvent{
+func (exue *exitUpdateEvent) FromDomain(e core.Event) {
+	from := e.(core.ExitUpdateEvent)
+	*exue = exitUpdateEvent{
 		header:           eventHeaderFromDomainEvent(from),
 		Description:      from.Description,
 		Direction:        from.Direction,
-		EdgeID:           from.EdgeId,
+		ExitID:           from.ExitID,
 		SourceLocationID: from.SourceLocationId,
 		DestLocationID:   from.DestLocationId,
 		DestZoneID:       from.DestZoneID,
 	}
 }
 
-func (leue locationEdgeUpdateEvent) Header() eventHeader {
-	return leue.header
+func (exue exitUpdateEvent) Header() eventHeader {
+	return exue.header
 }
 
-func (leue *locationEdgeUpdateEvent) SetHeader(h eventHeader) {
-	leue.header = h
+func (exue *exitUpdateEvent) SetHeader(h eventHeader) {
+	exue.header = h
 }

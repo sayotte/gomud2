@@ -10,22 +10,22 @@ import (
 
 const (
 	inspectSubcmdLocation = "location"
-	inspectSubcmdEdges    = "edges"
+	inspectSubcmdExits    = "exits"
 )
 
 var (
 	allInspectSubcommands = []string{
-		inspectSubcmdEdges,
+		inspectSubcmdExits,
 		inspectSubcmdLocation,
 	}
 	inspectNoSubcmdErr = fmt.Sprintf("Need one of: %s\n", strings.Join(allInspectSubcommands, ", "))
 )
 
 var orderedDirections = []string{
-	core.EdgeDirectionNorth,
-	core.EdgeDirectionSouth,
-	core.EdgeDirectionEast,
-	core.EdgeDirectionWest,
+	core.ExitDirectionNorth,
+	core.ExitDirectionSouth,
+	core.ExitDirectionEast,
+	core.ExitDirectionWest,
 }
 
 type inspectLocationReport struct {
@@ -50,23 +50,23 @@ func (ilr inspectLocationReport) bytes() []byte {
 	return outBytes
 }
 
-type inspectOutEdgesReport struct {
+type inspectOutExitsReport struct {
 	location *core.Location
 }
 
-func (ioer inspectOutEdgesReport) bytes() []byte {
-	directionToEdgeReportMap := make(map[string]*inspectLocationEdgeReport)
-	for _, edge := range ioer.location.OutEdges() {
-		edgeReport := &inspectLocationEdgeReport{}
-		edgeReport.fromLocationEdge(edge)
-		directionToEdgeReportMap[edge.Direction()] = edgeReport
+func (ioer inspectOutExitsReport) bytes() []byte {
+	directionToExitReportMap := make(map[string]*inspectExitReport)
+	for _, exit := range ioer.location.OutExits() {
+		exitReport := &inspectExitReport{}
+		exitReport.fromExit(exit)
+		directionToExitReportMap[exit.Direction()] = exitReport
 	}
 
 	var out yaml.MapSlice
 	for _, dir := range orderedDirections {
 		out = append(out, yaml.MapItem{
 			Key:   dir,
-			Value: directionToEdgeReportMap[dir],
+			Value: directionToExitReportMap[dir],
 		})
 	}
 
@@ -77,7 +77,7 @@ func (ioer inspectOutEdgesReport) bytes() []byte {
 	return outBytes
 }
 
-type inspectLocationEdgeReport struct {
+type inspectExitReport struct {
 	ID              uuid.UUID
 	Zone            string
 	Description     string
@@ -88,23 +88,23 @@ type inspectLocationEdgeReport struct {
 	OtherLocationID uuid.UUID
 }
 
-func (iler *inspectLocationEdgeReport) fromLocationEdge(edge *core.LocationEdge) {
-	iler.ID = edge.ID()
-	iler.Zone = edge.Zone().Tag()
-	iler.Description = edge.Description()
-	iler.Direction = edge.Direction()
-	if edge.Source() != nil {
-		iler.Source = edge.Source().Tag()
+func (ixr *inspectExitReport) fromExit(exit *core.Exit) {
+	ixr.ID = exit.ID()
+	ixr.Zone = exit.Zone().Tag()
+	ixr.Description = exit.Description()
+	ixr.Direction = exit.Direction()
+	if exit.Source() != nil {
+		ixr.Source = exit.Source().Tag()
 	}
-	if edge.Destination() != nil {
-		iler.Destination = edge.Destination().Tag()
+	if exit.Destination() != nil {
+		ixr.Destination = exit.Destination().Tag()
 	}
-	iler.OtherZoneID = edge.OtherZoneID()
-	iler.OtherLocationID = edge.OtherZoneLocID()
+	ixr.OtherZoneID = exit.OtherZoneID()
+	ixr.OtherLocationID = exit.OtherZoneLocID()
 }
 
-func (iler inspectLocationEdgeReport) bytes() []byte {
-	outBytes, err := yaml.Marshal(iler)
+func (ixr inspectExitReport) bytes() []byte {
+	outBytes, err := yaml.Marshal(ixr)
 	if err != nil {
 		return []byte(fmt.Sprintf("ERROR: yaml.Marshal(): %s\n", err))
 	}

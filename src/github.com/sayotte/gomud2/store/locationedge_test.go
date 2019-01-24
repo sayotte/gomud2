@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-func TestLocationEdgeAddToZoneEvent_roundtrip(t *testing.T) {
-	cmpDomainLeatze := func(left, right core.LocationEdgeAddToZoneEvent) (bool, string) {
+func TestExitAddToZoneEvent_roundtrip(t *testing.T) {
+	cmpDomainLeatze := func(left, right core.ExitAddToZoneEvent) (bool, string) {
 		if left.Type() != right.Type() {
 			return false, fmt.Sprintf("Type(): %d != %d", left.Type(), right.Type())
 		}
@@ -26,8 +26,8 @@ func TestLocationEdgeAddToZoneEvent_roundtrip(t *testing.T) {
 			return false, fmt.Sprintf("ShouldPersist(): %t != %t", left.ShouldPersist(), right.ShouldPersist())
 		}
 
-		if !uuid.Equal(left.EdgeId, right.EdgeId) {
-			return false, fmt.Sprintf("EdgeID: %q != %q", left.EdgeId, right.EdgeId)
+		if !uuid.Equal(left.ExitID, right.ExitID) {
+			return false, fmt.Sprintf("ExitID: %q != %q", left.ExitID, right.ExitID)
 		}
 		if left.Description != right.Description {
 			return false, fmt.Sprintf("description: %q != %q", left.Description, right.Description)
@@ -48,7 +48,7 @@ func TestLocationEdgeAddToZoneEvent_roundtrip(t *testing.T) {
 		return true, ""
 	}
 
-	inEvent := core.NewLocationEdgeAddToZoneEvent(
+	inEvent := core.NewExitAddToZoneEvent(
 		"desc",
 		"direction",
 		myuuid.NewId(),
@@ -59,11 +59,11 @@ func TestLocationEdgeAddToZoneEvent_roundtrip(t *testing.T) {
 	)
 	inEvent.SetSequenceNumber(97)
 
-	leatze := &locationEdgeAddToZoneEvent{}
+	leatze := &exitAddToZoneEvent{}
 	leatze.FromDomain(inEvent)
 	outEvent := leatze.ToDomain()
 
-	same, why := cmpDomainLeatze(inEvent, outEvent.(core.LocationEdgeAddToZoneEvent))
+	same, why := cmpDomainLeatze(inEvent, outEvent.(core.ExitAddToZoneEvent))
 	if !same {
 		t.Error(why)
 	}

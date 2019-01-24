@@ -32,17 +32,17 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 		return gh.handleCommandLook(terminalWidth)
 	}))
 
-	gh.cmdTrie.Add(core.EdgeDirectionNorth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
-		return gh.handleCommandMoveGeneric(terminalWidth, core.EdgeDirectionNorth)
+	gh.cmdTrie.Add(core.ExitDirectionNorth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
+		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionNorth)
 	}))
-	gh.cmdTrie.Add(core.EdgeDirectionSouth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
-		return gh.handleCommandMoveGeneric(terminalWidth, core.EdgeDirectionSouth)
+	gh.cmdTrie.Add(core.ExitDirectionSouth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
+		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionSouth)
 	}))
-	gh.cmdTrie.Add(core.EdgeDirectionEast, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
-		return gh.handleCommandMoveGeneric(terminalWidth, core.EdgeDirectionEast)
+	gh.cmdTrie.Add(core.ExitDirectionEast, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
+		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionEast)
 	}))
-	gh.cmdTrie.Add(core.EdgeDirectionWest, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
-		return gh.handleCommandMoveGeneric(terminalWidth, core.EdgeDirectionWest)
+	gh.cmdTrie.Add(core.ExitDirectionWest, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
+		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionWest)
 	}))
 
 	return lookAtLocation(core.ActorList{gh.actor}, terminalWidth, gh.actor.Location())
@@ -129,19 +129,19 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMove
 
 	if fromID == gh.actor.Location().ID() {
 		// this is a departure
-		outEdge := edgeRelativeToLocation(from, to)
-		if outEdge == nil {
+		outExit := exitRelativeToLocation(from, to)
+		if outExit == nil {
 			return []byte(fmt.Sprintf("%s departs to... somewhere.\n", actorName)), nil
 		}
-		return []byte(fmt.Sprintf("%s departs to the %s.\n", actorName, outEdge.Direction())), nil
+		return []byte(fmt.Sprintf("%s departs to the %s.\n", actorName, outExit.Direction())), nil
 
 	} else if toID == gh.actor.Location().ID() {
 		// this is an arrival
-		outEdge := edgeRelativeToLocation(to, from)
-		if outEdge == nil {
+		outExit := exitRelativeToLocation(to, from)
+		if outExit == nil {
 			return []byte(fmt.Sprintf("%s arrives from... somewhere.\n", actorName)), nil
 		}
-		return []byte(fmt.Sprintf("%s arrives from the %s.\n", actorName, outEdge.Direction())), nil
+		return []byte(fmt.Sprintf("%s arrives from the %s.\n", actorName, outExit.Direction())), nil
 	} else {
 		// the only way we can be getting this event is if we're subscribed to watching
 		// someone else's actions
@@ -154,16 +154,16 @@ func (gh *gameHandler) handleEventObjectRemoved(terminalWidth int, e core.Object
 }
 
 var locationExitDisplayOrder = []string{
-	core.EdgeDirectionNorth,
-	core.EdgeDirectionSouth,
-	core.EdgeDirectionEast,
-	core.EdgeDirectionWest,
+	core.ExitDirectionNorth,
+	core.ExitDirectionSouth,
+	core.ExitDirectionEast,
+	core.ExitDirectionWest,
 }
 
-func edgeRelativeToLocation(baseLoc, otherLoc *core.Location) *core.LocationEdge {
-	for _, edge := range baseLoc.OutEdges() {
-		if edge.Destination() == otherLoc {
-			return edge
+func exitRelativeToLocation(baseLoc, otherLoc *core.Location) *core.Exit {
+	for _, exit := range baseLoc.OutExits() {
+		if exit.Destination() == otherLoc {
+			return exit
 		}
 	}
 	return nil
@@ -202,19 +202,19 @@ func lookAtLocation(ignoreActors core.ActorList, terminalWidth int, loc *core.Lo
 	}
 
 	var exitClause string
-	edges := loc.OutEdges()
-	if len(edges) > 0 {
+	exits := loc.OutExits()
+	if len(exits) > 0 {
 		exitClause = "\nObvious exits:\n"
-		exitMap := make(map[string]*core.LocationEdge)
-		for _, edge := range edges {
-			exitMap[edge.Direction()] = edge
+		exitMap := make(map[string]*core.Exit)
+		for _, exit := range exits {
+			exitMap[exit.Direction()] = exit
 		}
 		for _, direction := range locationExitDisplayOrder {
-			edge, found := exitMap[direction]
+			exit, found := exitMap[direction]
 			if !found {
 				continue
 			}
-			exitClause += fmt.Sprintf("%s\t- %s\n", direction, edge.Description())
+			exitClause += fmt.Sprintf("%s\t- %s\n", direction, exit.Description())
 		}
 	}
 

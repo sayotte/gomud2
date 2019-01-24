@@ -10,25 +10,25 @@ import (
 )
 
 const (
-	EdgeDirectionNorth = "north"
-	EdgeDirectionSouth = "south"
-	EdgeDirectionEast  = "east"
-	EdgeDirectionWest  = "west"
+	ExitDirectionNorth = "north"
+	ExitDirectionSouth = "south"
+	ExitDirectionEast  = "east"
+	ExitDirectionWest  = "west"
 )
 
 var ValidDirections = map[string]bool{
-	EdgeDirectionNorth: true,
-	EdgeDirectionSouth: true,
-	EdgeDirectionEast:  true,
-	EdgeDirectionWest:  true,
+	ExitDirectionNorth: true,
+	ExitDirectionSouth: true,
+	ExitDirectionEast:  true,
+	ExitDirectionWest:  true,
 }
 
-func NewLocationEdge(id uuid.UUID, desc, direction string, src, dest *Location, zone *Zone, otherZoneID, otherLocID uuid.UUID) *LocationEdge {
+func NewExit(id uuid.UUID, desc, direction string, src, dest *Location, zone *Zone, otherZoneID, otherLocID uuid.UUID) *Exit {
 	newID := id
 	if uuid.Equal(id, uuid.Nil) {
 		newID = myuuid.NewId()
 	}
-	return &LocationEdge{
+	return &Exit{
 		id:             newID,
 		description:    desc,
 		direction:      direction,
@@ -41,7 +41,7 @@ func NewLocationEdge(id uuid.UUID, desc, direction string, src, dest *Location, 
 	}
 }
 
-type LocationEdge struct {
+type Exit struct {
 	id             uuid.UUID
 	description    string // e.g. "a small door"
 	direction      string // e.g. "north" or "forward"
@@ -51,148 +51,148 @@ type LocationEdge struct {
 	otherZoneID    uuid.UUID
 	otherZoneLocID uuid.UUID
 	// This is the channel where the Zone picks up new events related to this
-	// Edge. This should never be directly exposed by an accessor; public methods
+	// Exit. This should never be directly exposed by an accessor; public methods
 	// should create events and send them to the channel.
 	requestChan chan rpc.Request
 }
 
-func (le LocationEdge) ID() uuid.UUID {
-	return le.id
+func (ex Exit) ID() uuid.UUID {
+	return ex.id
 }
 
-func (le LocationEdge) Description() string {
-	return le.description
+func (ex Exit) Description() string {
+	return ex.description
 }
 
-func (le *LocationEdge) setDescription(s string) {
-	le.description = s
+func (ex *Exit) setDescription(s string) {
+	ex.description = s
 }
 
-func (le LocationEdge) Direction() string {
-	return le.direction
+func (ex Exit) Direction() string {
+	return ex.direction
 }
 
-func (le *LocationEdge) setDirection(s string) {
-	le.direction = s
+func (ex *Exit) setDirection(s string) {
+	ex.direction = s
 }
 
-func (le LocationEdge) Source() *Location {
-	return le.source
+func (ex Exit) Source() *Location {
+	return ex.source
 }
 
-func (le *LocationEdge) setSource(loc *Location) {
-	le.source = loc
+func (ex *Exit) setSource(loc *Location) {
+	ex.source = loc
 }
 
-func (le LocationEdge) Destination() *Location {
-	return le.destination
+func (ex Exit) Destination() *Location {
+	return ex.destination
 }
 
-func (le *LocationEdge) setDestination(loc *Location) {
-	le.destination = loc
+func (ex *Exit) setDestination(loc *Location) {
+	ex.destination = loc
 }
 
-func (le LocationEdge) OtherZoneID() uuid.UUID {
-	return le.otherZoneID
+func (ex Exit) OtherZoneID() uuid.UUID {
+	return ex.otherZoneID
 }
 
-func (le *LocationEdge) setOtherZoneID(id uuid.UUID) {
-	le.otherZoneID = id
+func (ex *Exit) setOtherZoneID(id uuid.UUID) {
+	ex.otherZoneID = id
 }
 
-func (le LocationEdge) OtherZoneLocID() uuid.UUID {
-	return le.otherZoneLocID
+func (ex Exit) OtherZoneLocID() uuid.UUID {
+	return ex.otherZoneLocID
 }
 
-func (le *LocationEdge) setOtherZoneLocID(id uuid.UUID) {
-	le.otherZoneLocID = id
+func (ex *Exit) setOtherZoneLocID(id uuid.UUID) {
+	ex.otherZoneLocID = id
 }
 
-func (le LocationEdge) Zone() *Zone {
-	return le.zone
+func (ex Exit) Zone() *Zone {
+	return ex.zone
 }
 
-func (le LocationEdge) Update(desc, direction string, source, dest *Location, extZoneID, extLocID uuid.UUID) error {
+func (ex Exit) Update(desc, direction string, source, dest *Location, extZoneID, extLocID uuid.UUID) error {
 	var destID uuid.UUID
 	if dest != nil {
 		destID = dest.ID()
 	} else {
 		destID = extLocID
 	}
-	e := NewLocationEdgeUpdateEvent(
+	e := NewExitUpdateEvent(
 		desc,
 		direction,
-		le.ID(),
+		ex.ID(),
 		source.ID(),
 		destID,
-		le.zone.ID(),
+		ex.zone.ID(),
 		extZoneID,
 	)
-	_, err := le.syncRequestToZone(e)
+	_, err := ex.syncRequestToZone(e)
 	return err
 }
 
-func (le LocationEdge) syncRequestToZone(e Event) (interface{}, error) {
+func (ex Exit) syncRequestToZone(e Event) (interface{}, error) {
 	req := rpc.NewRequest(e)
-	le.requestChan <- req
+	ex.requestChan <- req
 	response := <-req.ResponseChan
 	return response.Value, response.Err
 }
 
-func (le LocationEdge) snapshot(sequenceNum uint64) Event {
+func (ex Exit) snapshot(sequenceNum uint64) Event {
 	var destID uuid.UUID
-	if le.destination != nil {
-		destID = le.destination.ID()
+	if ex.destination != nil {
+		destID = ex.destination.ID()
 	} else {
-		destID = le.otherZoneLocID
+		destID = ex.otherZoneLocID
 	}
-	e := NewLocationEdgeAddToZoneEvent(
-		le.description,
-		le.direction,
-		le.id,
-		le.source.ID(),
+	e := NewExitAddToZoneEvent(
+		ex.description,
+		ex.direction,
+		ex.id,
+		ex.source.ID(),
 		destID,
-		le.zone.ID(),
-		le.otherZoneID,
+		ex.zone.ID(),
+		ex.otherZoneID,
 	)
 	e.SetSequenceNumber(sequenceNum)
 	return e
 }
 
-func (le LocationEdge) snapshotDependencies() []snapshottable {
-	deps := []snapshottable{le.source}
-	if le.destination != nil {
-		deps = append(deps, le.destination)
+func (ex Exit) snapshotDependencies() []snapshottable {
+	deps := []snapshottable{ex.source}
+	if ex.destination != nil {
+		deps = append(deps, ex.destination)
 	}
 	return deps
 }
 
-type LocationEdgeList []*LocationEdge
+type ExitList []*Exit
 
-func (lel LocationEdgeList) IndexOf(edge *LocationEdge) (int, error) {
-	for i := 0; i < len(lel); i++ {
-		if lel[i] == edge {
+func (el ExitList) IndexOf(exit *Exit) (int, error) {
+	for i := 0; i < len(el); i++ {
+		if el[i] == exit {
 			return i, nil
 		}
 	}
-	return -1, fmt.Errorf("Edge %q not found in list", edge.id)
+	return -1, fmt.Errorf("Exit %q not found in list", exit.id)
 }
 
-func (lel LocationEdgeList) Copy() LocationEdgeList {
-	out := make(LocationEdgeList, len(lel))
-	copy(out, lel)
+func (el ExitList) Copy() ExitList {
+	out := make(ExitList, len(el))
+	copy(out, el)
 	return out
 }
 
-func NewLocationEdgeAddToZoneEvent(desc, direction string, edgeId, sourceId, destLocId, srcZoneId, destZoneID uuid.UUID) LocationEdgeAddToZoneEvent {
-	return LocationEdgeAddToZoneEvent{
+func NewExitAddToZoneEvent(desc, direction string, exitId, sourceId, destLocId, srcZoneId, destZoneID uuid.UUID) ExitAddToZoneEvent {
+	return ExitAddToZoneEvent{
 		&eventGeneric{
-			eventType:     EventTypeLocationEdgeAddToZone,
+			eventType:     EventTypeExitAddToZone,
 			version:       1,
 			aggregateId:   srcZoneId,
 			shouldPersist: true,
 		},
-		edgeId,
+		exitId,
 		desc,
 		direction,
 		sourceId,
@@ -201,9 +201,9 @@ func NewLocationEdgeAddToZoneEvent(desc, direction string, edgeId, sourceId, des
 	}
 }
 
-type LocationEdgeAddToZoneEvent struct {
+type ExitAddToZoneEvent struct {
 	*eventGeneric
-	EdgeId           uuid.UUID
+	ExitID           uuid.UUID
 	Description      string
 	Direction        string
 	SourceLocationId uuid.UUID
@@ -211,27 +211,27 @@ type LocationEdgeAddToZoneEvent struct {
 	DestLocationId   uuid.UUID
 }
 
-func NewLocationEdgeUpdateEvent(desc, direction string, edgeID, sourceID, destID, srcZoneID, extZoneID uuid.UUID) LocationEdgeUpdateEvent {
-	lue := LocationEdgeUpdateEvent{
+func NewExitUpdateEvent(desc, direction string, exitID, sourceID, destID, srcZoneID, extZoneID uuid.UUID) ExitUpdateEvent {
+	xue := ExitUpdateEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeLocationEdgeUpdate,
+			eventType:     EventTypeExitUpdate,
 			version:       1,
 			aggregateId:   srcZoneID,
 			shouldPersist: true,
 		},
-		EdgeId:           edgeID,
+		ExitID:           exitID,
 		Description:      desc,
 		Direction:        direction,
 		SourceLocationId: sourceID,
 		DestLocationId:   destID,
 		DestZoneID:       extZoneID,
 	}
-	return lue
+	return xue
 }
 
-type LocationEdgeUpdateEvent struct {
+type ExitUpdateEvent struct {
 	*eventGeneric
-	EdgeId           uuid.UUID
+	ExitID           uuid.UUID
 	Description      string
 	Direction        string
 	SourceLocationId uuid.UUID

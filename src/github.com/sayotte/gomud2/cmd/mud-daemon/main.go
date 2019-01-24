@@ -26,7 +26,7 @@ type cliArgs struct {
 }
 
 func parseCliArgs() (cliArgs, error) {
-	initStartingZone := flag.Bool("initWorld", false, "Create a default world with some locations, edges, objects and actors; persist the related events, then exit.")
+	initStartingZone := flag.Bool("initWorld", false, "Create a default world with some locations, exits, objects and actors; persist the related events, then exit.")
 	worldConfig := flag.String("config", "mudConfig.yaml", "Configuration file for MUD daemon")
 
 	flag.Parse()
@@ -119,32 +119,32 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
-	edge1Prim := core.NewLocationEdge(
+	exit1Prim := core.NewExit(
 		gouuid.Nil,
 		"Elm Street",
-		core.EdgeDirectionWest,
+		core.ExitDirectionWest,
 		loc1,
 		loc2,
 		z,
 		gouuid.Nil,
 		gouuid.Nil,
 	)
-	_, err = z.AddLocationEdge(edge1Prim)
+	_, err = z.AddExit(exit1Prim)
 	if err != nil {
 		panic(err)
 	}
 
-	edge2Prim := core.NewLocationEdge(
+	exit2Prim := core.NewExit(
 		gouuid.Nil,
 		"Elm Street",
-		core.EdgeDirectionEast,
+		core.ExitDirectionEast,
 		loc2,
 		loc1,
 		z,
 		gouuid.Nil,
 		gouuid.Nil,
 	)
-	_, err = z.AddLocationEdge(edge2Prim)
+	_, err = z.AddExit(exit2Prim)
 	if err != nil {
 		panic(err)
 	}
@@ -173,32 +173,32 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
-	edge3Prim := core.NewLocationEdge(
+	exit3Prim := core.NewExit(
 		gouuid.Nil,
 		"in through the front door",
-		core.EdgeDirectionNorth,
+		core.ExitDirectionNorth,
 		loc2,
 		nil,
 		z,
 		z2.ID(),
 		loc3.ID(),
 	)
-	_, err = z.AddLocationEdge(edge3Prim)
+	_, err = z.AddExit(exit3Prim)
 	if err != nil {
 		panic(err)
 	}
 
-	edge4Prim := core.NewLocationEdge(
+	exit4Prim := core.NewExit(
 		gouuid.Nil,
 		"out the front door",
-		core.EdgeDirectionSouth,
+		core.ExitDirectionSouth,
 		loc3,
 		nil,
 		z2,
 		z.ID(),
 		loc2.ID(),
 	)
-	_, err = z2.AddLocationEdge(edge4Prim)
+	_, err = z2.AddExit(exit4Prim)
 	if err != nil {
 		panic(err)
 	}

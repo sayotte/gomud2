@@ -79,8 +79,8 @@ func (a *Actor) Move(from, to *Location) error {
 		return fmt.Errorf("cross-zone moves should use the World.MigrateZone() API call")
 	}
 	exitExists := false
-	for _, edge := range from.OutEdges() {
-		if edge.Destination() == to {
+	for _, exit := range from.OutExits() {
+		if exit.Destination() == to {
 			exitExists = true
 			break
 		}

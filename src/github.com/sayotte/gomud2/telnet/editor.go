@@ -20,10 +20,10 @@ const (
 	worldEditHandlerStateLocationEdit
 	worldEditHandlerStateLocationGetShortDesc
 	worldEditHandlerStateLocationGetDesc
-	worldEditHandlerStateEdgeEdit
-	worldEditHandlerStateEdgeGetDescription
-	worldEditHandlerStateEdgeGetDirection
-	worldEditHandlerStateEdgeGetDestination
+	worldEditHandlerStateExitEdit
+	worldEditHandlerStateExitGetDescription
+	worldEditHandlerStateExitGetDirection
+	worldEditHandlerStateExitGetDestination
 )
 
 const (
@@ -36,9 +36,9 @@ const (
 )
 
 const (
-	worldEditEdgeEditMenuItemDescription = "Change description"
-	worldEditEdgeEditMenuItemDirection   = "Change direction"
-	worldEditEdgeEditMenuItemDest        = "Change destination"
+	worldEditExitEditMenuItemDescription = "Change description"
+	worldEditExitEditMenuItemDirection   = "Change direction"
+	worldEditExitEditMenuItemDest        = "Change destination"
 )
 
 type worldEditCommandHandler func(line string, terminalWidth, terminalHeight int) ([]byte, error)
@@ -55,7 +55,7 @@ type worldEditHandler struct {
 	cmdTrie       *trie.Trie
 	zoneUnderEdit *core.Zone
 	locUnderEdit  *core.Location
-	edgeUnderEdit *core.LocationEdge
+	exitUnderEdit *core.Exit
 }
 
 func (weh *worldEditHandler) init(terminalWidth, terminalHeight int) []byte {
@@ -76,14 +76,14 @@ func (weh *worldEditHandler) handleRxLine(line []byte, terminalWidth, terminalHe
 		return weh.handleGetLocationShortDescState(line, terminalWidth, terminalHeight)
 	case worldEditHandlerStateLocationGetDesc:
 		return weh.handleGetLocationDescState(line, terminalWidth, terminalHeight)
-	case worldEditHandlerStateEdgeEdit:
-		return weh.handleEditEdgeState(line, terminalWidth, terminalHeight)
-	case worldEditHandlerStateEdgeGetDescription:
-		return weh.handleGetEdgeDescState(line, terminalWidth, terminalHeight)
-	case worldEditHandlerStateEdgeGetDirection:
-		return weh.handleGetEdgeDirectionState(line, terminalWidth, terminalHeight)
-	case worldEditHandlerStateEdgeGetDestination:
-		return weh.handleGetEdgeDestState(line, terminalWidth, terminalHeight)
+	case worldEditHandlerStateExitEdit:
+		return weh.handleEditExitState(line, terminalWidth, terminalHeight)
+	case worldEditHandlerStateExitGetDescription:
+		return weh.handleGetExitDescState(line, terminalWidth, terminalHeight)
+	case worldEditHandlerStateExitGetDirection:
+		return weh.handleGetExitDirectionState(line, terminalWidth, terminalHeight)
+	case worldEditHandlerStateExitGetDestination:
+		return weh.handleGetExitDestState(line, terminalWidth, terminalHeight)
 	default:
 		return nil, weh, fmt.Errorf("worldEditHandler: unknown state %d", weh.state)
 	}
@@ -182,16 +182,16 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 	}
 
 	weh.cmdTrie = trie.New()
-	weh.cmdTrie.Add(core.EdgeDirectionNorth, weh.getDirectionHandlerGeneric(core.EdgeDirectionNorth))
-	weh.cmdTrie.Add(core.EdgeDirectionSouth, weh.getDirectionHandlerGeneric(core.EdgeDirectionSouth))
-	weh.cmdTrie.Add(core.EdgeDirectionEast, weh.getDirectionHandlerGeneric(core.EdgeDirectionEast))
-	weh.cmdTrie.Add(core.EdgeDirectionWest, weh.getDirectionHandlerGeneric(core.EdgeDirectionWest))
-	weh.cmdTrie.Add("exit", weh.getExitHandler())
+	weh.cmdTrie.Add(core.ExitDirectionNorth, weh.getDirectionHandlerGeneric(core.ExitDirectionNorth))
+	weh.cmdTrie.Add(core.ExitDirectionSouth, weh.getDirectionHandlerGeneric(core.ExitDirectionSouth))
+	weh.cmdTrie.Add(core.ExitDirectionEast, weh.getDirectionHandlerGeneric(core.ExitDirectionEast))
+	weh.cmdTrie.Add(core.ExitDirectionWest, weh.getDirectionHandlerGeneric(core.ExitDirectionWest))
+	weh.cmdTrie.Add("leave", weh.getLeaveHandler())
 	weh.cmdTrie.Add("look", weh.getLookHandler())
 	weh.cmdTrie.Add("inspect", weh.getInspectHandler())
 	weh.cmdTrie.Add("newlocation", weh.getNewlocationHandler())
 	weh.cmdTrie.Add("editlocation", weh.gotoEditLocationMenu())
-	weh.cmdTrie.Add("editedge", weh.getEditEdgeHandler())
+	weh.cmdTrie.Add("editexit", weh.getEditExitHandler())
 	weh.cmdTrie.Add("commands", weh.getCommandsHandler())
 
 	return lookAtLocation(nil, terminalWidth, weh.locUnderEdit)
@@ -234,39 +234,39 @@ func (weh *worldEditHandler) getCommandsHandler() worldEditCommandHandler {
 
 func (weh *worldEditHandler) getDirectionHandlerGeneric(direction string) worldEditCommandHandler {
 	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
-		var outEdge *core.LocationEdge
-		for _, edge := range weh.locUnderEdit.OutEdges() {
-			if edge.Direction() == direction {
-				outEdge = edge
+		var outExit *core.Exit
+		for _, exit := range weh.locUnderEdit.OutExits() {
+			if exit.Direction() == direction {
+				outExit = exit
 				break
 			}
 		}
-		if outEdge == nil {
+		if outExit == nil {
 			return []byte(commands.ErrorNoSuchExit), nil
 		}
 
 		var outBytes []byte
-		if outEdge.Destination() == nil {
-			destZone := weh.world.ZoneByID(outEdge.OtherZoneID())
+		if outExit.Destination() == nil {
+			destZone := weh.world.ZoneByID(outExit.OtherZoneID())
 			if destZone == nil {
-				return []byte(fmt.Sprintf("Link to Zone %q, not currently loaded in World.\n", outEdge.OtherZoneID())), nil
+				return []byte(fmt.Sprintf("Link to Zone %q, not currently loaded in World.\n", outExit.OtherZoneID())), nil
 			}
-			destLoc := destZone.LocationByID(outEdge.OtherZoneLocID())
+			destLoc := destZone.LocationByID(outExit.OtherZoneLocID())
 			if destLoc == nil {
-				return []byte(fmt.Sprintf("Link to Location %q, in remote Zone %q-- location not found in remote Zone.\n", outEdge.OtherZoneLocID(), destZone.Tag())), nil
+				return []byte(fmt.Sprintf("Link to Location %q, in remote Zone %q-- location not found in remote Zone.\n", outExit.OtherZoneLocID(), destZone.Tag())), nil
 			}
 			outBytes = []byte(fmt.Sprintf("WARNING!!! Moving to different zone %q\n", destZone.Tag()))
 			weh.zoneUnderEdit = destZone
 			weh.locUnderEdit = destLoc
 		} else {
-			weh.locUnderEdit = outEdge.Destination()
+			weh.locUnderEdit = outExit.Destination()
 		}
 
 		return append(outBytes, lookAtLocation(nil, terminalWidth, weh.locUnderEdit)...), nil
 	}
 }
 
-func (weh *worldEditHandler) getExitHandler() worldEditCommandHandler {
+func (weh *worldEditHandler) getLeaveHandler() worldEditCommandHandler {
 	return func(ignoredS string, terminalWidth, terminalHeight int) ([]byte, error) {
 		return weh.gotoMainMenu(terminalWidth, terminalHeight), nil
 	}
@@ -284,8 +284,8 @@ func (weh *worldEditHandler) getInspectHandler() worldEditCommandHandler {
 			ilr := &inspectLocationReport{}
 			ilr.fromLocation(weh.locUnderEdit)
 			return ilr.bytes(), nil
-		case inspectSubcmdEdges:
-			ioer := inspectOutEdgesReport{location: weh.locUnderEdit}
+		case inspectSubcmdExits:
+			ioer := inspectOutExitsReport{location: weh.locUnderEdit}
 			return ioer.bytes(), nil
 		default:
 			return []byte(fmt.Sprintf("Don't know how to inspect %q. %s", subcmd, inspectNoSubcmdErr)), nil
@@ -304,9 +304,9 @@ func (weh *worldEditHandler) getNewlocationHandler() worldEditCommandHandler {
 			return []byte(fmt.Sprintf("Invalid direction %q, need one of: %s\n", direction, strings.Join(orderedDirections, ", "))), nil
 		}
 
-		for _, edge := range weh.locUnderEdit.OutEdges() {
-			if edge.Direction() == direction {
-				return []byte("Out-edge in that direction already exists from this Location.\n"), nil
+		for _, exit := range weh.locUnderEdit.OutExits() {
+			if exit.Direction() == direction {
+				return []byte("Out-exit in that direction already exists from this Location.\n"), nil
 			}
 		}
 
@@ -318,7 +318,7 @@ func (weh *worldEditHandler) getNewlocationHandler() worldEditCommandHandler {
 			return []byte(fmt.Sprintf("ERROR: AddLocation(): %s\n", err)), nil
 		}
 
-		outEdgePrim := core.NewLocationEdge(
+		outExitPrim := core.NewExit(
 			uuid.Nil,
 			fmt.Sprintf("To %s", newLoc.ID()),
 			direction,
@@ -328,12 +328,12 @@ func (weh *worldEditHandler) getNewlocationHandler() worldEditCommandHandler {
 			uuid.Nil,
 			uuid.Nil,
 		)
-		_, err = weh.zoneUnderEdit.AddLocationEdge(outEdgePrim)
+		_, err = weh.zoneUnderEdit.AddExit(outExitPrim)
 		if err != nil {
-			return []byte(fmt.Sprintf("ERROR: AddLocationEdge(1): %s\n", err)), nil
+			return []byte(fmt.Sprintf("ERROR: AddExit(1): %s\n", err)), nil
 		}
 
-		inEdgePrim := core.NewLocationEdge(
+		inExitPrim := core.NewExit(
 			uuid.Nil,
 			fmt.Sprintf("To %s", weh.locUnderEdit.ID()),
 			invertDirection(direction),
@@ -343,9 +343,9 @@ func (weh *worldEditHandler) getNewlocationHandler() worldEditCommandHandler {
 			uuid.Nil,
 			uuid.Nil,
 		)
-		_, err = weh.zoneUnderEdit.AddLocationEdge(inEdgePrim)
+		_, err = weh.zoneUnderEdit.AddExit(inExitPrim)
 		if err != nil {
-			return []byte(fmt.Sprintf("ERROR: AddLocationEdge(2): %s\n", err)), nil
+			return []byte(fmt.Sprintf("ERROR: AddExit(2): %s\n", err)), nil
 		}
 
 		return []byte("Done.\n"), nil
@@ -426,43 +426,43 @@ func (weh *worldEditHandler) handleGetLocationDescState(line []byte, terminalWid
 	return append([]byte("Done.\n"), menuBytes...), weh, nil
 }
 
-func (weh *worldEditHandler) getEditEdgeHandler() worldEditCommandHandler {
+func (weh *worldEditHandler) getEditExitHandler() worldEditCommandHandler {
 	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
 		params := strings.Split(line, " ")
 		if len(params) == 0 {
-			return []byte("Usage: editedge <direction>\n"), nil
+			return []byte("Usage: editexit <direction>\n"), nil
 		}
 		direction := strings.ToLower(params[0])
 		if !core.ValidDirections[direction] {
 			return []byte(fmt.Sprintf("Invalid direction %q, need one of: %s\n", direction, strings.Join(orderedDirections, ", "))), nil
 		}
 
-		var edge *core.LocationEdge
-		for _, maybeEdge := range weh.locUnderEdit.OutEdges() {
-			if maybeEdge.Direction() == direction {
-				edge = maybeEdge
+		var exit *core.Exit
+		for _, maybeExit := range weh.locUnderEdit.OutExits() {
+			if maybeExit.Direction() == direction {
+				exit = maybeExit
 				break
 			}
 		}
-		if edge == nil {
-			return []byte(fmt.Sprintf("No edge in direction %q.\n", direction)), nil
+		if exit == nil {
+			return []byte(fmt.Sprintf("No exit in direction %q.\n", direction)), nil
 		}
 
-		return weh.gotoEditEdgeState(edge, terminalWidth, terminalHeight), nil
+		return weh.gotoEditExitState(exit, terminalWidth, terminalHeight), nil
 	}
 }
 
-func (weh *worldEditHandler) gotoEditEdgeState(edge *core.LocationEdge, terminalWidth, terminalHeight int) []byte {
-	weh.state = worldEditHandlerStateEdgeEdit
-	weh.edgeUnderEdit = edge
+func (weh *worldEditHandler) gotoEditExitState(exit *core.Exit, terminalWidth, terminalHeight int) []byte {
+	weh.state = worldEditHandlerStateExitEdit
+	weh.exitUnderEdit = exit
 
-	iler := &inspectLocationEdgeReport{}
-	iler.fromLocationEdge(weh.edgeUnderEdit)
+	iler := &inspectExitReport{}
+	iler.fromExit(weh.exitUnderEdit)
 
 	options := []string{
-		worldEditEdgeEditMenuItemDescription,
-		worldEditEdgeEditMenuItemDirection,
-		worldEditEdgeEditMenuItemDest,
+		worldEditExitEditMenuItemDescription,
+		worldEditExitEditMenuItemDirection,
+		worldEditExitEditMenuItemDest,
 		menuItemCancel,
 	}
 	weh.currentMenu = &menu{
@@ -471,21 +471,21 @@ func (weh *worldEditHandler) gotoEditEdgeState(edge *core.LocationEdge, terminal
 	return append(iler.bytes(), weh.currentMenu.init(terminalWidth, terminalHeight)...)
 }
 
-func (weh *worldEditHandler) handleEditEdgeState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+func (weh *worldEditHandler) handleEditExitState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
 	outBytes, selection := weh.currentMenu.handleRxLine(line, terminalWidth, terminalHeight)
 	if selection == "" {
 		return outBytes, weh, nil
 	}
 
 	switch selection {
-	case worldEditEdgeEditMenuItemDescription:
-		weh.state = worldEditHandlerStateEdgeGetDescription
+	case worldEditExitEditMenuItemDescription:
+		weh.state = worldEditHandlerStateExitGetDescription
 		return []byte("Enter new description, followed by a newline <enter>.\n"), weh, nil
-	case worldEditEdgeEditMenuItemDirection:
-		weh.state = worldEditHandlerStateEdgeGetDirection
+	case worldEditExitEditMenuItemDirection:
+		weh.state = worldEditHandlerStateExitGetDirection
 		return []byte(fmt.Sprintf("Enter one of [%s] followed by a newline <enter>.\n", strings.Join(orderedDirections, ", "))), weh, nil
-	case worldEditEdgeEditMenuItemDest:
-		weh.state = worldEditHandlerStateEdgeGetDestination
+	case worldEditExitEditMenuItemDest:
+		weh.state = worldEditHandlerStateExitGetDestination
 		prompt := "Enter ID for destination Zone/Location, followed by a newline <enter>\n"
 		prompt += "Example: b6b0fff7-a7fe-4ba2-91e0-9e78e752f841/3730ad94-88fa-4f11-8cbc-bcebdaa0ac9b\n"
 		return []byte(prompt), weh, nil
@@ -497,127 +497,127 @@ func (weh *worldEditHandler) handleEditEdgeState(line []byte, terminalWidth, ter
 	}
 }
 
-func (weh *worldEditHandler) handleGetEdgeDescState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+func (weh *worldEditHandler) handleGetExitDescState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
 	newDesc := strings.TrimSuffix(string(line), "\n")
 
-	err := weh.edgeUnderEdit.Update(
+	err := weh.exitUnderEdit.Update(
 		newDesc,
-		weh.edgeUnderEdit.Direction(),
-		weh.edgeUnderEdit.Source(),
-		weh.edgeUnderEdit.Destination(),
-		weh.edgeUnderEdit.OtherZoneID(),
-		weh.edgeUnderEdit.OtherZoneLocID(),
+		weh.exitUnderEdit.Direction(),
+		weh.exitUnderEdit.Source(),
+		weh.exitUnderEdit.Destination(),
+		weh.exitUnderEdit.OtherZoneID(),
+		weh.exitUnderEdit.OtherZoneLocID(),
 	)
 	if err != nil {
-		fmt.Printf("ERROR: LocationEdge.Update(description): %s\n", err)
+		fmt.Printf("ERROR: Exit.Update(description): %s\n", err)
 		return nil, weh, errors.New("Whoops...")
 	}
 
-	menuBytes := weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)
+	menuBytes := weh.gotoEditExitState(weh.exitUnderEdit, terminalWidth, terminalHeight)
 	return append([]byte("Done.\n"), menuBytes...), weh, nil
 }
 
-func (weh *worldEditHandler) handleGetEdgeDirectionState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+func (weh *worldEditHandler) handleGetExitDirectionState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
 	newDir := strings.TrimSuffix(string(line), "\n")
 	if !core.ValidDirections[newDir] {
 		errBytes := []byte(fmt.Sprintf("Invalid direction, must be one of [%s].\n", strings.Join(orderedDirections, ", ")))
-		menuBytes := weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)
+		menuBytes := weh.gotoEditExitState(weh.exitUnderEdit, terminalWidth, terminalHeight)
 		return append(errBytes, menuBytes...), weh, nil
 	}
-	for _, existingEdge := range weh.locUnderEdit.OutEdges() {
-		if existingEdge.Direction() == newDir {
-			errBytes := []byte("There's an existing edge in that direction!\n")
-			menuBytes := weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)
+	for _, existingExit := range weh.locUnderEdit.OutExits() {
+		if existingExit.Direction() == newDir {
+			errBytes := []byte("There's an existing exit in that direction!\n")
+			menuBytes := weh.gotoEditExitState(weh.exitUnderEdit, terminalWidth, terminalHeight)
 			return append(errBytes, menuBytes...), weh, nil
 		}
 	}
 
-	err := weh.edgeUnderEdit.Update(
-		weh.edgeUnderEdit.Description(),
+	err := weh.exitUnderEdit.Update(
+		weh.exitUnderEdit.Description(),
 		newDir,
-		weh.edgeUnderEdit.Source(),
-		weh.edgeUnderEdit.Destination(),
-		weh.edgeUnderEdit.OtherZoneID(),
-		weh.edgeUnderEdit.OtherZoneLocID(),
+		weh.exitUnderEdit.Source(),
+		weh.exitUnderEdit.Destination(),
+		weh.exitUnderEdit.OtherZoneID(),
+		weh.exitUnderEdit.OtherZoneLocID(),
 	)
 	if err != nil {
-		fmt.Printf("ERROR: LocationEdge.Update(destination): %s\n", err)
+		fmt.Printf("ERROR: Exit.Update(destination): %s\n", err)
 		return nil, weh, errors.New("Whoops...")
 	}
-	menuBytes := weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)
+	menuBytes := weh.gotoEditExitState(weh.exitUnderEdit, terminalWidth, terminalHeight)
 	return append([]byte("Done.\n"), menuBytes...), weh, nil
 }
 
-func (weh *worldEditHandler) handleGetEdgeDestState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+func (weh *worldEditHandler) handleGetExitDestState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
 	in := strings.TrimSuffix(string(line), "\n")
 	parts := strings.Split(in, "/")
 	if len(parts) != 2 {
 		errBytes := []byte("Invalid input, must be of form <ID>/<ID>\n")
-		return append(errBytes, weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)...), weh, nil
+		return append(errBytes, weh.gotoEditExitState(weh.exitUnderEdit, terminalWidth, terminalHeight)...), weh, nil
 	}
 
 	zoneID, err := uuid.FromString(parts[0])
 	if err != nil {
 		errBytes := []byte(fmt.Sprintf("Invalid Zone ID: %s\n", err))
-		return append(errBytes, weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)...), weh, nil
+		return append(errBytes, weh.gotoEditExitState(weh.exitUnderEdit, terminalWidth, terminalHeight)...), weh, nil
 	}
 	locID, err := uuid.FromString(parts[1])
 	if err != nil {
 		errBytes := []byte(fmt.Sprintf("Invalid Location ID: %s\n", err))
-		return append(errBytes, weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)...), weh, nil
+		return append(errBytes, weh.gotoEditExitState(weh.exitUnderEdit, terminalWidth, terminalHeight)...), weh, nil
 	}
 
-	if uuid.Equal(zoneID, weh.edgeUnderEdit.Zone().ID()) {
+	if uuid.Equal(zoneID, weh.exitUnderEdit.Zone().ID()) {
 		// Handle both of these cases:
 		// - internal -> internal
 		// - external -> internal
-		dest := weh.edgeUnderEdit.Zone().LocationByID(locID)
+		dest := weh.exitUnderEdit.Zone().LocationByID(locID)
 		if dest == nil {
 			errBytes := []byte(fmt.Sprintf("No such Location with ID %q in this Zone\n", locID))
-			return append(errBytes, weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)...), weh, nil
+			return append(errBytes, weh.gotoEditExitState(weh.exitUnderEdit, terminalWidth, terminalHeight)...), weh, nil
 		}
-		err := weh.edgeUnderEdit.Update(
-			weh.edgeUnderEdit.Description(),
-			weh.edgeUnderEdit.Direction(),
-			weh.edgeUnderEdit.Source(),
+		err := weh.exitUnderEdit.Update(
+			weh.exitUnderEdit.Description(),
+			weh.exitUnderEdit.Direction(),
+			weh.exitUnderEdit.Source(),
 			dest,
 			uuid.Nil,
 			uuid.Nil,
 		)
 		if err != nil {
-			fmt.Printf("ERROR: LocationEdge.Update(destination): %s\n", err)
+			fmt.Printf("ERROR: Exit.Update(destination): %s\n", err)
 			return nil, weh, errors.New("Whoops...")
 		}
 	} else {
 		// Handle both of these cases:
 		// internal -> external
 		// external -> external
-		err := weh.edgeUnderEdit.Update(
-			weh.edgeUnderEdit.Description(),
-			weh.edgeUnderEdit.Direction(),
-			weh.edgeUnderEdit.Source(),
+		err := weh.exitUnderEdit.Update(
+			weh.exitUnderEdit.Description(),
+			weh.exitUnderEdit.Direction(),
+			weh.exitUnderEdit.Source(),
 			nil,
 			zoneID,
 			locID,
 		)
 		if err != nil {
-			fmt.Printf("ERROR: LocationEdge.Update(destination): %s\n", err)
+			fmt.Printf("ERROR: Exit.Update(destination): %s\n", err)
 			return nil, weh, errors.New("Whoops...")
 		}
 	}
-	return append([]byte("Done.\n"), weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)...), weh, nil
+	return append([]byte("Done.\n"), weh.gotoEditExitState(weh.exitUnderEdit, terminalWidth, terminalHeight)...), weh, nil
 }
 
 func invertDirection(inDir string) string {
 	switch inDir {
-	case core.EdgeDirectionNorth:
-		return core.EdgeDirectionSouth
-	case core.EdgeDirectionSouth:
-		return core.EdgeDirectionNorth
-	case core.EdgeDirectionEast:
-		return core.EdgeDirectionWest
-	case core.EdgeDirectionWest:
-		return core.EdgeDirectionEast
+	case core.ExitDirectionNorth:
+		return core.ExitDirectionSouth
+	case core.ExitDirectionSouth:
+		return core.ExitDirectionNorth
+	case core.ExitDirectionEast:
+		return core.ExitDirectionWest
+	case core.ExitDirectionWest:
+		return core.ExitDirectionEast
 	default:
 		return ""
 	}

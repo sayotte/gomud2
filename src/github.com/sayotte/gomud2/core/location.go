@@ -30,7 +30,7 @@ type Location struct {
 	description      string // e.g. "A quaint house with blue shutters .... etc."
 	actors           ActorList
 	objects          ObjectList
-	outEdges         LocationEdgeList
+	outExits         ExitList
 	observers        ObserverList
 	// This is the channel where the Zone picks up new events related to this
 	// Location. This should never be directly exposed by an accessor; public methods
@@ -127,30 +127,30 @@ func (l *Location) addObject(object *Object) error {
 	return nil
 }
 
-func (l Location) OutEdges() LocationEdgeList {
-	return l.outEdges.Copy()
+func (l Location) OutExits() ExitList {
+	return l.outExits.Copy()
 }
 
-func (l *Location) removeOutEdge(edge *LocationEdge) error {
-	idx, err := l.outEdges.IndexOf(edge)
+func (l *Location) removeExit(exit *Exit) error {
+	idx, err := l.outExits.IndexOf(exit)
 	if err != nil {
-		return fmt.Errorf("cannot remove Edge %q from location %q: %s", edge.ID(), l.id, err)
+		return fmt.Errorf("cannot remove Exit %q from Location %q: %s", exit.ID(), l.id, err)
 	}
-	l.outEdges = append(l.outEdges[:idx], l.outEdges[idx+1:]...)
+	l.outExits = append(l.outExits[:idx], l.outExits[idx+1:]...)
 	return nil
 }
 
-func (l *Location) addOutEdge(edge *LocationEdge) error {
-	_, err := l.outEdges.IndexOf(edge)
+func (l *Location) addOutExit(exit *Exit) error {
+	_, err := l.outExits.IndexOf(exit)
 	if err == nil {
-		return fmt.Errorf("Edge %q already present at location %q", edge.ID(), l.id)
+		return fmt.Errorf("Exit %q already present at Location %q", exit.ID(), l.id)
 	}
-	for _, existingEdge := range l.outEdges {
-		if existingEdge.Direction() == edge.Direction() {
-			return fmt.Errorf("out-Edge from location %q in direction %s already present", l.id, edge.Direction())
+	for _, existingExit := range l.outExits {
+		if existingExit.Direction() == exit.Direction() {
+			return fmt.Errorf("out-Exit from location %q in direction %s already present", l.id, exit.Direction())
 		}
 	}
-	l.outEdges = append(l.outEdges, edge)
+	l.outExits = append(l.outExits, exit)
 	return nil
 }
 

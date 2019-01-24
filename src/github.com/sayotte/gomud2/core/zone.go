@@ -24,7 +24,7 @@ func NewZone(id uuid.UUID, nickname string, persister EventPersister) *Zone {
 		nickname:      nickname,
 		actorsById:    make(map[uuid.UUID]*Actor),
 		locationsById: make(map[uuid.UUID]*Location),
-		edgesById:     make(map[uuid.UUID]*LocationEdge),
+		exitsById:     make(map[uuid.UUID]*Exit),
 		objectsById:   make(map[uuid.UUID]*Object),
 		persister:     persister,
 	}
@@ -37,7 +37,7 @@ type Zone struct {
 	nextSequenceId uint64
 	actorsById     map[uuid.UUID]*Actor
 	locationsById  map[uuid.UUID]*Location
-	edgesById      map[uuid.UUID]*LocationEdge
+	exitsById      map[uuid.UUID]*Exit
 	objectsById    map[uuid.UUID]*Object
 	// This is the channel where the Zone picks up new events submitted by its
 	// own public methods. This should never be directly exposed by an accessor;
@@ -102,10 +102,10 @@ func (z *Zone) StartEventProcessing() {
 				}
 			}
 
-			// absorb *one* request from each edge/location/object/actor
-			for _, edge := range z.edgesById {
+			// absorb *one* request from each exit/location/object/actor
+			for _, exit := range z.exitsById {
 				select {
-				case req := <-edge.requestChan:
+				case req := <-exit.requestChan:
 					requests = append(requests, req)
 				default:
 				}
@@ -247,12 +247,12 @@ func (z *Zone) apply(e Event) (interface{}, error) {
 	case EventTypeLocationUpdate:
 		typedEvent := e.(LocationUpdateEvent)
 		return nil, z.applyLocationUpdateEvent(typedEvent)
-	case EventTypeLocationEdgeAddToZone:
-		typedEvent := e.(LocationEdgeAddToZoneEvent)
-		return z.applyLocationEdgeAddToZoneEvent(typedEvent)
-	case EventTypeLocationEdgeUpdate:
-		typedEvent := e.(LocationEdgeUpdateEvent)
-		return nil, z.applyLocationEdgeUpdateEvent(typedEvent)
+	case EventTypeExitAddToZone:
+		typedEvent := e.(ExitAddToZoneEvent)
+		return z.applyExitAddToZoneEvent(typedEvent)
+	case EventTypeExitUpdate:
+		typedEvent := e.(ExitUpdateEvent)
+		return nil, z.applyExitUpdateEvent(typedEvent)
 	case EventTypeObjectAddToZone:
 		typedEvent := e.(ObjectAddToZoneEvent)
 		return z.applyObjectAddToZoneEvent(typedEvent)
@@ -414,20 +414,20 @@ func (z *Zone) applyLocationUpdateEvent(e LocationUpdateEvent) error {
 	return nil
 }
 
-func (z *Zone) AddLocationEdge(le *LocationEdge) (*LocationEdge, error) {
-	e := le.snapshot(0)
+func (z *Zone) AddExit(ex *Exit) (*Exit, error) {
+	e := ex.snapshot(0)
 	val, err := z.syncRequestToSelf(e)
 	if err != nil {
 		return nil, err
 	}
-	newEdge := val.(*LocationEdge)
-	return newEdge, nil
+	newExit := val.(*Exit)
+	return newExit, nil
 }
 
-func (z *Zone) applyLocationEdgeAddToZoneEvent(e LocationEdgeAddToZoneEvent) (*LocationEdge, error) {
-	_, duplicate := z.edgesById[e.EdgeId]
+func (z *Zone) applyExitAddToZoneEvent(e ExitAddToZoneEvent) (*Exit, error) {
+	_, duplicate := z.exitsById[e.ExitID]
 	if duplicate {
-		return nil, fmt.Errorf("Edge with ID %q already present in zone", e.EdgeId)
+		return nil, fmt.Errorf("Exit with ID %q already present in zone", e.ExitID)
 	}
 	srcLoc, ok := z.locationsById[e.SourceLocationId]
 	if !ok {
@@ -445,8 +445,8 @@ func (z *Zone) applyLocationEdgeAddToZoneEvent(e LocationEdgeAddToZoneEvent) (*L
 		destLocID = e.DestLocationId
 	}
 
-	edge := NewLocationEdge(
-		e.EdgeId,
+	exit := NewExit(
+		e.ExitID,
 		e.Description,
 		e.Direction,
 		srcLoc,
@@ -455,19 +455,19 @@ func (z *Zone) applyLocationEdgeAddToZoneEvent(e LocationEdgeAddToZoneEvent) (*L
 		e.DestZoneID,
 		destLocID,
 	)
-	err := srcLoc.addOutEdge(edge)
+	err := srcLoc.addOutExit(exit)
 	if err != nil {
 		return nil, err
 	}
-	z.edgesById[edge.ID()] = edge
-	return edge, nil
+	z.exitsById[exit.ID()] = exit
+	return exit, nil
 }
 
-func (z *Zone) applyLocationEdgeUpdateEvent(e LocationEdgeUpdateEvent) error {
+func (z *Zone) applyExitUpdateEvent(e ExitUpdateEvent) error {
 	// Check for all invalid cases / dereferences
-	edge, ok := z.edgesById[e.EdgeId]
+	exit, ok := z.exitsById[e.ExitID]
 	if !ok {
-		return fmt.Errorf("unknown LocationEdge %q", e.EdgeId)
+		return fmt.Errorf("unknown Exit %q", e.ExitID)
 	}
 	newSrc, ok := z.locationsById[e.SourceLocationId]
 	if !ok {
@@ -488,78 +488,78 @@ func (z *Zone) applyLocationEdgeUpdateEvent(e LocationEdgeUpdateEvent) error {
 	//| old otherZoneID | old otherZoneLocID | old Dest* | new otherZoneID | action                      | note                                               |
 	//|-----------------+--------------------+-----------+-----------------+-----------------------------+----------------------------------------------------|
 	//| nil             | nil                | non-nil   | nil             | resolve destination         | internal -> internal                               |
-	//|                 |                    |           |                 | edge.setDestination()       |                                                    |
+	//|                 |                    |           |                 | exit.setDestination()       |                                                    |
 	//|                 |                    |           |                 |                             |                                                    |
-	//| nil             | nil                | non-nil   | non-nil         | edge.setDestination(nil)    | internal -> external                               |
-	//|                 |                    |           |                 | edge.setOtherZoneID()       |                                                    |
-	//|                 |                    |           |                 | edge.setotherZoneLocID()    |                                                    |
+	//| nil             | nil                | non-nil   | non-nil         | exit.setDestination(nil)    | internal -> external                               |
+	//|                 |                    |           |                 | exit.setOtherZoneID()       |                                                    |
+	//|                 |                    |           |                 | exit.setotherZoneLocID()    |                                                    |
 	//|                 |                    |           |                 |                             |                                                    |
 	//| non-nil         | non-nil            | nil       | nil             | resolve destination         | external -> internal                               |
-	//|                 |                    |           |                 | edge.setDestination()       |                                                    |
-	//|                 |                    |           |                 | edge.setOtherZoneID(nil)    |                                                    |
-	//|                 |                    |           |                 | edge.setOtherZoneLocID(nil) |                                                    |
+	//|                 |                    |           |                 | exit.setDestination()       |                                                    |
+	//|                 |                    |           |                 | exit.setOtherZoneID(nil)    |                                                    |
+	//|                 |                    |           |                 | exit.setOtherZoneLocID(nil) |                                                    |
 	//|                 |                    |           |                 |                             |                                                    |
-	//| non-nil         | non-nil            | nil       | non-nil         | edge.setOtherZoneID()       | external -> external                               |
-	//|                 |                    |           |                 | edge.setOtherZoneLocID()    |                                                    |
+	//| non-nil         | non-nil            | nil       | non-nil         | exit.setOtherZoneID()       | external -> external                               |
+	//|                 |                    |           |                 | exit.setOtherZoneLocID()    |                                                    |
 	//|                 |                    |           |                 |                             |                                                    |
 	//| nil             | nil                | nil       | *               | error                       | invalid prior state, no destination                |
 	//| non-nil         | non-nil            | non-nil   | *               | error                       | invalid prior state, internal+external destination |
 	//| nil             | non-nil            | *         | *               | error                       | invalid prior state, external loc ref w/o zone ref |
 	//| non-nil         | nil                | *         | *               | error                       | invalid prior state, external zone ref w/o loc ref |
 	///// Handle destination error cases
-	if uuid.Equal(edge.OtherZoneID(), uuid.Nil) && uuid.Equal(edge.OtherZoneLocID(), uuid.Nil) && edge.Destination() == nil {
-		return errors.New("invalid prior state, LocationEdge has no internal/external destination")
+	if uuid.Equal(exit.OtherZoneID(), uuid.Nil) && uuid.Equal(exit.OtherZoneLocID(), uuid.Nil) && exit.Destination() == nil {
+		return errors.New("invalid prior state, Exit has no internal/external destination")
 	}
-	if !uuid.Equal(edge.OtherZoneID(), uuid.Nil) && !uuid.Equal(edge.OtherZoneLocID(), uuid.Nil) && edge.Destination() != nil {
-		return errors.New("invalid prior state, LocationEdge has both internal/external destinations")
+	if !uuid.Equal(exit.OtherZoneID(), uuid.Nil) && !uuid.Equal(exit.OtherZoneLocID(), uuid.Nil) && exit.Destination() != nil {
+		return errors.New("invalid prior state, Exit has both internal/external destinations")
 	}
-	if uuid.Equal(edge.OtherZoneID(), uuid.Nil) && !uuid.Equal(edge.OtherZoneLocID(), uuid.Nil) {
-		return errors.New("invalid prior state, LocationEdge has external Location reference without Zone reference")
+	if uuid.Equal(exit.OtherZoneID(), uuid.Nil) && !uuid.Equal(exit.OtherZoneLocID(), uuid.Nil) {
+		return errors.New("invalid prior state, Exit has external Location reference without Zone reference")
 	}
-	if !uuid.Equal(edge.OtherZoneID(), uuid.Nil) && uuid.Equal(edge.OtherZoneLocID(), uuid.Nil) {
-		return errors.New("invalid prior state, LocationEdge has external Zone reference without Location reference")
+	if !uuid.Equal(exit.OtherZoneID(), uuid.Nil) && uuid.Equal(exit.OtherZoneLocID(), uuid.Nil) {
+		return errors.New("invalid prior state, Exit has external Zone reference without Location reference")
 	}
 
 	// Handle destination update cases
-	if uuid.Equal(edge.OtherZoneID(), uuid.Nil) {
+	if uuid.Equal(exit.OtherZoneID(), uuid.Nil) {
 		if uuid.Equal(e.DestZoneID, uuid.Nil) {
 			// internal -> internal
-			edge.setDestination(newDst)
+			exit.setDestination(newDst)
 		} else {
 			// internal -> external
-			edge.setDestination(nil)
-			edge.setOtherZoneID(e.DestZoneID)
-			edge.setOtherZoneLocID(e.DestLocationId)
+			exit.setDestination(nil)
+			exit.setOtherZoneID(e.DestZoneID)
+			exit.setOtherZoneLocID(e.DestLocationId)
 		}
 	} else {
 		if uuid.Equal(e.DestZoneID, uuid.Nil) {
 			// external -> internal
-			edge.setDestination(newDst)
-			edge.setOtherZoneID(uuid.Nil)
-			edge.setOtherZoneLocID(uuid.Nil)
+			exit.setDestination(newDst)
+			exit.setOtherZoneID(uuid.Nil)
+			exit.setOtherZoneLocID(uuid.Nil)
 		} else {
 			// external -> external
-			edge.setOtherZoneID(e.DestZoneID)
-			edge.setOtherZoneLocID(e.DestLocationId)
+			exit.setOtherZoneID(e.DestZoneID)
+			exit.setOtherZoneLocID(e.DestLocationId)
 		}
 	}
 
 	// Changing source location requires updating bi-directional pointers
-	if newSrc != edge.Source() {
-		oldSrc := edge.Source()
-		err := oldSrc.removeOutEdge(edge)
+	if newSrc != exit.Source() {
+		oldSrc := exit.Source()
+		err := oldSrc.removeExit(exit)
 		if err != nil {
 			return err
 		}
-		err = newSrc.addOutEdge(edge)
+		err = newSrc.addOutExit(exit)
 		if err != nil {
 			return err
 		}
-		edge.setSource(newSrc)
+		exit.setSource(newSrc)
 	}
 
-	edge.setDescription(e.Description)
-	edge.setDirection(e.Direction)
+	exit.setDescription(e.Description)
+	exit.setDirection(e.Direction)
 
 	return nil
 }
@@ -657,7 +657,7 @@ func (z *Zone) applyObjectMoveEvent(e ObjectMoveEvent) error {
 }
 
 func (z *Zone) snapshot(sequenceNum uint64) []Event {
-	setSize := len(z.locationsById) + len(z.edgesById) + len(z.actorsById) + len(z.objectsById)
+	setSize := len(z.locationsById) + len(z.exitsById) + len(z.actorsById) + len(z.objectsById)
 	visited := make(map[snapshottable]bool, setSize)
 	for _, actor := range z.actorsById {
 		visited[actor] = false
@@ -665,8 +665,8 @@ func (z *Zone) snapshot(sequenceNum uint64) []Event {
 	for _, loc := range z.locationsById {
 		visited[loc] = false
 	}
-	for _, edge := range z.edgesById {
-		visited[edge] = false
+	for _, exit := range z.exitsById {
+		visited[exit] = false
 	}
 	for _, obj := range z.objectsById {
 		visited[obj] = false
