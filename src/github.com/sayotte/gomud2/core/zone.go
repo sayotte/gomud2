@@ -208,6 +208,14 @@ func (z *Zone) Locations() LocationList {
 	return out
 }
 
+func (z *Zone) Exits() ExitList {
+	out := make(ExitList, 0, len(z.exitsById))
+	for _, exit := range z.exitsById {
+		out = append(out, exit)
+	}
+	return out
+}
+
 func (z *Zone) LocationByID(id uuid.UUID) *Location {
 	return z.locationsById[id]
 }

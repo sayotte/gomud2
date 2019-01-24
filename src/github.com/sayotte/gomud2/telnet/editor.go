@@ -192,6 +192,7 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 	weh.cmdTrie.Add("inspect", weh.getInspectHandler())
 	weh.cmdTrie.Add("newlocation", weh.getNewlocationHandler())
 	weh.cmdTrie.Add("editlocation", weh.gotoEditLocationMenu())
+	weh.cmdTrie.Add("orphanlocations", weh.getOrphanLocationsHandler())
 	weh.cmdTrie.Add("editexit", weh.getEditExitHandler())
 	weh.cmdTrie.Add("commands", weh.getCommandsHandler())
 
@@ -252,6 +253,27 @@ func (weh *worldEditHandler) getGotoHandler() worldEditCommandHandler {
 
 		weh.locUnderEdit = loc
 		return lookAtLocation(nil, terminalWidth, weh.locUnderEdit), nil
+	}
+}
+
+func (weh *worldEditHandler) getOrphanLocationsHandler() worldEditCommandHandler {
+	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
+		locHasIncomingExits := make(map[*core.Location]bool)
+		for _, exit := range weh.zoneUnderEdit.Exits() {
+			if exit.Destination() != nil {
+				locHasIncomingExits[exit.Destination()] = true
+			}
+		}
+
+		var orphanLocTags []string
+		for _, loc := range weh.zoneUnderEdit.Locations() {
+			if !locHasIncomingExits[loc] {
+				orphanLocTags = append(orphanLocTags, loc.Tag())
+			}
+		}
+
+		summaryFmt := "Orphaned Locations (having no incoming exits from other Locations in this Zone):\n%s\n"
+		return []byte(fmt.Sprintf(summaryFmt, strings.Join(orphanLocTags, "\n"))), nil
 	}
 }
 
