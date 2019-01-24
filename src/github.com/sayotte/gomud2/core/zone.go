@@ -31,14 +31,15 @@ func NewZone(id uuid.UUID, nickname string, persister EventPersister) *Zone {
 }
 
 type Zone struct {
-	id             uuid.UUID
-	nickname       string
-	world          *World
-	nextSequenceId uint64
-	actorsById     map[uuid.UUID]*Actor
-	locationsById  map[uuid.UUID]*Location
-	exitsById      map[uuid.UUID]*Exit
-	objectsById    map[uuid.UUID]*Object
+	id              uuid.UUID
+	nickname        string
+	world           *World
+	defaultLocation *Location
+	nextSequenceId  uint64
+	actorsById      map[uuid.UUID]*Actor
+	locationsById   map[uuid.UUID]*Location
+	exitsById       map[uuid.UUID]*Exit
+	objectsById     map[uuid.UUID]*Object
 	// This is the channel where the Zone picks up new events submitted by its
 	// own public methods. This should never be directly exposed by an accessor;
 	// public methods should create requests and send them to the channel.
@@ -232,6 +233,26 @@ func (z *Zone) setWorld(world *World) {
 	z.world = world
 }
 
+func (z *Zone) DefaultLocation() *Location {
+	return z.defaultLocation
+}
+
+func (z *Zone) SetDefaultLocation(loc *Location) error {
+	e := NewZoneSetDefaultLocationEvent(loc.ID(), z.id)
+	_, err := z.syncRequestToSelf(e)
+	return err
+}
+
+func (z *Zone) applyZoneSetDefaultLocationEvent(e ZoneSetDefaultLocationEvent) error {
+	loc, ok := z.locationsById[e.LocationID]
+	if !ok {
+		return fmt.Errorf("no such Location with ID %q in Zone", e.LocationID)
+	}
+
+	z.defaultLocation = loc
+	return nil
+}
+
 func (z *Zone) sendEventToObservers(e Event, oList ObserverList) {
 	for _, o := range oList {
 		o.SendEvent(e)
@@ -273,6 +294,9 @@ func (z *Zone) apply(e Event) (interface{}, error) {
 	case EventTypeObjectMove:
 		typedEvent := e.(ObjectMoveEvent)
 		return nil, z.applyObjectMoveEvent(typedEvent)
+	case EventTypeZoneSetDefaultLocation:
+		typedEvent := e.(ZoneSetDefaultLocationEvent)
+		return nil, z.applyZoneSetDefaultLocationEvent(typedEvent)
 	default:
 		return nil, fmt.Errorf("unknown Event type %T", e)
 	}
@@ -729,4 +753,21 @@ func dfsSnapshottableDepsOmittingVisited(this snapshottable, visitedMap map[snap
 	ret = append(ret, this)
 	visitedMap[this] = true
 	return ret
+}
+
+func NewZoneSetDefaultLocationEvent(locID, zoneID uuid.UUID) ZoneSetDefaultLocationEvent {
+	return ZoneSetDefaultLocationEvent{
+		eventGeneric: &eventGeneric{
+			eventType:     EventTypeZoneSetDefaultLocation,
+			version:       1,
+			aggregateId:   zoneID,
+			shouldPersist: true,
+		},
+		LocationID: locID,
+	}
+}
+
+type ZoneSetDefaultLocationEvent struct {
+	*eventGeneric
+	LocationID uuid.UUID
 }

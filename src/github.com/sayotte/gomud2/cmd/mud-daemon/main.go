@@ -108,6 +108,11 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
+	err = z.SetDefaultLocation(loc1)
+	if err != nil {
+		panic(err)
+	}
+
 	shortDesc = "123 Elm Street"
 	longDesc = "Sitting below the level of the street at the end of a slight "
 	longDesc += "slope, this house's cute blue shutters and the whimsical "
@@ -169,6 +174,11 @@ func initStartingWorld(worldConfigFile string) error {
 	longDesc += "conversation with friends."
 	loc3Prim := core.NewLocation(gouuid.Nil, z2, shortDesc, longDesc)
 	loc3, err := z2.AddLocation(loc3Prim)
+	if err != nil {
+		panic(err)
+	}
+
+	err = z2.SetDefaultLocation(loc3)
 	if err != nil {
 		panic(err)
 	}

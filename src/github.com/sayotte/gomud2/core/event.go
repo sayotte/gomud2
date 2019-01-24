@@ -16,6 +16,7 @@ const (
 	EventTypeObjectAddToZone
 	EventTypeObjectRemoveFromZone
 	EventTypeObjectMove
+	EventTypeZoneSetDefaultLocation
 )
 
 type Event interface {

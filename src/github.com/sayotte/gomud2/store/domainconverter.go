@@ -45,6 +45,8 @@ func writeEvent(e core.Event, outStream io.Writer, useCompression bool) error {
 		frommer = &objectRemoveFromZoneEvent{}
 	case core.EventTypeObjectMove:
 		frommer = &objectMoveEvent{}
+	case core.EventTypeZoneSetDefaultLocation:
+		frommer = &zoneSetDefaultLocationEvent{}
 	default:
 		return fmt.Errorf("unhandled event type %T", e)
 	}
@@ -138,6 +140,8 @@ func readEvent(inStream io.Reader) (core.Event, error) {
 		toEr = &objectRemoveFromZoneEvent{}
 	case core.EventTypeObjectMove:
 		toEr = &objectMoveEvent{}
+	case core.EventTypeZoneSetDefaultLocation:
+		toEr = &zoneSetDefaultLocationEvent{}
 	}
 	err = json.Unmarshal(buf, toEr)
 	if err != nil {
