@@ -33,6 +33,8 @@ func writeEvent(e core.Event, outStream io.Writer, useCompression bool) error {
 		frommer = &actorRemoveFromZoneEvent{}
 	case core.EventTypeLocationAddToZone:
 		frommer = &locationAddToZoneEvent{}
+	case core.EventTypeLocationRemoveFromZone:
+		frommer = &locationRemoveFromZoneEvent{}
 	case core.EventTypeLocationUpdate:
 		frommer = &locationUpdateEvent{}
 	case core.EventTypeExitAddToZone:
@@ -130,6 +132,8 @@ func readEvent(inStream io.Reader) (core.Event, error) {
 		toEr = &actorRemoveFromZoneEvent{}
 	case core.EventTypeLocationAddToZone:
 		toEr = &locationAddToZoneEvent{}
+	case core.EventTypeLocationRemoveFromZone:
+		toEr = &locationRemoveFromZoneEvent{}
 	case core.EventTypeLocationUpdate:
 		toEr = &locationUpdateEvent{}
 	case core.EventTypeExitAddToZone:

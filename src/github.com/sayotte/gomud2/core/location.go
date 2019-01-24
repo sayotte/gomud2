@@ -267,3 +267,20 @@ func (lue LocationUpdateEvent) ShortDescription() string {
 func (lue LocationUpdateEvent) Description() string {
 	return lue.desc
 }
+
+func NewLocationRemoveFromZoneEvent(locID, zoneID uuid.UUID) LocationRemoveFromZoneEvent {
+	return LocationRemoveFromZoneEvent{
+		eventGeneric: &eventGeneric{
+			eventType:     EventTypeLocationRemoveFromZone,
+			version:       1,
+			aggregateId:   zoneID,
+			shouldPersist: true,
+		},
+		LocationID: locID,
+	}
+}
+
+type LocationRemoveFromZoneEvent struct {
+	*eventGeneric
+	LocationID uuid.UUID
+}

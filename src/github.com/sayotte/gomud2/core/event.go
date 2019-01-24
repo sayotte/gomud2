@@ -10,6 +10,7 @@ const (
 	EventTypeActorAddToZone
 	EventTypeActorRemoveFromZone
 	EventTypeLocationAddToZone
+	EventTypeLocationRemoveFromZone
 	EventTypeLocationUpdate
 	EventTypeExitAddToZone
 	EventTypeExitUpdate

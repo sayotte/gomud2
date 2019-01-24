@@ -276,6 +276,9 @@ func (z *Zone) apply(e Event) (interface{}, error) {
 	case EventTypeLocationAddToZone:
 		typedEvent := e.(LocationAddToZoneEvent)
 		return z.applyLocationAddToZoneEvent(typedEvent)
+	case EventTypeLocationRemoveFromZone:
+		typedEvent := e.(LocationRemoveFromZoneEvent)
+		return nil, z.applyLocationRemoveFromZoneEvent(typedEvent)
 	case EventTypeLocationUpdate:
 		typedEvent := e.(LocationUpdateEvent)
 		return nil, z.applyLocationUpdateEvent(typedEvent)
@@ -482,6 +485,27 @@ func (z *Zone) applyLocationUpdateEvent(e LocationUpdateEvent) error {
 
 	loc.setShortDescription(e.ShortDescription())
 	loc.setDescription(e.Description())
+	return nil
+}
+
+func (z *Zone) RemoveLocation(l *Location) error {
+	e := NewLocationRemoveFromZoneEvent(l.ID(), z.id)
+	_, err := z.syncRequestToSelf(e)
+	return err
+}
+
+func (z *Zone) applyLocationRemoveFromZoneEvent(e LocationRemoveFromZoneEvent) error {
+	loc, found := z.locationsById[e.LocationID]
+	if !found {
+		return fmt.Errorf("no Location with ID %q found in Zone", e.LocationID)
+	}
+	if len(loc.OutExits()) != 0 {
+		return errors.New("Location has Exits which would be orphaned")
+	}
+	if len(loc.Actors()) != 0 {
+		return errors.New("Location has Actors which would be orphaned")
+	}
+	delete(z.locationsById, e.LocationID)
 	return nil
 }
 

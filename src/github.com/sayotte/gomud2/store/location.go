@@ -40,6 +40,33 @@ func (latze *locationAddToZoneEvent) SetHeader(h eventHeader) {
 	latze.header = h
 }
 
+type locationRemoveFromZoneEvent struct {
+	header     eventHeader
+	LocationID uuid.UUID
+}
+
+func (lrfze *locationRemoveFromZoneEvent) FromDomain(e core.Event) {
+	from := e.(core.LocationRemoveFromZoneEvent)
+	*lrfze = locationRemoveFromZoneEvent{
+		header:     eventHeaderFromDomainEvent(from),
+		LocationID: from.LocationID,
+	}
+}
+
+func (lrfze locationRemoveFromZoneEvent) ToDomain() core.Event {
+	e := core.NewLocationRemoveFromZoneEvent(lrfze.LocationID, lrfze.header.AggregateId)
+	e.SetSequenceNumber(lrfze.header.SequenceNumber)
+	return e
+}
+
+func (lrfze locationRemoveFromZoneEvent) Header() eventHeader {
+	return lrfze.header
+}
+
+func (lrfze *locationRemoveFromZoneEvent) SetHeader(h eventHeader) {
+	lrfze.header = h
+}
+
 type locationUpdateEvent struct {
 	header          eventHeader
 	LocationID      uuid.UUID
