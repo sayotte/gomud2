@@ -19,6 +19,7 @@ const (
 	mainMenuItemCreateCharacter  = "Create a new character"
 	mainMenuItemAccountSettings  = "Account settings and maintenance"
 	mainMenuItemServerOperations = "MUD server operations"
+	mainMenuItemWorldEditor      = "Enter world editor"
 	mainMenuItemDisconnect       = "Disconnect"
 	menuItemCancel               = "Cancel"
 	opsMenuItemSnapshot          = "Store a snapshot of current MUD state"
@@ -72,6 +73,9 @@ func (lh *lobbyHandler) gotoMainMenu(terminalWidth, terminalHeight int) []byte {
 	if lh.authZDesc.ServerOperations {
 		options = append(options, mainMenuItemServerOperations)
 	}
+	if lh.authZDesc.EditWorld {
+		options = append(options, mainMenuItemWorldEditor)
+	}
 	options = append(options, mainMenuItemAccountSettings, mainMenuItemDisconnect)
 
 	lh.currentMenu = &menu{
@@ -97,6 +101,15 @@ func (lh *lobbyHandler) handleMainMenuState(line []byte, terminalWidth, terminal
 	case mainMenuItemServerOperations:
 		outBytes := lh.gotoOperationsMenu(terminalWidth, terminalHeight)
 		return outBytes, lh, nil
+	case mainMenuItemWorldEditor:
+		worldEditHandler := &worldEditHandler{
+			authService: lh.authService,
+			world:       lh.world,
+			session:     lh.session,
+			accountID:   lh.accountID,
+			authZDesc:   lh.authZDesc,
+		}
+		return nil, worldEditHandler, nil
 	case mainMenuItemDisconnect:
 		return []byte("Ok, bye!\n"), nil, nil
 	default:
