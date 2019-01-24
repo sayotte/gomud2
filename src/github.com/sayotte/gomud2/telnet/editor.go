@@ -186,6 +186,7 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 	weh.cmdTrie.Add(core.ExitDirectionSouth, weh.getDirectionHandlerGeneric(core.ExitDirectionSouth))
 	weh.cmdTrie.Add(core.ExitDirectionEast, weh.getDirectionHandlerGeneric(core.ExitDirectionEast))
 	weh.cmdTrie.Add(core.ExitDirectionWest, weh.getDirectionHandlerGeneric(core.ExitDirectionWest))
+	weh.cmdTrie.Add("goto", weh.getGotoHandler())
 	weh.cmdTrie.Add("leave", weh.getLeaveHandler())
 	weh.cmdTrie.Add("look", weh.getLookHandler())
 	weh.cmdTrie.Add("inspect", weh.getInspectHandler())
@@ -229,6 +230,28 @@ func (weh *worldEditHandler) getLookHandler() worldEditCommandHandler {
 func (weh *worldEditHandler) getCommandsHandler() worldEditCommandHandler {
 	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
 		return summarizeCommands(weh.cmdTrie, terminalWidth), nil
+	}
+}
+
+func (weh *worldEditHandler) getGotoHandler() worldEditCommandHandler {
+	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) == 0 {
+			return []byte("Goto where? Need the ID of a Location.\n"), nil
+		}
+
+		locID, err := uuid.FromString(params[0])
+		if err != nil {
+			return []byte(fmt.Sprintf("Invalid Location ID: %s\n", err)), nil
+		}
+
+		loc := weh.zoneUnderEdit.LocationByID(locID)
+		if loc == nil {
+			return []byte(fmt.Sprintf("No such Location %q in this Zone.\n", locID)), nil
+		}
+
+		weh.locUnderEdit = loc
+		return lookAtLocation(nil, terminalWidth, weh.locUnderEdit), nil
 	}
 }
 
