@@ -178,7 +178,12 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 	weh.state = worldEditHandlerStateZoneEdit
 	weh.zoneUnderEdit = zone
 	if loc == nil {
-		weh.locUnderEdit = zone.Locations()[0]
+		weh.locUnderEdit = zone.DefaultLocation()
+		if weh.locUnderEdit == nil {
+			weh.locUnderEdit = zone.Locations()[0]
+		}
+	} else {
+		weh.locUnderEdit = loc
 	}
 
 	weh.cmdTrie = trie.New()
@@ -193,6 +198,7 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 	weh.cmdTrie.Add("newlocation", weh.getNewlocationHandler())
 	weh.cmdTrie.Add("editlocation", weh.gotoEditLocationMenu())
 	weh.cmdTrie.Add("orphanlocations", weh.getOrphanLocationsHandler())
+	weh.cmdTrie.Add("setdefaultlocation", weh.getSetDefaultLocHandler())
 	weh.cmdTrie.Add("editexit", weh.getEditExitHandler())
 	weh.cmdTrie.Add("remexit", weh.getRemExitHandler())
 	weh.cmdTrie.Add("commands", weh.getCommandsHandler())
@@ -472,6 +478,28 @@ func (weh *worldEditHandler) handleGetLocationDescState(line []byte, terminalWid
 	return append([]byte("Done.\n"), menuBytes...), weh, nil
 }
 
+func (weh *worldEditHandler) getSetDefaultLocHandler() worldEditCommandHandler {
+	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) != 1 || (len(params) == 1 && params[0] == "") {
+			return []byte("Usage: setdefaultlocation <location ID>\n"), nil
+		}
+		locID, err := uuid.FromString(params[0])
+		if err != nil {
+			return []byte(fmt.Sprintf("Invalid Location ID: %s\n", err)), nil
+		}
+		loc := weh.zoneUnderEdit.LocationByID(locID)
+		if loc == nil {
+			return []byte(fmt.Sprintf("No Location with ID %q in Zone\n", locID)), nil
+		}
+		err = weh.zoneUnderEdit.SetDefaultLocation(loc)
+		if err != nil {
+			return []byte("Whoops...\n"), fmt.Errorf("Zone.SetDefaultLocation(): %s", err)
+		}
+		return []byte("Done.\n"), nil
+	}
+}
+
 func (weh *worldEditHandler) getEditExitHandler() worldEditCommandHandler {
 	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
 		params := strings.Split(line, " ")
@@ -657,7 +685,7 @@ func (weh *worldEditHandler) handleGetExitDestState(line []byte, terminalWidth, 
 func (weh *worldEditHandler) getRemExitHandler() worldEditCommandHandler {
 	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
 		params := strings.Split(line, " ")
-		if len(params) == 0 {
+		if len(params) != 1 {
 			return []byte("Usage: remexit <direction\n"), nil
 		}
 		direction := strings.ToLower(params[0])
