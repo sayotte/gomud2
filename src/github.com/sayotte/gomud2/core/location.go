@@ -54,8 +54,16 @@ func (l Location) ShortDescription() string {
 	return l.shortDescription
 }
 
+func (l *Location) setShortDescription(s string) {
+	l.shortDescription = s
+}
+
 func (l Location) Description() string {
 	return l.description
+}
+
+func (l *Location) setDescription(s string) {
+	l.description = s
 }
 
 func (l Location) Observers() ObserverList {
@@ -150,6 +158,17 @@ func (l *Location) setZone(z *Zone) {
 	l.zone = z
 }
 
+func (l Location) Update(shortDesc, desc string) error {
+	e := NewLocationUpdateEvent(
+		shortDesc,
+		desc,
+		l.id,
+		l.zone.ID(),
+	)
+	_, err := l.syncRequestToZone(e)
+	return err
+}
+
 func (l *Location) syncRequestToZone(e Event) (interface{}, error) {
 	req := rpc.NewRequest(e)
 	l.requestChan <- req
@@ -214,4 +233,37 @@ func (latze LocationAddToZoneEvent) ShortDescription() string {
 
 func (latze LocationAddToZoneEvent) Description() string {
 	return latze.desc
+}
+
+func NewLocationUpdateEvent(shortDesc, desc string, locationID, zoneID uuid.UUID) LocationUpdateEvent {
+	return LocationUpdateEvent{
+		&eventGeneric{
+			eventType:     EventTypeLocationUpdate,
+			version:       1,
+			aggregateId:   zoneID,
+			shouldPersist: true,
+		},
+		locationID,
+		shortDesc,
+		desc,
+	}
+}
+
+type LocationUpdateEvent struct {
+	*eventGeneric
+	locationID uuid.UUID
+	shortDesc  string
+	desc       string
+}
+
+func (lue LocationUpdateEvent) LocationID() uuid.UUID {
+	return lue.locationID
+}
+
+func (lue LocationUpdateEvent) ShortDescription() string {
+	return lue.shortDesc
+}
+
+func (lue LocationUpdateEvent) Description() string {
+	return lue.desc
 }

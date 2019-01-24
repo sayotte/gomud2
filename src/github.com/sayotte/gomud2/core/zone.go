@@ -244,6 +244,9 @@ func (z *Zone) apply(e Event) (interface{}, error) {
 	case EventTypeLocationAddToZone:
 		typedEvent := e.(LocationAddToZoneEvent)
 		return z.applyLocationAddToZoneEvent(typedEvent)
+	case EventTypeLocationUpdate:
+		typedEvent := e.(LocationUpdateEvent)
+		return nil, z.applyLocationUpdateEvent(typedEvent)
 	case EventTypeLocationEdgeAddToZone:
 		typedEvent := e.(LocationEdgeAddToZoneEvent)
 		return z.applyLocationEdgeAddToZoneEvent(typedEvent)
@@ -395,6 +398,17 @@ func (z *Zone) applyLocationAddToZoneEvent(e LocationAddToZoneEvent) (*Location,
 	)
 	z.locationsById[e.locationId] = loc
 	return loc, nil
+}
+
+func (z *Zone) applyLocationUpdateEvent(e LocationUpdateEvent) error {
+	loc, ok := z.locationsById[e.locationID]
+	if !ok {
+		return fmt.Errorf("unknown Location %q", e.locationID)
+	}
+
+	loc.setShortDescription(e.ShortDescription())
+	loc.setDescription(e.Description())
+	return nil
 }
 
 func (z *Zone) AddLocationEdge(le *LocationEdge) (*LocationEdge, error) {
