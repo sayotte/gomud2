@@ -16,6 +16,13 @@ const (
 	EdgeDirectionWest  = "west"
 )
 
+var ValidDirections = map[string]bool{
+	EdgeDirectionNorth: true,
+	EdgeDirectionSouth: true,
+	EdgeDirectionEast:  true,
+	EdgeDirectionWest:  true,
+}
+
 func NewLocationEdge(id uuid.UUID, desc, direction string, src, dest *Location, zone *Zone, otherZoneID, otherLocID uuid.UUID) *LocationEdge {
 	newID := id
 	if uuid.Equal(id, uuid.Nil) {
@@ -30,6 +37,7 @@ func NewLocationEdge(id uuid.UUID, desc, direction string, src, dest *Location, 
 		zone:           zone,
 		otherZoneID:    otherZoneID,
 		otherZoneLocID: otherLocID,
+		requestChan:    make(chan rpc.Request),
 	}
 }
 

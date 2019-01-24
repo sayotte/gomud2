@@ -20,6 +20,10 @@ const (
 	worldEditHandlerStateLocationEdit
 	worldEditHandlerStateLocationGetShortDesc
 	worldEditHandlerStateLocationGetDesc
+	worldEditHandlerStateEdgeEdit
+	worldEditHandlerStateEdgeGetDescription
+	worldEditHandlerStateEdgeGetDirection
+	worldEditHandlerStateEdgeGetDestination
 )
 
 const (
@@ -29,6 +33,12 @@ const (
 const (
 	worldEditLocEditMenuItemShortDescription = "Change short description"
 	worldEditLocEditMenuItemLongDescription  = "Change long description"
+)
+
+const (
+	worldEditEdgeEditMenuItemDescription = "Change description"
+	worldEditEdgeEditMenuItemDirection   = "Change direction"
+	worldEditEdgeEditMenuItemDest        = "Change destination"
 )
 
 type worldEditCommandHandler func(line string, terminalWidth, terminalHeight int) ([]byte, error)
@@ -45,6 +55,7 @@ type worldEditHandler struct {
 	cmdTrie       *trie.Trie
 	zoneUnderEdit *core.Zone
 	locUnderEdit  *core.Location
+	edgeUnderEdit *core.LocationEdge
 }
 
 func (weh *worldEditHandler) init(terminalWidth, terminalHeight int) []byte {
@@ -65,6 +76,14 @@ func (weh *worldEditHandler) handleRxLine(line []byte, terminalWidth, terminalHe
 		return weh.handleGetLocationShortDescState(line, terminalWidth, terminalHeight)
 	case worldEditHandlerStateLocationGetDesc:
 		return weh.handleGetLocationDescState(line, terminalWidth, terminalHeight)
+	case worldEditHandlerStateEdgeEdit:
+		return weh.handleEditEdgeState(line, terminalWidth, terminalHeight)
+	case worldEditHandlerStateEdgeGetDescription:
+		return weh.handleGetEdgeDescState(line, terminalWidth, terminalHeight)
+	case worldEditHandlerStateEdgeGetDirection:
+		return weh.handleGetEdgeDirectionState(line, terminalWidth, terminalHeight)
+	case worldEditHandlerStateEdgeGetDestination:
+		return weh.handleGetEdgeDestState(line, terminalWidth, terminalHeight)
 	default:
 		return nil, weh, fmt.Errorf("worldEditHandler: unknown state %d", weh.state)
 	}
@@ -172,6 +191,7 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 	weh.cmdTrie.Add("inspect", weh.getInspectHandler())
 	weh.cmdTrie.Add("newlocation", weh.getNewlocationHandler())
 	weh.cmdTrie.Add("editlocation", weh.gotoEditLocationMenu())
+	weh.cmdTrie.Add("editedge", weh.getEditEdgeHandler())
 	weh.cmdTrie.Add("commands", weh.getCommandsHandler())
 
 	return lookAtLocation(nil, terminalWidth, weh.locUnderEdit)
@@ -430,6 +450,162 @@ func (weh *worldEditHandler) getEditEdgeHandler() worldEditCommandHandler {
 
 		return weh.gotoEditEdgeState(edge, terminalWidth, terminalHeight), nil
 	}
+}
+
+func (weh *worldEditHandler) gotoEditEdgeState(edge *core.LocationEdge, terminalWidth, terminalHeight int) []byte {
+	weh.state = worldEditHandlerStateEdgeEdit
+	weh.edgeUnderEdit = edge
+
+	iler := &inspectLocationEdgeReport{}
+	iler.fromLocationEdge(weh.edgeUnderEdit)
+
+	options := []string{
+		worldEditEdgeEditMenuItemDescription,
+		worldEditEdgeEditMenuItemDirection,
+		worldEditEdgeEditMenuItemDest,
+		menuItemCancel,
+	}
+	weh.currentMenu = &menu{
+		options: options,
+	}
+	return append(iler.bytes(), weh.currentMenu.init(terminalWidth, terminalHeight)...)
+}
+
+func (weh *worldEditHandler) handleEditEdgeState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+	outBytes, selection := weh.currentMenu.handleRxLine(line, terminalWidth, terminalHeight)
+	if selection == "" {
+		return outBytes, weh, nil
+	}
+
+	switch selection {
+	case worldEditEdgeEditMenuItemDescription:
+		weh.state = worldEditHandlerStateEdgeGetDescription
+		return []byte("Enter new description, followed by a newline <enter>.\n"), weh, nil
+	case worldEditEdgeEditMenuItemDirection:
+		weh.state = worldEditHandlerStateEdgeGetDirection
+		return []byte(fmt.Sprintf("Enter one of [%s] followed by a newline <enter>.\n", strings.Join(orderedDirections, ", "))), weh, nil
+	case worldEditEdgeEditMenuItemDest:
+		weh.state = worldEditHandlerStateEdgeGetDestination
+		prompt := "Enter ID for destination Zone/Location, followed by a newline <enter>\n"
+		prompt += "Example: b6b0fff7-a7fe-4ba2-91e0-9e78e752f841/3730ad94-88fa-4f11-8cbc-bcebdaa0ac9b\n"
+		return []byte(prompt), weh, nil
+	case menuItemCancel:
+		fallthrough
+	default:
+		outBytes := weh.gotoZoneEditState(terminalWidth, weh.zoneUnderEdit, weh.locUnderEdit)
+		return outBytes, weh, nil
+	}
+}
+
+func (weh *worldEditHandler) handleGetEdgeDescState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+	newDesc := strings.TrimSuffix(string(line), "\n")
+
+	err := weh.edgeUnderEdit.Update(
+		newDesc,
+		weh.edgeUnderEdit.Direction(),
+		weh.edgeUnderEdit.Source(),
+		weh.edgeUnderEdit.Destination(),
+		weh.edgeUnderEdit.OtherZoneID(),
+		weh.edgeUnderEdit.OtherZoneLocID(),
+	)
+	if err != nil {
+		fmt.Printf("ERROR: LocationEdge.Update(description): %s\n", err)
+		return nil, weh, errors.New("Whoops...")
+	}
+
+	menuBytes := weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)
+	return append([]byte("Done.\n"), menuBytes...), weh, nil
+}
+
+func (weh *worldEditHandler) handleGetEdgeDirectionState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+	newDir := strings.TrimSuffix(string(line), "\n")
+	if !core.ValidDirections[newDir] {
+		errBytes := []byte(fmt.Sprintf("Invalid direction, must be one of [%s].\n", strings.Join(orderedDirections, ", ")))
+		menuBytes := weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)
+		return append(errBytes, menuBytes...), weh, nil
+	}
+	for _, existingEdge := range weh.locUnderEdit.OutEdges() {
+		if existingEdge.Direction() == newDir {
+			errBytes := []byte("There's an existing edge in that direction!\n")
+			menuBytes := weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)
+			return append(errBytes, menuBytes...), weh, nil
+		}
+	}
+
+	err := weh.edgeUnderEdit.Update(
+		weh.edgeUnderEdit.Description(),
+		newDir,
+		weh.edgeUnderEdit.Source(),
+		weh.edgeUnderEdit.Destination(),
+		weh.edgeUnderEdit.OtherZoneID(),
+		weh.edgeUnderEdit.OtherZoneLocID(),
+	)
+	if err != nil {
+		fmt.Printf("ERROR: LocationEdge.Update(destination): %s\n", err)
+		return nil, weh, errors.New("Whoops...")
+	}
+	menuBytes := weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)
+	return append([]byte("Done.\n"), menuBytes...), weh, nil
+}
+
+func (weh *worldEditHandler) handleGetEdgeDestState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+	in := strings.TrimSuffix(string(line), "\n")
+	parts := strings.Split(in, "/")
+	if len(parts) != 2 {
+		errBytes := []byte("Invalid input, must be of form <ID>/<ID>\n")
+		return append(errBytes, weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)...), weh, nil
+	}
+
+	zoneID, err := uuid.FromString(parts[0])
+	if err != nil {
+		errBytes := []byte(fmt.Sprintf("Invalid Zone ID: %s\n", err))
+		return append(errBytes, weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)...), weh, nil
+	}
+	locID, err := uuid.FromString(parts[1])
+	if err != nil {
+		errBytes := []byte(fmt.Sprintf("Invalid Location ID: %s\n", err))
+		return append(errBytes, weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)...), weh, nil
+	}
+
+	if uuid.Equal(zoneID, weh.edgeUnderEdit.Zone().ID()) {
+		// Handle both of these cases:
+		// - internal -> internal
+		// - external -> internal
+		dest := weh.edgeUnderEdit.Zone().LocationByID(locID)
+		if dest == nil {
+			errBytes := []byte(fmt.Sprintf("No such Location with ID %q in this Zone\n", locID))
+			return append(errBytes, weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)...), weh, nil
+		}
+		err := weh.edgeUnderEdit.Update(
+			weh.edgeUnderEdit.Description(),
+			weh.edgeUnderEdit.Direction(),
+			weh.edgeUnderEdit.Source(),
+			dest,
+			uuid.Nil,
+			uuid.Nil,
+		)
+		if err != nil {
+			fmt.Printf("ERROR: LocationEdge.Update(destination): %s\n", err)
+			return nil, weh, errors.New("Whoops...")
+		}
+	} else {
+		// Handle both of these cases:
+		// internal -> external
+		// external -> external
+		err := weh.edgeUnderEdit.Update(
+			weh.edgeUnderEdit.Description(),
+			weh.edgeUnderEdit.Direction(),
+			weh.edgeUnderEdit.Source(),
+			nil,
+			zoneID,
+			locID,
+		)
+		if err != nil {
+			fmt.Printf("ERROR: LocationEdge.Update(destination): %s\n", err)
+			return nil, weh, errors.New("Whoops...")
+		}
+	}
+	return append([]byte("Done.\n"), weh.gotoEditEdgeState(weh.edgeUnderEdit, terminalWidth, terminalHeight)...), weh, nil
 }
 
 func invertDirection(inDir string) string {
