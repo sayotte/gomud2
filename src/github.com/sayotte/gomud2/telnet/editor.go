@@ -17,12 +17,19 @@ const (
 	worldEditHandlerStateMainMenu = iota
 	worldEditHandlerStateZoneSelect
 	worldEditHandlerStateZoneEdit
+	worldEditHandlerStateLocationEdit
+	worldEditHandlerStateLocationGetShortDesc
+	worldEditHandlerStateLocationGetDesc
 )
 
 const (
 	worldEditMainMenuItemEditExistingZone = "Edit an existing zone"
 )
 
+const (
+	worldEditLocEditMenuItemShortDescription = "Change short description"
+	worldEditLocEditMenuItemLongDescription  = "Change long description"
+)
 
 type worldEditCommandHandler func(line string, terminalWidth, terminalHeight int) ([]byte, error)
 
@@ -52,6 +59,12 @@ func (weh *worldEditHandler) handleRxLine(line []byte, terminalWidth, terminalHe
 		return weh.handleZoneSelectState(line, terminalWidth, terminalHeight)
 	case worldEditHandlerStateZoneEdit:
 		return weh.handleZoneEditState(line, terminalWidth, terminalHeight)
+	case worldEditHandlerStateLocationEdit:
+		return weh.handleEditLocationState(line, terminalWidth, terminalHeight)
+	case worldEditHandlerStateLocationGetShortDesc:
+		return weh.handleGetLocationShortDescState(line, terminalWidth, terminalHeight)
+	case worldEditHandlerStateLocationGetDesc:
+		return weh.handleGetLocationDescState(line, terminalWidth, terminalHeight)
 	default:
 		return nil, weh, fmt.Errorf("worldEditHandler: unknown state %d", weh.state)
 	}
@@ -158,6 +171,7 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 	weh.cmdTrie.Add("look", weh.getLookHandler())
 	weh.cmdTrie.Add("inspect", weh.getInspectHandler())
 	weh.cmdTrie.Add("newlocation", weh.getNewlocationHandler())
+	weh.cmdTrie.Add("editlocation", weh.gotoEditLocationMenu())
 	weh.cmdTrie.Add("commands", weh.getCommandsHandler())
 
 	return lookAtLocation(nil, terminalWidth, weh.locUnderEdit)
@@ -315,6 +329,106 @@ func (weh *worldEditHandler) getNewlocationHandler() worldEditCommandHandler {
 		}
 
 		return []byte("Done.\n"), nil
+	}
+}
+
+func (weh *worldEditHandler) gotoEditLocationMenu() worldEditCommandHandler {
+	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
+		ilr := &inspectLocationReport{}
+		ilr.fromLocation(weh.locUnderEdit)
+		locInspectBytes := ilr.bytes()
+
+		weh.state = worldEditHandlerStateLocationEdit
+		options := []string{
+			worldEditLocEditMenuItemShortDescription,
+			worldEditLocEditMenuItemLongDescription,
+			menuItemCancel,
+		}
+		weh.currentMenu = &menu{
+			options: options,
+		}
+
+		outBytes := append(locInspectBytes, weh.currentMenu.init(terminalWidth, terminalHeight)...)
+		return outBytes, nil
+	}
+}
+
+func (weh *worldEditHandler) handleEditLocationState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+	outBytes, selection := weh.currentMenu.handleRxLine(line, terminalWidth, terminalHeight)
+	if selection == "" {
+		return outBytes, weh, nil
+	}
+
+	switch selection {
+	case worldEditLocEditMenuItemShortDescription:
+		weh.state = worldEditHandlerStateLocationGetShortDesc
+		return []byte("Enter new short description, followed by a newline <enter>.\n"), weh, nil
+	case worldEditLocEditMenuItemLongDescription:
+		weh.state = worldEditHandlerStateLocationGetDesc
+		return []byte("Enter new description, followed by a newline <enter>\n"), weh, nil
+	case menuItemCancel:
+		fallthrough
+	default:
+		outBytes := weh.gotoZoneEditState(terminalWidth, weh.zoneUnderEdit, weh.locUnderEdit)
+		return outBytes, weh, nil
+	}
+}
+
+func (weh *worldEditHandler) handleGetLocationShortDescState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+	newShortDesc := strings.TrimSuffix(string(line), "\n")
+	err := weh.locUnderEdit.Update(
+		newShortDesc,
+		weh.locUnderEdit.Description(),
+	)
+	if err != nil {
+		fmt.Printf("ERROR: Location.Update(...): %s\n", err)
+		return nil, weh, errors.New("Whoops...")
+	}
+
+	gotoMenuFunc := weh.gotoEditLocationMenu()
+	menuBytes, _ := gotoMenuFunc(string(line), terminalWidth, terminalHeight)
+	return append([]byte("Done.\n"), menuBytes...), weh, nil
+}
+
+func (weh *worldEditHandler) handleGetLocationDescState(line []byte, terminalWidth, terminalHeight int) ([]byte, handler, error) {
+	newDesc := strings.TrimSuffix(string(line), "\n")
+	err := weh.locUnderEdit.Update(
+		weh.locUnderEdit.ShortDescription(),
+		newDesc,
+	)
+	if err != nil {
+		fmt.Printf("ERROR: Location.Update(...): %s\n", err)
+		return nil, weh, errors.New("Whoops...")
+	}
+
+	gotoMenuFunc := weh.gotoEditLocationMenu()
+	menuBytes, _ := gotoMenuFunc(string(line), terminalWidth, terminalHeight)
+	return append([]byte("Done.\n"), menuBytes...), weh, nil
+}
+
+func (weh *worldEditHandler) getEditEdgeHandler() worldEditCommandHandler {
+	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) == 0 {
+			return []byte("Usage: editedge <direction>\n"), nil
+		}
+		direction := strings.ToLower(params[0])
+		if !core.ValidDirections[direction] {
+			return []byte(fmt.Sprintf("Invalid direction %q, need one of: %s\n", direction, strings.Join(orderedDirections, ", "))), nil
+		}
+
+		var edge *core.LocationEdge
+		for _, maybeEdge := range weh.locUnderEdit.OutEdges() {
+			if maybeEdge.Direction() == direction {
+				edge = maybeEdge
+				break
+			}
+		}
+		if edge == nil {
+			return []byte(fmt.Sprintf("No edge in direction %q.\n", direction)), nil
+		}
+
+		return weh.gotoEditEdgeState(edge, terminalWidth, terminalHeight), nil
 	}
 }
 
