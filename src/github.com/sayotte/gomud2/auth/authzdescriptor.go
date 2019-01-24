@@ -5,4 +5,5 @@ type AuthZDescriptor struct {
 	PossessCharacter bool
 	MayLogin         bool
 	ServerOperations bool
+	EditWorld        bool
 }
