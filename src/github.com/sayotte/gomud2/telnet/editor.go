@@ -157,6 +157,7 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 	weh.cmdTrie.Add("exit", weh.getExitHandler())
 	weh.cmdTrie.Add("look", weh.getLookHandler())
 	weh.cmdTrie.Add("inspect", weh.getInspectHandler())
+	weh.cmdTrie.Add("newlocation", weh.getNewlocationHandler())
 	weh.cmdTrie.Add("commands", weh.getCommandsHandler())
 
 	return lookAtLocation(nil, terminalWidth, weh.locUnderEdit)
@@ -258,3 +259,76 @@ func (weh *worldEditHandler) getInspectHandler() worldEditCommandHandler {
 	}
 }
 
+func (weh *worldEditHandler) getNewlocationHandler() worldEditCommandHandler {
+	return func(line string, terminalWidth, terminalHeight int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) == 0 {
+			return []byte("Usage: newlocation <direction>\n"), nil
+		}
+		direction := strings.ToLower(params[0])
+		if !core.ValidDirections[direction] {
+			return []byte(fmt.Sprintf("Invalid direction %q, need one of: %s\n", direction, strings.Join(orderedDirections, ", "))), nil
+		}
+
+		for _, edge := range weh.locUnderEdit.OutEdges() {
+			if edge.Direction() == direction {
+				return []byte("Out-edge in that direction already exists from this Location.\n"), nil
+			}
+		}
+
+		shortDesc := "Short description goes here"
+		longDesc := "Long description goes here"
+		newLocPrim := core.NewLocation(uuid.Nil, weh.zoneUnderEdit, shortDesc, longDesc)
+		newLoc, err := weh.zoneUnderEdit.AddLocation(newLocPrim)
+		if err != nil {
+			return []byte(fmt.Sprintf("ERROR: AddLocation(): %s\n", err)), nil
+		}
+
+		outEdgePrim := core.NewLocationEdge(
+			uuid.Nil,
+			fmt.Sprintf("To %s", newLoc.ID()),
+			direction,
+			weh.locUnderEdit,
+			newLoc,
+			weh.zoneUnderEdit,
+			uuid.Nil,
+			uuid.Nil,
+		)
+		_, err = weh.zoneUnderEdit.AddLocationEdge(outEdgePrim)
+		if err != nil {
+			return []byte(fmt.Sprintf("ERROR: AddLocationEdge(1): %s\n", err)), nil
+		}
+
+		inEdgePrim := core.NewLocationEdge(
+			uuid.Nil,
+			fmt.Sprintf("To %s", weh.locUnderEdit.ID()),
+			invertDirection(direction),
+			newLoc,
+			weh.locUnderEdit,
+			weh.zoneUnderEdit,
+			uuid.Nil,
+			uuid.Nil,
+		)
+		_, err = weh.zoneUnderEdit.AddLocationEdge(inEdgePrim)
+		if err != nil {
+			return []byte(fmt.Sprintf("ERROR: AddLocationEdge(2): %s\n", err)), nil
+		}
+
+		return []byte("Done.\n"), nil
+	}
+}
+
+func invertDirection(inDir string) string {
+	switch inDir {
+	case core.EdgeDirectionNorth:
+		return core.EdgeDirectionSouth
+	case core.EdgeDirectionSouth:
+		return core.EdgeDirectionNorth
+	case core.EdgeDirectionEast:
+		return core.EdgeDirectionWest
+	case core.EdgeDirectionWest:
+		return core.EdgeDirectionEast
+	default:
+		return ""
+	}
+}
