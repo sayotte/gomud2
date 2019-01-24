@@ -3,6 +3,7 @@ package telnet
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/derekparker/trie"
@@ -188,12 +189,17 @@ func (weh *worldEditHandler) gotoZoneEditState(terminalWidth int, zone *core.Zon
 
 	weh.cmdTrie = trie.New()
 	weh.cmdTrie.Add(core.ExitDirectionNorth, weh.getDirectionHandlerGeneric(core.ExitDirectionNorth))
+	weh.cmdTrie.Add("n", weh.getDirectionHandlerGeneric(core.ExitDirectionNorth))
 	weh.cmdTrie.Add(core.ExitDirectionSouth, weh.getDirectionHandlerGeneric(core.ExitDirectionSouth))
+	weh.cmdTrie.Add("s", weh.getDirectionHandlerGeneric(core.ExitDirectionSouth))
 	weh.cmdTrie.Add(core.ExitDirectionEast, weh.getDirectionHandlerGeneric(core.ExitDirectionEast))
+	weh.cmdTrie.Add("e", weh.getDirectionHandlerGeneric(core.ExitDirectionEast))
 	weh.cmdTrie.Add(core.ExitDirectionWest, weh.getDirectionHandlerGeneric(core.ExitDirectionWest))
+	weh.cmdTrie.Add("w", weh.getDirectionHandlerGeneric(core.ExitDirectionWest))
 	weh.cmdTrie.Add("goto", weh.getGotoHandler())
 	weh.cmdTrie.Add("leave", weh.getLeaveHandler())
 	weh.cmdTrie.Add("look", weh.getLookHandler())
+	weh.cmdTrie.Add("l", weh.getLookHandler())
 	weh.cmdTrie.Add("inspect", weh.getInspectHandler())
 	weh.cmdTrie.Add("newlocation", weh.getNewlocationHandler())
 	weh.cmdTrie.Add("editlocation", weh.gotoEditLocationMenu())
@@ -219,6 +225,8 @@ func (weh *worldEditHandler) handleZoneEditState(lineB []byte, terminalWidth, te
 	if len(terms) == 0 {
 		return []byte(fmt.Sprintf("Unrecognized command %q, try \"commands\".\n", firstTerm)), weh, nil
 	}
+	// sort terms so we always pick the shortest match
+	sort.Strings(terms)
 
 	restOfLine := strings.TrimLeft(strings.TrimPrefix(line, firstTerm), " ")
 
@@ -521,6 +529,9 @@ func (weh *worldEditHandler) getRemLocationHandler() worldEditCommandHandler {
 		}
 
 		dstLoc := weh.zoneUnderEdit.DefaultLocation()
+		if dstLoc == nil {
+			return []byte("No default location set for Zone, use 'setdefaultlocation' to set one first.\n"), nil
+		}
 		for _, actor := range loc.Actors() {
 			err = actor.AdminRelocate(dstLoc)
 			if err != nil {
