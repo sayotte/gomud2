@@ -11,6 +11,7 @@ const (
 	EventTypeLocationAddToZone
 	EventTypeLocationUpdate
 	EventTypeLocationEdgeAddToZone
+	EventTypeLocationEdgeUpdate
 	EventTypeObjectAddToZone
 	EventTypeObjectRemoveFromZone
 	EventTypeObjectMove

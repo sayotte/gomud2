@@ -56,20 +56,72 @@ func (le LocationEdge) Description() string {
 	return le.description
 }
 
+func (le *LocationEdge) setDescription(s string) {
+	le.description = s
+}
+
 func (le LocationEdge) Direction() string {
 	return le.direction
+}
+
+func (le *LocationEdge) setDirection(s string) {
+	le.direction = s
+}
+
+func (le LocationEdge) Source() *Location {
+	return le.source
+}
+
+func (le *LocationEdge) setSource(loc *Location) {
+	le.source = loc
 }
 
 func (le LocationEdge) Destination() *Location {
 	return le.destination
 }
 
+func (le *LocationEdge) setDestination(loc *Location) {
+	le.destination = loc
+}
+
 func (le LocationEdge) OtherZoneID() uuid.UUID {
 	return le.otherZoneID
 }
 
+func (le *LocationEdge) setOtherZoneID(id uuid.UUID) {
+	le.otherZoneID = id
+}
+
 func (le LocationEdge) OtherZoneLocID() uuid.UUID {
 	return le.otherZoneLocID
+}
+
+func (le *LocationEdge) setOtherZoneLocID(id uuid.UUID) {
+	le.otherZoneLocID = id
+}
+
+func (le LocationEdge) Zone() *Zone {
+	return le.zone
+}
+
+func (le LocationEdge) Update(desc, direction string, source, dest *Location, extZoneID, extLocID uuid.UUID) error {
+	var destID uuid.UUID
+	if dest != nil {
+		destID = dest.ID()
+	} else {
+		destID = extLocID
+	}
+	e := NewLocationEdgeUpdateEvent(
+		desc,
+		direction,
+		le.ID(),
+		source.ID(),
+		destID,
+		le.zone.ID(),
+		extZoneID,
+	)
+	_, err := le.syncRequestToZone(e)
+	return err
 }
 
 func (le LocationEdge) syncRequestToZone(e Event) (interface{}, error) {
@@ -142,6 +194,34 @@ func NewLocationEdgeAddToZoneEvent(desc, direction string, edgeId, sourceId, des
 }
 
 type LocationEdgeAddToZoneEvent struct {
+	*eventGeneric
+	EdgeId           uuid.UUID
+	Description      string
+	Direction        string
+	SourceLocationId uuid.UUID
+	DestZoneID       uuid.UUID
+	DestLocationId   uuid.UUID
+}
+
+func NewLocationEdgeUpdateEvent(desc, direction string, edgeID, sourceID, destID, srcZoneID, extZoneID uuid.UUID) LocationEdgeUpdateEvent {
+	lue := LocationEdgeUpdateEvent{
+		eventGeneric: &eventGeneric{
+			eventType:     EventTypeLocationEdgeUpdate,
+			version:       1,
+			aggregateId:   srcZoneID,
+			shouldPersist: true,
+		},
+		EdgeId:           edgeID,
+		Description:      desc,
+		Direction:        direction,
+		SourceLocationId: sourceID,
+		DestLocationId:   destID,
+		DestZoneID:       extZoneID,
+	}
+	return lue
+}
+
+type LocationEdgeUpdateEvent struct {
 	*eventGeneric
 	EdgeId           uuid.UUID
 	Description      string

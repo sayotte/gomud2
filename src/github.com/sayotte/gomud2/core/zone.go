@@ -250,6 +250,9 @@ func (z *Zone) apply(e Event) (interface{}, error) {
 	case EventTypeLocationEdgeAddToZone:
 		typedEvent := e.(LocationEdgeAddToZoneEvent)
 		return z.applyLocationEdgeAddToZoneEvent(typedEvent)
+	case EventTypeLocationEdgeUpdate:
+		typedEvent := e.(LocationEdgeUpdateEvent)
+		return nil, z.applyLocationEdgeUpdateEvent(typedEvent)
 	case EventTypeObjectAddToZone:
 		typedEvent := e.(ObjectAddToZoneEvent)
 		return z.applyObjectAddToZoneEvent(typedEvent)
@@ -458,6 +461,107 @@ func (z *Zone) applyLocationEdgeAddToZoneEvent(e LocationEdgeAddToZoneEvent) (*L
 	}
 	z.edgesById[edge.ID()] = edge
 	return edge, nil
+}
+
+func (z *Zone) applyLocationEdgeUpdateEvent(e LocationEdgeUpdateEvent) error {
+	// Check for all invalid cases / dereferences
+	edge, ok := z.edgesById[e.EdgeId]
+	if !ok {
+		return fmt.Errorf("unknown LocationEdge %q", e.EdgeId)
+	}
+	newSrc, ok := z.locationsById[e.SourceLocationId]
+	if !ok {
+		return fmt.Errorf("unknown source Location %q", e.SourceLocationId)
+	}
+	if uuid.Equal(e.DestLocationId, uuid.Nil) {
+		return errors.New("destination Location ID cannot be nil")
+	}
+	var newDst *Location
+	if uuid.Equal(e.DestZoneID, uuid.Nil) {
+		_, ok := z.locationsById[e.DestLocationId]
+		if !ok {
+			return fmt.Errorf("unknown destination Location %q", e.DestLocationId)
+		}
+		newDst = z.locationsById[e.DestLocationId]
+	}
+	// Truth table for destination updates
+	//| old otherZoneID | old otherZoneLocID | old Dest* | new otherZoneID | action                      | note                                               |
+	//|-----------------+--------------------+-----------+-----------------+-----------------------------+----------------------------------------------------|
+	//| nil             | nil                | non-nil   | nil             | resolve destination         | internal -> internal                               |
+	//|                 |                    |           |                 | edge.setDestination()       |                                                    |
+	//|                 |                    |           |                 |                             |                                                    |
+	//| nil             | nil                | non-nil   | non-nil         | edge.setDestination(nil)    | internal -> external                               |
+	//|                 |                    |           |                 | edge.setOtherZoneID()       |                                                    |
+	//|                 |                    |           |                 | edge.setotherZoneLocID()    |                                                    |
+	//|                 |                    |           |                 |                             |                                                    |
+	//| non-nil         | non-nil            | nil       | nil             | resolve destination         | external -> internal                               |
+	//|                 |                    |           |                 | edge.setDestination()       |                                                    |
+	//|                 |                    |           |                 | edge.setOtherZoneID(nil)    |                                                    |
+	//|                 |                    |           |                 | edge.setOtherZoneLocID(nil) |                                                    |
+	//|                 |                    |           |                 |                             |                                                    |
+	//| non-nil         | non-nil            | nil       | non-nil         | edge.setOtherZoneID()       | external -> external                               |
+	//|                 |                    |           |                 | edge.setOtherZoneLocID()    |                                                    |
+	//|                 |                    |           |                 |                             |                                                    |
+	//| nil             | nil                | nil       | *               | error                       | invalid prior state, no destination                |
+	//| non-nil         | non-nil            | non-nil   | *               | error                       | invalid prior state, internal+external destination |
+	//| nil             | non-nil            | *         | *               | error                       | invalid prior state, external loc ref w/o zone ref |
+	//| non-nil         | nil                | *         | *               | error                       | invalid prior state, external zone ref w/o loc ref |
+	///// Handle destination error cases
+	if uuid.Equal(edge.OtherZoneID(), uuid.Nil) && uuid.Equal(edge.OtherZoneLocID(), uuid.Nil) && edge.Destination() == nil {
+		return errors.New("invalid prior state, LocationEdge has no internal/external destination")
+	}
+	if !uuid.Equal(edge.OtherZoneID(), uuid.Nil) && !uuid.Equal(edge.OtherZoneLocID(), uuid.Nil) && edge.Destination() != nil {
+		return errors.New("invalid prior state, LocationEdge has both internal/external destinations")
+	}
+	if uuid.Equal(edge.OtherZoneID(), uuid.Nil) && !uuid.Equal(edge.OtherZoneLocID(), uuid.Nil) {
+		return errors.New("invalid prior state, LocationEdge has external Location reference without Zone reference")
+	}
+	if !uuid.Equal(edge.OtherZoneID(), uuid.Nil) && uuid.Equal(edge.OtherZoneLocID(), uuid.Nil) {
+		return errors.New("invalid prior state, LocationEdge has external Zone reference without Location reference")
+	}
+
+	// Handle destination update cases
+	if uuid.Equal(edge.OtherZoneID(), uuid.Nil) {
+		if uuid.Equal(e.DestZoneID, uuid.Nil) {
+			// internal -> internal
+			edge.setDestination(newDst)
+		} else {
+			// internal -> external
+			edge.setDestination(nil)
+			edge.setOtherZoneID(e.DestZoneID)
+			edge.setOtherZoneLocID(e.DestLocationId)
+		}
+	} else {
+		if uuid.Equal(e.DestZoneID, uuid.Nil) {
+			// external -> internal
+			edge.setDestination(newDst)
+			edge.setOtherZoneID(uuid.Nil)
+			edge.setOtherZoneLocID(uuid.Nil)
+		} else {
+			// external -> external
+			edge.setOtherZoneID(e.DestZoneID)
+			edge.setOtherZoneLocID(e.DestLocationId)
+		}
+	}
+
+	// Changing source location requires updating bi-directional pointers
+	if newSrc != edge.Source() {
+		oldSrc := edge.Source()
+		err := oldSrc.removeOutEdge(edge)
+		if err != nil {
+			return err
+		}
+		err = newSrc.addOutEdge(edge)
+		if err != nil {
+			return err
+		}
+		edge.setSource(newSrc)
+	}
+
+	edge.setDescription(e.Description)
+	edge.setDirection(e.Direction)
+
+	return nil
 }
 
 func (z *Zone) AddObject(o *Object, startingLocation *Location) (*Object, error) {
