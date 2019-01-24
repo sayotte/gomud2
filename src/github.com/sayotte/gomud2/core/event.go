@@ -6,6 +6,7 @@ import (
 
 const (
 	EventTypeActorMove = iota
+	EventTypeActorAdminRelocate
 	EventTypeActorAddToZone
 	EventTypeActorRemoveFromZone
 	EventTypeLocationAddToZone

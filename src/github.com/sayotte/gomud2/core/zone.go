@@ -267,6 +267,9 @@ func (z *Zone) apply(e Event) (interface{}, error) {
 	case EventTypeActorMove:
 		typedEvent := e.(*ActorMoveEvent)
 		return nil, z.applyActorMoveEvent(typedEvent)
+	case EventTypeActorAdminRelocate:
+		typedEvent := e.(ActorAdminRelocateEvent)
+		return nil, z.applyActorAdminRelocate(typedEvent)
 	case EventTypeActorRemoveFromZone:
 		typedEvent := e.(ActorRemoveFromZoneEvent)
 		return nil, z.applyActorRemoveEvent(typedEvent)
@@ -336,6 +339,39 @@ func (z *Zone) applyActorMoveEvent(e *ActorMoveEvent) error {
 	for _, o := range toLoc.Observers() {
 		oList = append(oList, o)
 	}
+	z.sendEventToObservers(e, oList)
+
+	return nil
+}
+
+func (z *Zone) applyActorAdminRelocate(e ActorAdminRelocateEvent) error {
+	actor, found := z.actorsById[e.ActorID]
+	if !found {
+		return fmt.Errorf("no such Actor with ID %q in Zone", e.ActorID)
+	}
+	toLoc, found := z.locationsById[e.ToLocationID]
+	if !found {
+		return fmt.Errorf("no such Location with ID %q in Zone", e.ToLocationID)
+	}
+
+	var oList ObserverList
+	// It's possible the Actor has been orphaned with no location, which is why we're
+	// relocating them. Otherwise, though, we need to remove them from their existing
+	// location.
+	fromLoc := actor.Location()
+	if fromLoc != nil {
+		err := fromLoc.removeActor(actor)
+		if err != nil {
+			return err
+		}
+		oList = fromLoc.Observers()
+	}
+	err := toLoc.addActor(actor)
+	if err != nil {
+		return err
+	}
+	actor.setLocation(toLoc)
+	oList = append(oList, toLoc.Observers()...)
 	z.sendEventToObservers(e, oList)
 
 	return nil

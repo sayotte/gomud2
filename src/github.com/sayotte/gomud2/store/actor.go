@@ -40,6 +40,34 @@ func (ame *actorMoveEvent) SetHeader(h eventHeader) {
 	ame.header = h
 }
 
+type actorAdminRelocateEvent struct {
+	header                eventHeader
+	ActorID, ToLocationID uuid.UUID
+}
+
+func (aare *actorAdminRelocateEvent) FromDomain(e core.Event) {
+	from := e.(core.ActorAdminRelocateEvent)
+	*aare = actorAdminRelocateEvent{
+		header:       eventHeaderFromDomainEvent(from),
+		ActorID:      from.ActorID,
+		ToLocationID: from.ToLocationID,
+	}
+}
+
+func (aare actorAdminRelocateEvent) ToDomain() core.Event {
+	e := core.NewActorAdminRelocateEvent(aare.ActorID, aare.ToLocationID, aare.header.AggregateId)
+	e.SetSequenceNumber(aare.header.SequenceNumber)
+	return e
+}
+
+func (aare actorAdminRelocateEvent) Header() eventHeader {
+	return aare.header
+}
+
+func (aare *actorAdminRelocateEvent) SetHeader(h eventHeader) {
+	aare.header = h
+}
+
 type actorAddToZoneEvent struct {
 	header                      eventHeader
 	ActorID, StartingLocationID uuid.UUID

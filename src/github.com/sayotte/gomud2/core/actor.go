@@ -2,11 +2,14 @@ package core
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/satori/go.uuid"
+
 	"github.com/sayotte/gomud2/rpc"
 	myuuid "github.com/sayotte/gomud2/uuid"
-	"sync"
 )
 
 func NewActor(id uuid.UUID, name string, location *Location, zone *Zone) *Actor {
@@ -74,7 +77,6 @@ func (a *Actor) setLocation(loc *Location) {
 }
 
 func (a *Actor) Move(from, to *Location) error {
-	fmt.Printf("actor %q, moving from %q to %q\n", a.Name(), from.ShortDescription(), to.ShortDescription())
 	if from.Zone() != to.Zone() {
 		return fmt.Errorf("cross-zone moves should use the World.MigrateZone() API call")
 	}
@@ -96,6 +98,16 @@ func (a *Actor) Move(from, to *Location) error {
 	)
 	_, err := a.syncRequestToZone(e)
 
+	return err
+}
+
+func (a *Actor) AdminRelocate(to *Location) error {
+	fromLoc := a.location
+	if fromLoc != nil && fromLoc.Zone() != to.Zone() {
+		return errors.New("cannot AdminRelocate across Zones")
+	}
+	e := NewActorAdminRelocateEvent(a.id, to.ID(), to.Zone().ID())
+	_, err := a.syncRequestToZone(e)
 	return err
 }
 
@@ -182,6 +194,25 @@ func (ame ActorMoveEvent) MarshalJSON() ([]byte, error) {
 
 func (ame *ActorMoveEvent) UnmarshalJSON(in []byte) error {
 	return nil
+}
+
+func NewActorAdminRelocateEvent(actorID, locID, zoneID uuid.UUID) ActorAdminRelocateEvent {
+	return ActorAdminRelocateEvent{
+		eventGeneric: &eventGeneric{
+			eventType:     EventTypeActorAdminRelocate,
+			version:       1,
+			aggregateId:   zoneID,
+			shouldPersist: true,
+		},
+		ActorID:      actorID,
+		ToLocationID: locID,
+	}
+}
+
+type ActorAdminRelocateEvent struct {
+	*eventGeneric
+	ActorID      uuid.UUID
+	ToLocationID uuid.UUID
 }
 
 func NewActorAddToZoneEvent(name string, actorId, startingLocationId, zoneId uuid.UUID) ActorAddToZoneEvent {
