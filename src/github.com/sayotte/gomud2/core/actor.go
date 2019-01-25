@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -80,23 +79,15 @@ func (a *Actor) Move(from, to *Location) error {
 	if from.Zone() != to.Zone() {
 		return fmt.Errorf("cross-zone moves should use the World.MigrateZone() API call")
 	}
-	exitExists := false
-	for _, exit := range from.OutExits() {
-		if exit.Destination() == to {
-			exitExists = true
-			break
-		}
-	}
-	if !exitExists {
-		return fmt.Errorf("no exit to that destination from location %q", from.ID())
-	}
+
 	e := NewActorMoveEvent(
 		from.ID(),
 		to.ID(),
 		a.id,
 		a.zone.ID(),
 	)
-	_, err := a.syncRequestToZone(e)
+	cmd := newActorMoveCommand(e)
+	_, err := a.syncRequestToZone(cmd)
 
 	return err
 }
@@ -107,7 +98,8 @@ func (a *Actor) AdminRelocate(to *Location) error {
 		return errors.New("cannot AdminRelocate across Zones")
 	}
 	e := NewActorAdminRelocateEvent(a.id, to.ID(), to.Zone().ID())
-	_, err := a.syncRequestToZone(e)
+	c := newActorAdminRelocateCommand(e)
+	_, err := a.syncRequestToZone(c)
 	return err
 }
 
@@ -123,8 +115,8 @@ func (a *Actor) setZone(z *Zone) {
 	a.zone = z
 }
 
-func (a *Actor) syncRequestToZone(e Event) (interface{}, error) {
-	req := rpc.NewRequest(e)
+func (a *Actor) syncRequestToZone(c Command) (interface{}, error) {
+	req := rpc.NewRequest(c)
 	a.requestChan <- req
 	response := <-req.ResponseChan
 	return response.Value, response.Err
@@ -162,7 +154,15 @@ func (al ActorList) Copy() ActorList {
 	return out
 }
 
-func newActorMoveCommand(wrapped ActorMoveEvent) actorMoveCommand {
+func (al ActorList) Remove(actor *Actor) ActorList {
+	idx, err := al.IndexOf(actor)
+	if err != nil {
+		return al
+	}
+	return append(al[:idx], al[idx+1:]...)
+}
+
+func newActorMoveCommand(wrapped *ActorMoveEvent) actorMoveCommand {
 	return actorMoveCommand{
 		commandGeneric{commandType: CommandTypeActorMove},
 		wrapped,
@@ -171,7 +171,7 @@ func newActorMoveCommand(wrapped ActorMoveEvent) actorMoveCommand {
 
 type actorMoveCommand struct {
 	commandGeneric
-	wrappedEvent ActorMoveEvent
+	wrappedEvent *ActorMoveEvent
 }
 
 func NewActorMoveEvent(fromLocationId, toLocationId, actorId, zoneId uuid.UUID) *ActorMoveEvent {
@@ -199,16 +199,7 @@ func (ame ActorMoveEvent) FromToActorIDs() (uuid.UUID, uuid.UUID, uuid.UUID) {
 	return ame.fromLocationId, ame.toLocationId, ame.actorId
 }
 
-func (ame ActorMoveEvent) MarshalJSON() ([]byte, error) {
-	type marshalable ActorMoveEvent
-	return json.Marshal(marshalable(ame))
-}
-
-func (ame *ActorMoveEvent) UnmarshalJSON(in []byte) error {
-	return nil
-}
-
-func newActorAdminRelocateCommand(wrapped ActorAdminRelocateEvent) actorAdminRelocateCommand {
+func newActorAdminRelocateCommand(wrapped *ActorAdminRelocateEvent) actorAdminRelocateCommand {
 	return actorAdminRelocateCommand{
 		commandGeneric{commandType: CommandTypeActorAdminRelocate},
 		wrapped,
@@ -217,11 +208,11 @@ func newActorAdminRelocateCommand(wrapped ActorAdminRelocateEvent) actorAdminRel
 
 type actorAdminRelocateCommand struct {
 	commandGeneric
-	wrappedEvent ActorAdminRelocateEvent
+	wrappedEvent *ActorAdminRelocateEvent
 }
 
-func NewActorAdminRelocateEvent(actorID, locID, zoneID uuid.UUID) ActorAdminRelocateEvent {
-	return ActorAdminRelocateEvent{
+func NewActorAdminRelocateEvent(actorID, locID, zoneID uuid.UUID) *ActorAdminRelocateEvent {
+	return &ActorAdminRelocateEvent{
 		eventGeneric: &eventGeneric{
 			eventType:     EventTypeActorAdminRelocate,
 			version:       1,
@@ -239,7 +230,7 @@ type ActorAdminRelocateEvent struct {
 	ToLocationID uuid.UUID
 }
 
-func newActorAddToZoneCommand(wrapped ActorAddToZoneEvent) actorAddToZoneCommand {
+func newActorAddToZoneCommand(wrapped *ActorAddToZoneEvent) actorAddToZoneCommand {
 	return actorAddToZoneCommand{
 		commandGeneric{commandType: CommandTypeActorAddToZone},
 		wrapped,
@@ -248,11 +239,11 @@ func newActorAddToZoneCommand(wrapped ActorAddToZoneEvent) actorAddToZoneCommand
 
 type actorAddToZoneCommand struct {
 	commandGeneric
-	wrappedEvent ActorAddToZoneEvent
+	wrappedEvent *ActorAddToZoneEvent
 }
 
-func NewActorAddToZoneEvent(name string, actorId, startingLocationId, zoneId uuid.UUID) ActorAddToZoneEvent {
-	return ActorAddToZoneEvent{
+func NewActorAddToZoneEvent(name string, actorId, startingLocationId, zoneId uuid.UUID) *ActorAddToZoneEvent {
+	return &ActorAddToZoneEvent{
 		&eventGeneric{
 			eventType:     EventTypeActorAddToZone,
 			version:       1,
@@ -284,8 +275,8 @@ func (aatze ActorAddToZoneEvent) StartingLocationID() uuid.UUID {
 	return aatze.startingLocationId
 }
 
-func newActorRemoveFromZoneCommand(wrapped ActorRemoveFromZoneEvent) actorRemoveFromZoneCommand {
-	return actorRemoveFromZoneCommand{
+func newActorRemoveFromZoneCommand(wrapped *ActorRemoveFromZoneEvent) *actorRemoveFromZoneCommand {
+	return &actorRemoveFromZoneCommand{
 		commandGeneric{commandType: CommandTypeActorRemoveFromZone},
 		wrapped,
 	}
@@ -293,7 +284,7 @@ func newActorRemoveFromZoneCommand(wrapped ActorRemoveFromZoneEvent) actorRemove
 
 type actorRemoveFromZoneCommand struct {
 	commandGeneric
-	wrappedEvent ActorRemoveFromZoneEvent
+	wrappedEvent *ActorRemoveFromZoneEvent
 }
 
 func NewActorRemoveFromZoneEvent(actorID, zoneID uuid.UUID) ActorRemoveFromZoneEvent {

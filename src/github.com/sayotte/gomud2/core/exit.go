@@ -128,12 +128,13 @@ func (ex Exit) Update(desc, direction string, source, dest *Location, extZoneID,
 		ex.zone.ID(),
 		extZoneID,
 	)
-	_, err := ex.syncRequestToZone(e)
+	cmd := newExitUpdateCommand(e)
+	_, err := ex.syncRequestToZone(cmd)
 	return err
 }
 
-func (ex Exit) syncRequestToZone(e Event) (interface{}, error) {
-	req := rpc.NewRequest(e)
+func (ex Exit) syncRequestToZone(c Command) (interface{}, error) {
+	req := rpc.NewRequest(c)
 	ex.requestChan <- req
 	response := <-req.ResponseChan
 	return response.Value, response.Err
@@ -184,7 +185,15 @@ func (el ExitList) Copy() ExitList {
 	return out
 }
 
-func newExitAddToZoneCommand(wrapped ExitAddToZoneEvent) exitAddToZoneCommand {
+func (el ExitList) Remove(ex *Exit) ExitList {
+	idx, err := el.IndexOf(ex)
+	if err != nil {
+		return el
+	}
+	return append(el[:idx], el[idx+1:]...)
+}
+
+func newExitAddToZoneCommand(wrapped *ExitAddToZoneEvent) exitAddToZoneCommand {
 	return exitAddToZoneCommand{
 		commandGeneric{commandType: CommandTypeExitAddToZone},
 		wrapped,
@@ -193,11 +202,11 @@ func newExitAddToZoneCommand(wrapped ExitAddToZoneEvent) exitAddToZoneCommand {
 
 type exitAddToZoneCommand struct {
 	commandGeneric
-	wrappedEvent ExitAddToZoneEvent
+	wrappedEvent *ExitAddToZoneEvent
 }
 
-func NewExitAddToZoneEvent(desc, direction string, exitId, sourceId, destLocId, srcZoneId, destZoneID uuid.UUID) ExitAddToZoneEvent {
-	return ExitAddToZoneEvent{
+func NewExitAddToZoneEvent(desc, direction string, exitId, sourceId, destLocId, srcZoneId, destZoneID uuid.UUID) *ExitAddToZoneEvent {
+	return &ExitAddToZoneEvent{
 		&eventGeneric{
 			eventType:     EventTypeExitAddToZone,
 			version:       1,
@@ -223,7 +232,7 @@ type ExitAddToZoneEvent struct {
 	DestLocationId   uuid.UUID
 }
 
-func newExitUpdateCommand(wrapped ExitUpdateEvent) exitUpdateCommand {
+func newExitUpdateCommand(wrapped *ExitUpdateEvent) exitUpdateCommand {
 	return exitUpdateCommand{
 		commandGeneric{commandType: CommandTypeExitUpdate},
 		wrapped,
@@ -232,11 +241,11 @@ func newExitUpdateCommand(wrapped ExitUpdateEvent) exitUpdateCommand {
 
 type exitUpdateCommand struct {
 	commandGeneric
-	wrappedEvent ExitUpdateEvent
+	wrappedEvent *ExitUpdateEvent
 }
 
-func NewExitUpdateEvent(desc, direction string, exitID, sourceID, destID, srcZoneID, extZoneID uuid.UUID) ExitUpdateEvent {
-	xue := ExitUpdateEvent{
+func NewExitUpdateEvent(desc, direction string, exitID, sourceID, destID, srcZoneID, extZoneID uuid.UUID) *ExitUpdateEvent {
+	xue := &ExitUpdateEvent{
 		eventGeneric: &eventGeneric{
 			eventType:     EventTypeExitUpdate,
 			version:       1,
@@ -263,7 +272,7 @@ type ExitUpdateEvent struct {
 	DestLocationId   uuid.UUID
 }
 
-func newExitRemoveFromZoneCommand(wrapped ExitRemoveFromZoneEvent) exitRemoveFromZoneCommand {
+func newExitRemoveFromZoneCommand(wrapped *ExitRemoveFromZoneEvent) exitRemoveFromZoneCommand {
 	return exitRemoveFromZoneCommand{
 		commandGeneric{commandType: CommandTypeExitRemoveFromZone},
 		wrapped,
@@ -272,11 +281,11 @@ func newExitRemoveFromZoneCommand(wrapped ExitRemoveFromZoneEvent) exitRemoveFro
 
 type exitRemoveFromZoneCommand struct {
 	commandGeneric
-	wrappedEvent ExitRemoveFromZoneEvent
+	wrappedEvent *ExitRemoveFromZoneEvent
 }
 
-func NewExitRemoveFromZoneEvent(exitID, zoneID uuid.UUID) ExitRemoveFromZoneEvent {
-	return ExitRemoveFromZoneEvent{
+func NewExitRemoveFromZoneEvent(exitID, zoneID uuid.UUID) *ExitRemoveFromZoneEvent {
+	return &ExitRemoveFromZoneEvent{
 		eventGeneric: &eventGeneric{
 			eventType:     EventTypeExitRemoveFromZone,
 			version:       1,

@@ -26,7 +26,7 @@ func (eatze exitAddToZoneEvent) ToDomain() core.Event {
 }
 
 func (eatze *exitAddToZoneEvent) FromDomain(e core.Event) {
-	from := e.(core.ExitAddToZoneEvent)
+	from := e.(*core.ExitAddToZoneEvent)
 	*eatze = exitAddToZoneEvent{
 		header:           eventHeaderFromDomainEvent(from),
 		Description:      from.Description,
@@ -67,7 +67,7 @@ func (exue exitUpdateEvent) ToDomain() core.Event {
 }
 
 func (exue *exitUpdateEvent) FromDomain(e core.Event) {
-	from := e.(core.ExitUpdateEvent)
+	from := e.(*core.ExitUpdateEvent)
 	*exue = exitUpdateEvent{
 		header:           eventHeaderFromDomainEvent(from),
 		Description:      from.Description,
@@ -99,7 +99,7 @@ func (erfz exitRemoveFromZoneEvent) ToDomain() core.Event {
 }
 
 func (erfz *exitRemoveFromZoneEvent) FromDomain(e core.Event) {
-	from := e.(core.ExitRemoveFromZoneEvent)
+	from := e.(*core.ExitRemoveFromZoneEvent)
 	*erfz = exitRemoveFromZoneEvent{
 		header: eventHeaderFromDomainEvent(from),
 		ExitID: from.ExitID,

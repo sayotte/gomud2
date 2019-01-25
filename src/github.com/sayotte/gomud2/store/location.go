@@ -12,7 +12,7 @@ type locationAddToZoneEvent struct {
 }
 
 func (latze *locationAddToZoneEvent) FromDomain(e core.Event) {
-	from := e.(core.LocationAddToZoneEvent)
+	from := e.(*core.LocationAddToZoneEvent)
 	*latze = locationAddToZoneEvent{
 		header:     eventHeaderFromDomainEvent(from),
 		LocationID: from.LocationID(),
@@ -46,7 +46,7 @@ type locationRemoveFromZoneEvent struct {
 }
 
 func (lrfze *locationRemoveFromZoneEvent) FromDomain(e core.Event) {
-	from := e.(core.LocationRemoveFromZoneEvent)
+	from := e.(*core.LocationRemoveFromZoneEvent)
 	*lrfze = locationRemoveFromZoneEvent{
 		header:     eventHeaderFromDomainEvent(from),
 		LocationID: from.LocationID,
@@ -74,7 +74,7 @@ type locationUpdateEvent struct {
 }
 
 func (lue *locationUpdateEvent) FromDomain(e core.Event) {
-	from := e.(core.LocationUpdateEvent)
+	from := e.(*core.LocationUpdateEvent)
 	*lue = locationUpdateEvent{
 		header:     eventHeaderFromDomainEvent(from),
 		LocationID: from.LocationID(),

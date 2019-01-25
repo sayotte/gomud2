@@ -18,7 +18,7 @@ func (zsdle zoneSetDefaultLocationEvent) ToDomain() core.Event {
 }
 
 func (zsdle *zoneSetDefaultLocationEvent) FromDomain(e core.Event) {
-	from := e.(core.ZoneSetDefaultLocationEvent)
+	from := e.(*core.ZoneSetDefaultLocationEvent)
 	*zsdle = zoneSetDefaultLocationEvent{
 		header:     eventHeaderFromDomainEvent(from),
 		LocationID: from.LocationID,

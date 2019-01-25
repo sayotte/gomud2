@@ -13,7 +13,7 @@ type objectAddToZoneEvent struct {
 }
 
 func (oatze *objectAddToZoneEvent) FromDomain(e core.Event) {
-	from := e.(core.ObjectAddToZoneEvent)
+	from := e.(*core.ObjectAddToZoneEvent)
 	*oatze = objectAddToZoneEvent{
 		header: eventHeader{
 			EventType:      from.Type(),
@@ -53,7 +53,7 @@ type objectRemoveFromZoneEvent struct {
 }
 
 func (orfze *objectRemoveFromZoneEvent) FromDomain(e core.Event) {
-	from := e.(core.ObjectRemoveFromZoneEvent)
+	from := e.(*core.ObjectRemoveFromZoneEvent)
 	*orfze = objectRemoveFromZoneEvent{
 		header:   eventHeaderFromDomainEvent(e),
 		ObjectID: from.ObjectID(),
@@ -83,7 +83,7 @@ type objectMoveEvent struct {
 }
 
 func (ome *objectMoveEvent) FromDomain(e core.Event) {
-	from := e.(core.ObjectMoveEvent)
+	from := e.(*core.ObjectMoveEvent)
 	*ome = objectMoveEvent{
 		header:         eventHeaderFromDomainEvent(from),
 		FromLocationId: from.FromLocationID(),
@@ -117,7 +117,7 @@ type objectAdminRelocateEvent struct {
 }
 
 func (oare *objectAdminRelocateEvent) FromDomain(e core.Event) {
-	from := e.(core.ObjectAdminRelocateEvent)
+	from := e.(*core.ObjectAdminRelocateEvent)
 	*oare = objectAdminRelocateEvent{
 		header:       eventHeaderFromDomainEvent(from),
 		ObjectID:     from.ObjectID,

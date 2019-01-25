@@ -56,7 +56,6 @@ func (o *Object) setZone(zone *Zone) {
 }
 
 func (o *Object) Move(from, to *Location) error {
-	fmt.Printf("object %q, moving from %q to %q\n", o.name, from.ShortDescription(), to.ShortDescription())
 	if from.Zone() != to.Zone() {
 		return fmt.Errorf("cross-zone moves not yet supported")
 	}
@@ -66,7 +65,8 @@ func (o *Object) Move(from, to *Location) error {
 		o.id,
 		o.zone.ID(),
 	)
-	_, err := o.syncRequestToZone(e)
+	cmd := newObjectMoveCommand(e)
+	_, err := o.syncRequestToZone(cmd)
 	return err
 }
 
@@ -76,12 +76,13 @@ func (o *Object) AdminRelocate(to *Location) error {
 		return errors.New("cannot AdminRelocate across Zones")
 	}
 	e := NewObjectAdminRelocateEvent(o.id, to.ID(), to.Zone().ID())
-	_, err := o.syncRequestToZone(e)
+	cmd := newObjectAdminRelocateCommand(e)
+	_, err := o.syncRequestToZone(cmd)
 	return err
 }
 
-func (o *Object) syncRequestToZone(e Event) (interface{}, error) {
-	req := rpc.NewRequest(e)
+func (o *Object) syncRequestToZone(c Command) (interface{}, error) {
+	req := rpc.NewRequest(c)
 	o.requestChan <- req
 	response := <-req.ResponseChan
 	return response.Value, response.Err
@@ -119,7 +120,15 @@ func (ol ObjectList) Copy() ObjectList {
 	return out
 }
 
-func newObjectAddToZoneCommand(wrapped ObjectAddToZoneEvent) objectAddToZoneCommand {
+func (ol ObjectList) Remove(object *Object) ObjectList {
+	idx, err := ol.IndexOf(object)
+	if err != nil {
+		return ol
+	}
+	return append(ol[:idx], ol[idx+1:]...)
+}
+
+func newObjectAddToZoneCommand(wrapped *ObjectAddToZoneEvent) objectAddToZoneCommand {
 	return objectAddToZoneCommand{
 		commandGeneric{commandType: CommandTypeObjectAddToZone},
 		wrapped,
@@ -128,11 +137,11 @@ func newObjectAddToZoneCommand(wrapped ObjectAddToZoneEvent) objectAddToZoneComm
 
 type objectAddToZoneCommand struct {
 	commandGeneric
-	wrappedEvent ObjectAddToZoneEvent
+	wrappedEvent *ObjectAddToZoneEvent
 }
 
-func NewObjectAddToZoneEvent(name string, objectId, startingLocationId, zoneId uuid.UUID) ObjectAddToZoneEvent {
-	return ObjectAddToZoneEvent{
+func NewObjectAddToZoneEvent(name string, objectId, startingLocationId, zoneId uuid.UUID) *ObjectAddToZoneEvent {
+	return &ObjectAddToZoneEvent{
 		&eventGeneric{
 			eventType:     EventTypeObjectAddToZone,
 			version:       1,
@@ -164,7 +173,7 @@ func (oatze ObjectAddToZoneEvent) StartingLocationID() uuid.UUID {
 	return oatze.startingLocationId
 }
 
-func newObjectRemoveFromZoneCommand(wrapped ObjectRemoveFromZoneEvent) objectRemoveFromZoneCommand {
+func newObjectRemoveFromZoneCommand(wrapped *ObjectRemoveFromZoneEvent) objectRemoveFromZoneCommand {
 	return objectRemoveFromZoneCommand{
 		commandGeneric{commandType: CommandTypeObjectRemoveFromZone},
 		wrapped,
@@ -173,11 +182,11 @@ func newObjectRemoveFromZoneCommand(wrapped ObjectRemoveFromZoneEvent) objectRem
 
 type objectRemoveFromZoneCommand struct {
 	commandGeneric
-	wrappedEvent ObjectRemoveFromZoneEvent
+	wrappedEvent *ObjectRemoveFromZoneEvent
 }
 
-func NewObjectRemoveFromZoneEvent(name string, objectID, zoneID uuid.UUID) ObjectRemoveFromZoneEvent {
-	return ObjectRemoveFromZoneEvent{
+func NewObjectRemoveFromZoneEvent(name string, objectID, zoneID uuid.UUID) *ObjectRemoveFromZoneEvent {
+	return &ObjectRemoveFromZoneEvent{
 		&eventGeneric{
 			eventType:     EventTypeObjectRemoveFromZone,
 			version:       1,
@@ -203,7 +212,7 @@ func (orfze ObjectRemoveFromZoneEvent) Name() string {
 	return orfze.name
 }
 
-func newObjectMoveCommand(wrapped ObjectMoveEvent) objectMoveCommand {
+func newObjectMoveCommand(wrapped *ObjectMoveEvent) objectMoveCommand {
 	return objectMoveCommand{
 		commandGeneric{commandType: CommandTypeObjectMove},
 		wrapped,
@@ -212,11 +221,11 @@ func newObjectMoveCommand(wrapped ObjectMoveEvent) objectMoveCommand {
 
 type objectMoveCommand struct {
 	commandGeneric
-	wrappedEvent ObjectMoveEvent
+	wrappedEvent *ObjectMoveEvent
 }
 
-func NewObjectMoveEvent(fromLocationId, toLocationId, objectId, zoneId uuid.UUID) ObjectMoveEvent {
-	return ObjectMoveEvent{
+func NewObjectMoveEvent(fromLocationId, toLocationId, objectId, zoneId uuid.UUID) *ObjectMoveEvent {
+	return &ObjectMoveEvent{
 		&eventGeneric{
 			eventType:     EventTypeObjectMove,
 			version:       1,
@@ -248,7 +257,7 @@ func (ome ObjectMoveEvent) ObjectID() uuid.UUID {
 	return ome.objectId
 }
 
-func newObjectAdminRelocateCommand(wrapped ObjectAdminRelocateEvent) objectAdminRelocateCommand {
+func newObjectAdminRelocateCommand(wrapped *ObjectAdminRelocateEvent) objectAdminRelocateCommand {
 	return objectAdminRelocateCommand{
 		commandGeneric{commandType: CommandTypeObjectAdminRelocate},
 		wrapped,
@@ -257,11 +266,11 @@ func newObjectAdminRelocateCommand(wrapped ObjectAdminRelocateEvent) objectAdmin
 
 type objectAdminRelocateCommand struct {
 	commandGeneric
-	wrappedEvent ObjectAdminRelocateEvent
+	wrappedEvent *ObjectAdminRelocateEvent
 }
 
-func NewObjectAdminRelocateEvent(objectID, locID, zoneID uuid.UUID) ObjectAdminRelocateEvent {
-	return ObjectAdminRelocateEvent{
+func NewObjectAdminRelocateEvent(objectID, locID, zoneID uuid.UUID) *ObjectAdminRelocateEvent {
+	return &ObjectAdminRelocateEvent{
 		eventGeneric: &eventGeneric{
 			eventType:     EventTypeObjectAdminRelocate,
 			version:       1,

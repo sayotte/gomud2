@@ -94,7 +94,7 @@ func initStartingWorld(worldConfigFile string) error {
 		UseCompression: true,
 	}
 	z := core.NewZone(gouuid.Nil, "overworld", eStore)
-	z.StartEventProcessing()
+	z.StartCommandProcessing()
 
 	shortDesc := "A nearby bar"
 	longDesc := "Nothing special to see at this local watering hole. Just the usual "
@@ -166,7 +166,7 @@ func initStartingWorld(worldConfigFile string) error {
 	}
 
 	z2 := core.NewZone(gouuid.Nil, "123 Elm St", eStore)
-	z2.StartEventProcessing()
+	z2.StartCommandProcessing()
 
 	shortDesc = "The Foxhunt Room"
 	longDesc = "A small room with wood paneled walls, standing here you "

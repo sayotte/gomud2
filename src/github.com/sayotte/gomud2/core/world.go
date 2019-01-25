@@ -86,7 +86,7 @@ func (w *World) LoadAndStart(zoneTags []string, defaultZoneID, defaultLocID uuid
 	w.frontDoorLocation = defaultLoc
 
 	for _, zone := range w.Zones() {
-		zone.StartEventProcessing()
+		zone.StartCommandProcessing()
 	}
 
 	err = w.ReplayIntentLog()
@@ -297,7 +297,7 @@ func (w *World) handleSnapshot() error {
 	// stop all event processing so we're sure to get sequence numbers
 	// representing a single instant in time across all zones
 	for _, zone := range w.zones {
-		zone.StopEventProcessing()
+		zone.StopCommandProcessing()
 	}
 	zoneIDToSeqNum := make(map[uuid.UUID]uint64)
 	zoneIDToNickname := make(map[uuid.UUID]string)
@@ -306,7 +306,7 @@ func (w *World) handleSnapshot() error {
 		zoneIDToNickname[zone.ID()] = zone.Nickname()
 		// restart processing events for each zone after getting its current
 		// sequence number
-		zone.StartEventProcessing()
+		zone.StartCommandProcessing()
 	}
 
 	for zoneId, seqNum := range zoneIDToSeqNum {

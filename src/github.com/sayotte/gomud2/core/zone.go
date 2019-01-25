@@ -3,7 +3,6 @@ package core
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -49,6 +48,8 @@ type Zone struct {
 	persister           EventPersister
 }
 
+//////// getters + non-command-setters
+
 func (z *Zone) ID() uuid.UUID {
 	return z.id
 }
@@ -69,14 +70,164 @@ func (z *Zone) LastSequenceNum() uint64 {
 	return z.nextSequenceId - 1
 }
 
-func (z *Zone) syncRequestToSelf(e Event) (interface{}, error) {
-	req := rpc.NewRequest(e)
+func (z *Zone) Actors() ActorList {
+	out := make(ActorList, 0, len(z.actorsById))
+	for _, actor := range z.actorsById {
+		out = append(out, actor)
+	}
+	return out
+}
+
+func (z *Zone) ActorByID(id uuid.UUID) *Actor {
+	return z.actorsById[id]
+}
+
+func (z *Zone) Locations() LocationList {
+	out := make(LocationList, 0, len(z.locationsById))
+	for _, loc := range z.locationsById {
+		out = append(out, loc)
+	}
+	return out
+}
+
+func (z *Zone) LocationByID(id uuid.UUID) *Location {
+	return z.locationsById[id]
+}
+
+func (z *Zone) DefaultLocation() *Location {
+	return z.defaultLocation
+}
+
+func (z *Zone) Exits() ExitList {
+	out := make(ExitList, 0, len(z.exitsById))
+	for _, exit := range z.exitsById {
+		out = append(out, exit)
+	}
+	return out
+}
+
+func (z *Zone) ExitsToLocation(loc *Location) ExitList {
+	var out ExitList
+	for _, exit := range z.exitsById {
+		if exit.Destination() == loc {
+			out = append(out, exit)
+		}
+	}
+	return out
+}
+
+func (z *Zone) ObjectByID(id uuid.UUID) *Object {
+	return z.objectsById[id]
+}
+
+func (z *Zone) World() *World {
+	return z.world
+}
+
+func (z *Zone) setWorld(world *World) {
+	z.world = world
+}
+
+//////// public command methods
+
+func (z *Zone) AddActor(a *Actor) (*Actor, error) {
+	e := a.snapshot(0).(*ActorAddToZoneEvent)
+	cmd := newActorAddToZoneCommand(e)
+	val, err := z.syncRequestToSelf(cmd)
+	newActor := val.(*Actor)
+	return newActor, err
+}
+
+func (z *Zone) RemoveActor(a *Actor) error {
+	e := NewActorRemoveFromZoneEvent(a.ID(), z.id)
+	cmd := newActorRemoveFromZoneCommand(&e)
+	_, err := z.syncRequestToSelf(cmd)
+	return err
+}
+
+// MigrateInActor is a wrapper for AddActor, ensuring the given Observer
+// receives the associated AddActorToZone event. Otherwise, since we're
+// returning a new Actor object, the Observer would not already be associated
+// with that new object and would never see the event.
+//
+// This function is never called when replaying our event-stream and there is
+// no corresponding Event type-- it is purely to ensure correct communication
+// as a migration is happening live.
+func (z *Zone) MigrateInActor(a *Actor, o Observer) (*Actor, error) {
+	a.Location().addObserver(o)
+	newActor, err := z.AddActor(a)
+	a.Location().removeObserver(o)
+	return newActor, err
+}
+
+func (z *Zone) AddLocation(l *Location) (*Location, error) {
+	e := l.snapshot(0).(*LocationAddToZoneEvent)
+	cmd := newLocationAddToZoneCommand(e)
+	val, err := z.syncRequestToSelf(cmd)
+	if err != nil {
+		return nil, err
+	}
+	newLoc := val.(*Location)
+	return newLoc, nil
+}
+
+func (z *Zone) RemoveLocation(l *Location) error {
+	e := NewLocationRemoveFromZoneEvent(l.ID(), z.id)
+	cmd := newLocationRemoveFromZoneCommand(e)
+	_, err := z.syncRequestToSelf(cmd)
+	return err
+}
+
+func (z *Zone) AddExit(ex *Exit) (*Exit, error) {
+	e := ex.snapshot(0).(*ExitAddToZoneEvent)
+	cmd := newExitAddToZoneCommand(e)
+	val, err := z.syncRequestToSelf(cmd)
+	if err != nil {
+		return nil, err
+	}
+	newExit := val.(*Exit)
+	return newExit, nil
+}
+
+func (z *Zone) RemoveExit(ex *Exit) error {
+	e := NewExitRemoveFromZoneEvent(ex.ID(), z.id)
+	cmd := newExitRemoveFromZoneCommand(e)
+	_, err := z.syncRequestToSelf(cmd)
+	return err
+}
+
+func (z *Zone) AddObject(o *Object, startingLocation *Location) (*Object, error) {
+	e := o.snapshot(0).(*ObjectAddToZoneEvent)
+	cmd := newObjectAddToZoneCommand(e)
+	val, err := z.syncRequestToSelf(cmd)
+	newObject := val.(*Object)
+	return newObject, err
+}
+
+func (z *Zone) RemoveObject(o *Object) error {
+	e := NewObjectRemoveFromZoneEvent(o.Name(), o.ID(), z.id)
+	cmd := newObjectRemoveFromZoneCommand(e)
+	_, err := z.syncRequestToSelf(cmd)
+	return err
+}
+
+func (z *Zone) SetDefaultLocation(loc *Location) error {
+	e := NewZoneSetDefaultLocationEvent(loc.ID(), z.id)
+	cmd := newZoneSetDefaultLocationCommand(e)
+	_, err := z.syncRequestToSelf(cmd)
+	return err
+}
+
+//////// command processing
+
+func (z *Zone) syncRequestToSelf(c Command) (interface{}, error) {
+	req := rpc.NewRequest(c)
 	z.internalRequestChan <- req
 	response := <-req.ResponseChan
 	return response.Value, response.Err
 }
 
-func (z *Zone) StartEventProcessing() {
+func (z *Zone) StartCommandProcessing() {
 	z.internalRequestChan = make(chan rpc.Request)
 	z.stopChan = make(chan struct{})
 	go func() {
@@ -134,8 +285,8 @@ func (z *Zone) StartEventProcessing() {
 			}
 
 			for _, req := range requests {
-				e := req.Payload.(Event)
-				value, err := z.processEvent(e)
+				e := req.Payload.(Command)
+				value, err := z.processCommand(e)
 				response := rpc.Response{
 					Err:   err,
 					Value: value,
@@ -148,39 +299,7 @@ func (z *Zone) StartEventProcessing() {
 	}()
 }
 
-// this is used to rebuild state from an Event store; it is not to be used
-// during normal operations
-func (z *Zone) ReplayEvents(inChan <-chan rpc.Response) error {
-	for res := range inChan {
-		if res.Err != nil {
-			return res.Err
-		}
-		_, err := z.processEvent(res.Value.(Event))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (z *Zone) processEvent(e Event) (interface{}, error) {
-	if e.SequenceNumber() == 0 {
-		e.SetSequenceNumber(z.nextSequenceId)
-	}
-	log.Printf("DEBUG: zone processing event %d", e.SequenceNumber())
-	out, err := z.apply(e)
-	if err != nil {
-		return nil, err
-	}
-	if z.persister != nil {
-		err = z.persister.PersistEvent(e)
-	}
-	z.nextSequenceId = e.SequenceNumber() + 1
-
-	return out, err
-}
-
-func (z *Zone) StopEventProcessing() {
+func (z *Zone) StopCommandProcessing() {
 	if z.stopWG == nil {
 		z.stopWG = &sync.WaitGroup{}
 	}
@@ -189,79 +308,403 @@ func (z *Zone) StopEventProcessing() {
 	z.stopWG.Wait()
 }
 
-func (z *Zone) Actors() ActorList {
-	out := make(ActorList, 0, len(z.actorsById))
-	for _, actor := range z.actorsById {
-		out = append(out, actor)
+func (z *Zone) processCommand(c Command) (interface{}, error) {
+	var outEvents []Event
+	var err error
+	var out interface{}
+
+	// Command processing happens like so:
+	// 1- invoke command handler
+	//   1a- create events
+	//   1b- apply events
+	//      1b1- notify observers of event
+	// 2- persist events
+
+	switch c.CommandType() {
+	case CommandTypeActorAddToZone:
+		out, outEvents, err = z.processActorAddToZoneCommand(c)
+	case CommandTypeActorMove:
+		outEvents, err = z.processActorMoveCommand(c)
+	case CommandTypeActorAdminRelocate:
+		outEvents, err = z.processActorAdminRelocateCommand(c)
+	case CommandTypeActorRemoveFromZone:
+		outEvents, err = z.processActorRemoveCommand(c)
+	case CommandTypeLocationAddToZone:
+		out, outEvents, err = z.processLocationAddToZoneCommand(c)
+	case CommandTypeLocationUpdate:
+		outEvents, err = z.processLocationUpdateCommand(c)
+	case CommandTypeLocationRemoveFromZone:
+		outEvents, err = z.processLocationRemoveFromZoneCommand(c)
+	case CommandTypeExitAddToZone:
+		out, outEvents, err = z.processExitAddToZoneCommand(c)
+	case CommandTypeExitUpdate:
+		outEvents, err = z.processExitUpdateCommand(c)
+	case CommandTypeExitRemoveFromZone:
+		outEvents, err = z.processExitRemoveFromZoneCommand(c)
+	case CommandTypeObjectAddToZone:
+		out, outEvents, err = z.processObjectAddToZoneEvent(c)
+	case CommandTypeObjectMove:
+		outEvents, err = z.processObjectMoveCommand(c)
+	case CommandTypeObjectAdminRelocate:
+		outEvents, err = z.processObjectAdminRelocateCommand(c)
+	case CommandTypeObjectRemoveFromZone:
+		outEvents, err = z.processExitRemoveFromZoneCommand(c)
+	case CommandTypeZoneSetDefaultLocation:
+		outEvents, err = z.processZoneSetDefaultLocationCommand(c)
+	default:
+		err = fmt.Errorf("unrecognized Command type %d", c.CommandType())
 	}
-	return out
-}
-
-func (z *Zone) ActorByID(id uuid.UUID) *Actor {
-	return z.actorsById[id]
-}
-
-func (z *Zone) Locations() LocationList {
-	out := make(LocationList, 0, len(z.locationsById))
-	for _, loc := range z.locationsById {
-		out = append(out, loc)
+	if err != nil {
+		return nil, err
 	}
-	return out
-}
 
-func (z *Zone) Exits() ExitList {
-	out := make(ExitList, 0, len(z.exitsById))
-	for _, exit := range z.exitsById {
-		out = append(out, exit)
-	}
-	return out
-}
-
-func (z *Zone) ExitsToLocation(loc *Location) ExitList {
-	var out ExitList
-	for _, exit := range z.exitsById {
-		if exit.Destination() == loc {
-			out = append(out, exit)
+	for _, e := range outEvents {
+		if z.persister != nil {
+			err = z.persister.PersistEvent(e)
 		}
 	}
-	return out
+
+	return out, err
 }
 
-func (z *Zone) LocationByID(id uuid.UUID) *Location {
-	return z.locationsById[id]
-}
+func (z *Zone) processActorAddToZoneCommand(c Command) (interface{}, []Event, error) {
+	cmd := c.(actorAddToZoneCommand)
+	e := cmd.wrappedEvent
 
-func (z *Zone) ObjectByID(id uuid.UUID) *Object {
-	return z.objectsById[id]
-}
-
-func (z *Zone) World() *World {
-	return z.world
-}
-
-func (z *Zone) setWorld(world *World) {
-	z.world = world
-}
-
-func (z *Zone) DefaultLocation() *Location {
-	return z.defaultLocation
-}
-
-func (z *Zone) SetDefaultLocation(loc *Location) error {
-	e := NewZoneSetDefaultLocationEvent(loc.ID(), z.id)
-	_, err := z.syncRequestToSelf(e)
-	return err
-}
-
-func (z *Zone) applyZoneSetDefaultLocationEvent(e ZoneSetDefaultLocationEvent) error {
-	loc, ok := z.locationsById[e.LocationID]
+	_, ok := z.locationsById[e.startingLocationId]
 	if !ok {
-		return fmt.Errorf("no such Location with ID %q in Zone", e.LocationID)
+		return nil, nil, fmt.Errorf("unknown startingLocation %q", e.startingLocationId)
+	}
+	_, duplicate := z.actorsById[e.actorId]
+	if duplicate {
+		return nil, nil, fmt.Errorf("Actor %q already present in zone", e.actorId)
 	}
 
-	z.defaultLocation = loc
-	return nil
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	out, err := z.applyEvent(e)
+	return out, []Event{e}, err
 }
+
+func (z *Zone) processActorMoveCommand(c Command) ([]Event, error) {
+	cmd := c.(actorMoveCommand)
+	e := cmd.wrappedEvent
+
+	from, ok := z.locationsById[e.fromLocationId]
+	if !ok {
+		return nil, fmt.Errorf("unknown from-location %q", e.fromLocationId)
+	}
+	to, ok := z.locationsById[e.toLocationId]
+	if !ok {
+		return nil, fmt.Errorf("unknown to-location %q", e.toLocationId)
+	}
+	exitExists := false
+	for _, exit := range from.OutExits() {
+		if exit.Destination() == to {
+			exitExists = true
+			break
+		}
+	}
+	if !exitExists {
+		return nil, fmt.Errorf("no exit to that destination from location %q", from.ID())
+	}
+	_, ok = z.actorsById[e.actorId]
+	if !ok {
+		return nil, fmt.Errorf("unknown Actor %q", e.actorId)
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	_, err := z.applyEvent(e)
+	return []Event{e}, err
+}
+
+func (z *Zone) processActorAdminRelocateCommand(c Command) ([]Event, error) {
+	cmd := c.(actorAdminRelocateCommand)
+	e := cmd.wrappedEvent
+
+	_, found := z.actorsById[e.ActorID]
+	if !found {
+		return nil, fmt.Errorf("no such Actor with ID %q in Zone", e.ActorID)
+	}
+	_, found = z.locationsById[e.ToLocationID]
+	if !found {
+		return nil, fmt.Errorf("no such Location with ID %q in Zone", e.ToLocationID)
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	_, err := z.applyEvent(e)
+	return []Event{e}, err
+}
+
+func (z *Zone) processActorRemoveCommand(c Command) ([]Event, error) {
+	cmd := c.(actorRemoveFromZoneCommand)
+	e := cmd.wrappedEvent
+	_, found := z.actorsById[e.actorID]
+	if !found {
+		return nil, fmt.Errorf("Actor %q not found in Zone", e.actorID)
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	_, err := z.applyEvent(e)
+	return []Event{e}, err
+}
+
+func (z *Zone) processLocationAddToZoneCommand(c Command) (interface{}, []Event, error) {
+	cmd := c.(locationAddToZoneCommand)
+	e := cmd.wrappedEvent
+	_, duplicate := z.locationsById[e.locationId]
+	if duplicate {
+		return nil, nil, fmt.Errorf("Location with ID %q already present in Zone", e.locationId)
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	loc, err := z.applyEvent(e)
+	return loc, []Event{e}, err
+}
+
+func (z *Zone) processLocationUpdateCommand(c Command) ([]Event, error) {
+	cmd := c.(locationUpdateCommand)
+	e := cmd.wrappedEvent
+
+	_, ok := z.locationsById[e.locationID]
+	if !ok {
+		return nil, fmt.Errorf("unknown Location %q", e.locationID)
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	_, err := z.applyEvent(e)
+	return []Event{e}, err
+}
+
+func (z *Zone) processLocationRemoveFromZoneCommand(c Command) ([]Event, error) {
+	cmd := c.(locationRemoveFromZoneCommand)
+	e := cmd.wrappedEvent
+
+	loc, found := z.locationsById[e.LocationID]
+	if !found {
+		return nil, fmt.Errorf("no Location with ID %q found in Zone", e.LocationID)
+	}
+	if len(loc.OutExits()) != 0 {
+		return nil, errors.New("Location has Exits which would be orphaned")
+	}
+	if len(loc.Actors()) != 0 {
+		return nil, errors.New("Location has Actors which would be orphaned")
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	_, err := z.applyEvent(e)
+	return []Event{e}, err
+}
+
+func (z *Zone) processExitAddToZoneCommand(c Command) (interface{}, []Event, error) {
+	cmd := c.(exitAddToZoneCommand)
+	e := cmd.wrappedEvent
+
+	_, duplicate := z.exitsById[e.ExitID]
+	if duplicate {
+		return nil, nil, fmt.Errorf("Exit with ID %q already present in zone", e.ExitID)
+	}
+	srcLoc, ok := z.locationsById[e.SourceLocationId]
+	if !ok {
+		return nil, nil, fmt.Errorf("unknown source location %q", e.SourceLocationId)
+	}
+	for _, existingExit := range srcLoc.OutExits() {
+		if existingExit.Direction() == e.Direction {
+			return nil, nil, fmt.Errorf("Exit in direction %q already exists from Location", e.Direction)
+		}
+	}
+	if uuid.Equal(e.DestZoneID, uuid.Nil) {
+		var ok bool
+		_, ok = z.locationsById[e.DestLocationId]
+		if !ok {
+			return nil, nil, fmt.Errorf("unknown destination Location %q", e.DestLocationId)
+		}
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	newExit, err := z.applyEvent(e)
+	return newExit, []Event{e}, err
+}
+
+func (z *Zone) processExitUpdateCommand(c Command) ([]Event, error) {
+	cmd := c.(exitUpdateCommand)
+	e := cmd.wrappedEvent
+
+	// Check for all invalid cases / dereferences
+	exit, ok := z.exitsById[e.ExitID]
+	if !ok {
+		return nil, fmt.Errorf("unknown Exit %q", e.ExitID)
+	}
+	_, ok = z.locationsById[e.SourceLocationId]
+	if !ok {
+		return nil, fmt.Errorf("unknown source Location %q", e.SourceLocationId)
+	}
+	if uuid.Equal(e.DestLocationId, uuid.Nil) {
+		return nil, errors.New("destination Location ID cannot be nil")
+	}
+	var _ *Location
+	if uuid.Equal(e.DestZoneID, uuid.Nil) {
+		_, ok := z.locationsById[e.DestLocationId]
+		if !ok {
+			return nil, fmt.Errorf("unknown destination Location %q", e.DestLocationId)
+		}
+	}
+	// Truth table for destination updates
+	//| old otherZoneID | old otherZoneLocID | old Dest* | new otherZoneID | action                      | note                                               |
+	//|-----------------+--------------------+-----------+-----------------+-----------------------------+----------------------------------------------------|
+	//| nil             | nil                | non-nil   | nil             | resolve destination         | internal -> internal                               |
+	//|                 |                    |           |                 | exit.setDestination()       |                                                    |
+	//|                 |                    |           |                 |                             |                                                    |
+	//| nil             | nil                | non-nil   | non-nil         | exit.setDestination(nil)    | internal -> external                               |
+	//|                 |                    |           |                 | exit.setOtherZoneID()       |                                                    |
+	//|                 |                    |           |                 | exit.setotherZoneLocID()    |                                                    |
+	//|                 |                    |           |                 |                             |                                                    |
+	//| non-nil         | non-nil            | nil       | nil             | resolve destination         | external -> internal                               |
+	//|                 |                    |           |                 | exit.setDestination()       |                                                    |
+	//|                 |                    |           |                 | exit.setOtherZoneID(nil)    |                                                    |
+	//|                 |                    |           |                 | exit.setOtherZoneLocID(nil) |                                                    |
+	//|                 |                    |           |                 |                             |                                                    |
+	//| non-nil         | non-nil            | nil       | non-nil         | exit.setOtherZoneID()       | external -> external                               |
+	//|                 |                    |           |                 | exit.setOtherZoneLocID()    |                                                    |
+	//|                 |                    |           |                 |                             |                                                    |
+	//| nil             | nil                | nil       | *               | error                       | invalid prior state, no destination                |
+	//| non-nil         | non-nil            | non-nil   | *               | error                       | invalid prior state, internal+external destination |
+	//| nil             | non-nil            | *         | *               | error                       | invalid prior state, external loc ref w/o zone ref |
+	//| non-nil         | nil                | *         | *               | error                       | invalid prior state, external zone ref w/o loc ref |
+	///// Handle destination error cases
+	if uuid.Equal(exit.OtherZoneID(), uuid.Nil) && uuid.Equal(exit.OtherZoneLocID(), uuid.Nil) && exit.Destination() == nil {
+		return nil, errors.New("invalid prior state, Exit has no internal/external destination")
+	}
+	if !uuid.Equal(exit.OtherZoneID(), uuid.Nil) && !uuid.Equal(exit.OtherZoneLocID(), uuid.Nil) && exit.Destination() != nil {
+		return nil, errors.New("invalid prior state, Exit has both internal/external destinations")
+	}
+	if uuid.Equal(exit.OtherZoneID(), uuid.Nil) && !uuid.Equal(exit.OtherZoneLocID(), uuid.Nil) {
+		return nil, errors.New("invalid prior state, Exit has external Location reference without Zone reference")
+	}
+	if !uuid.Equal(exit.OtherZoneID(), uuid.Nil) && uuid.Equal(exit.OtherZoneLocID(), uuid.Nil) {
+		return nil, errors.New("invalid prior state, Exit has external Zone reference without Location reference")
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	_, err := z.applyEvent(e)
+	return []Event{e}, err
+}
+
+func (z *Zone) processExitRemoveFromZoneCommand(c Command) ([]Event, error) {
+	cmd := c.(exitRemoveFromZoneCommand)
+	e := cmd.wrappedEvent
+
+	_, found := z.exitsById[e.ExitID]
+	if !found {
+		return nil, fmt.Errorf("no such Exit with ID %q in Zone", e.ExitID)
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	_, err := z.applyEvent(e)
+	return []Event{e}, err
+}
+
+func (z *Zone) processObjectAddToZoneEvent(c Command) (interface{}, []Event, error) {
+	cmd := c.(objectAddToZoneCommand)
+	e := cmd.wrappedEvent
+
+	_, ok := z.locationsById[e.startingLocationId]
+	if !ok {
+		return nil, nil, fmt.Errorf("unknown startingLocation %q", e.startingLocationId)
+	}
+	_, duplicate := z.objectsById[e.objectId]
+	if duplicate {
+		return nil, nil, fmt.Errorf("Object with ID %q already present in zone", e.objectId)
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	out, err := z.applyEvent(e)
+	return out, []Event{e}, err
+}
+
+func (z *Zone) processObjectMoveCommand(c Command) ([]Event, error) {
+	cmd := c.(objectMoveCommand)
+	e := cmd.wrappedEvent
+
+	_, ok := z.locationsById[e.fromLocationId]
+	if !ok {
+		return nil, fmt.Errorf("unknown from-location %q", e.fromLocationId)
+	}
+	_, ok = z.locationsById[e.toLocationId]
+	if !ok {
+		return nil, fmt.Errorf("unknown to-location %q", e.toLocationId)
+	}
+	_, ok = z.objectsById[e.objectId]
+	if !ok {
+		return nil, fmt.Errorf("unknown Object %q", e.objectId)
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	_, err := z.applyEvent(e)
+	return []Event{e}, err
+}
+
+func (z *Zone) processObjectAdminRelocateCommand(c Command) ([]Event, error) {
+	cmd := c.(objectAdminRelocateCommand)
+	e := cmd.wrappedEvent
+
+	_, found := z.objectsById[e.ObjectID]
+	if !found {
+		return nil, fmt.Errorf("no such Object with ID %q in Zone", e.ObjectID)
+	}
+	_, found = z.locationsById[e.ToLocationID]
+	if !found {
+		return nil, fmt.Errorf("no such Location with ID %q in Zone", e.ToLocationID)
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	_, err := z.applyEvent(e)
+	return []Event{e}, err
+}
+
+func (z *Zone) processObjectRemoveFromZoneCommand(c Command) ([]Event, error) {
+	cmd := c.(objectRemoveFromZoneCommand)
+	e := cmd.wrappedEvent
+
+	_, found := z.objectsById[e.ObjectID()]
+	if !found {
+		return nil, fmt.Errorf("Object %q not found in Zone", e.ObjectID())
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	_, err := z.applyEvent(e)
+	return []Event{e}, err
+}
+
+func (z *Zone) processZoneSetDefaultLocationCommand(c Command) ([]Event, error) {
+	cmd := c.(zoneSetDefaultLocationCommand)
+	e := cmd.wrappedEvent
+
+	_, ok := z.locationsById[e.LocationID]
+	if !ok {
+		return nil, fmt.Errorf("no such Location with ID %q in Zone", e.LocationID)
+	}
+
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	_, err := z.applyEvent(e)
+	return []Event{e}, err
+}
+
+//////// Event processing
 
 func (z *Zone) sendEventToObservers(e Event, oList ObserverList) {
 	for _, o := range oList {
@@ -269,105 +712,134 @@ func (z *Zone) sendEventToObservers(e Event, oList ObserverList) {
 	}
 }
 
-func (z *Zone) apply(e Event) (interface{}, error) {
-	switch e.Type() {
-	case EventTypeActorAddToZone:
-		typedEvent := e.(ActorAddToZoneEvent)
-		return z.applyActorAddToZoneEvent(typedEvent)
-	case EventTypeActorMove:
-		typedEvent := e.(*ActorMoveEvent)
-		return nil, z.applyActorMoveEvent(typedEvent)
-	case EventTypeActorAdminRelocate:
-		typedEvent := e.(ActorAdminRelocateEvent)
-		return nil, z.applyActorAdminRelocate(typedEvent)
-	case EventTypeActorRemoveFromZone:
-		typedEvent := e.(ActorRemoveFromZoneEvent)
-		return nil, z.applyActorRemoveEvent(typedEvent)
-	case EventTypeLocationAddToZone:
-		typedEvent := e.(LocationAddToZoneEvent)
-		return z.applyLocationAddToZoneEvent(typedEvent)
-	case EventTypeLocationRemoveFromZone:
-		typedEvent := e.(LocationRemoveFromZoneEvent)
-		return nil, z.applyLocationRemoveFromZoneEvent(typedEvent)
-	case EventTypeLocationUpdate:
-		typedEvent := e.(LocationUpdateEvent)
-		return nil, z.applyLocationUpdateEvent(typedEvent)
-	case EventTypeExitAddToZone:
-		typedEvent := e.(ExitAddToZoneEvent)
-		return z.applyExitAddToZoneEvent(typedEvent)
-	case EventTypeExitUpdate:
-		typedEvent := e.(ExitUpdateEvent)
-		return nil, z.applyExitUpdateEvent(typedEvent)
-	case EventTypeExitRemoveFromZone:
-		typedEvent := e.(ExitRemoveFromZoneEvent)
-		return nil, z.applyExitRemoveFromZoneEvent(typedEvent)
-	case EventTypeObjectAddToZone:
-		typedEvent := e.(ObjectAddToZoneEvent)
-		return z.applyObjectAddToZoneEvent(typedEvent)
-	case EventTypeObjectRemoveFromZone:
-		typedEvent := e.(ObjectRemoveFromZoneEvent)
-		return nil, z.applyObjectRemoveFromZoneEvent(typedEvent)
-	case EventTypeObjectMove:
-		typedEvent := e.(ObjectMoveEvent)
-		return nil, z.applyObjectMoveEvent(typedEvent)
-	case EventTypeObjectAdminRelocate:
-		typedEvent := e.(ObjectAdminRelocateEvent)
-		return nil, z.applyObjectAdminRelocateEvent(typedEvent)
-	case EventTypeZoneSetDefaultLocation:
-		typedEvent := e.(ZoneSetDefaultLocationEvent)
-		return nil, z.applyZoneSetDefaultLocationEvent(typedEvent)
-	default:
-		return nil, fmt.Errorf("unknown Event type %T", e)
+// this is used to rebuild state from an Event store; it is not to be used
+// during normal operations
+func (z *Zone) ReplayEvents(inChan <-chan rpc.Response) error {
+	for res := range inChan {
+		if res.Err != nil {
+			return res.Err
+		}
+		_, err := z.applyEvent(res.Value.(Event))
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (z *Zone) applyActorMoveEvent(e *ActorMoveEvent) error {
-	fromLoc, ok := z.locationsById[e.fromLocationId]
-	if !ok {
-		return fmt.Errorf("unknown from-location %q", e.fromLocationId)
-	}
-	toLoc, ok := z.locationsById[e.toLocationId]
-	if !ok {
-		return fmt.Errorf("unknown to-location %q", e.toLocationId)
-	}
-	actor, ok := z.actorsById[e.actorId]
-	if !ok {
-		return fmt.Errorf("unknown Actor %q", e.actorId)
+func (z *Zone) applyEvent(e Event) (interface{}, error) {
+	fmt.Printf("DEBUG: Zone applying event %d\n", e.SequenceNumber())
+
+	var out interface{}
+	var oList ObserverList
+	var err error
+
+	switch e.Type() {
+	case EventTypeActorAddToZone:
+		typedEvent := e.(*ActorAddToZoneEvent)
+		out, oList, err = z.applyActorAddToZoneEvent(typedEvent)
+	case EventTypeActorMove:
+		typedEvent := e.(*ActorMoveEvent)
+		oList, err = z.applyActorMoveEvent(typedEvent)
+	case EventTypeActorAdminRelocate:
+		typedEvent := e.(*ActorAdminRelocateEvent)
+		oList, err = z.applyActorAdminRelocateEvent(typedEvent)
+	case EventTypeActorRemoveFromZone:
+		typedEvent := e.(*ActorRemoveFromZoneEvent)
+		oList, err = z.applyActorRemoveEvent(typedEvent)
+	case EventTypeLocationAddToZone:
+		typedEvent := e.(*LocationAddToZoneEvent)
+		out, err = z.applyLocationAddToZoneEvent(typedEvent)
+	case EventTypeLocationUpdate:
+		typedEvent := e.(*LocationUpdateEvent)
+		err = z.applyLocationUpdateEvent(typedEvent)
+	case EventTypeLocationRemoveFromZone:
+		typedEvent := e.(*LocationRemoveFromZoneEvent)
+		z.applyLocationRemoveFromZoneEvent(typedEvent)
+	case EventTypeExitAddToZone:
+		typedEvent := e.(*ExitAddToZoneEvent)
+		out, err = z.applyExitAddToZoneEvent(typedEvent)
+	case EventTypeExitUpdate:
+		typedEvent := e.(*ExitUpdateEvent)
+		err = z.applyExitUpdateEvent(typedEvent)
+	case EventTypeExitRemoveFromZone:
+		typedEvent := e.(*ExitRemoveFromZoneEvent)
+		err = z.applyExitRemoveFromZoneEvent(typedEvent)
+	case EventTypeObjectAddToZone:
+		typedEvent := e.(*ObjectAddToZoneEvent)
+		out, oList, err = z.applyObjectAddToZoneEvent(typedEvent)
+	case EventTypeObjectMove:
+		typedEvent := e.(*ObjectMoveEvent)
+		oList, err = z.applyObjectMoveEvent(typedEvent)
+	case EventTypeObjectAdminRelocate:
+		typedEvent := e.(*ObjectAdminRelocateEvent)
+		oList, err = z.applyObjectAdminRelocateEvent(typedEvent)
+	case EventTypeObjectRemoveFromZone:
+		typedEvent := e.(*ObjectRemoveFromZoneEvent)
+		oList, err = z.applyObjectRemoveFromZoneEvent(typedEvent)
+	case EventTypeZoneSetDefaultLocation:
+		typedEvent := e.(*ZoneSetDefaultLocationEvent)
+		err = z.applyZoneSetDefaultLocationEvent(typedEvent)
+	default:
+		err = fmt.Errorf("unknown Event type %T", e)
 	}
 
-	err := fromLoc.removeActor(actor)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	err = toLoc.addActor(actor)
-	if err != nil {
-		return err
+	z.sendEventToObservers(e, oList)
+	return out, nil
+}
+
+func (z *Zone) applyActorAddToZoneEvent(e *ActorAddToZoneEvent) (*Actor, ObserverList, error) {
+	newLoc := z.locationsById[e.startingLocationId]
+	if newLoc == nil {
+		if z.defaultLocation == nil {
+			return nil, nil, fmt.Errorf("cannot resolve StartingLocationID %q, and no default Location set for Zone", e.startingLocationId)
+		}
+		newLoc = z.defaultLocation
 	}
+	actor := NewActor(e.ActorID(), e.name, newLoc, z)
+
+	newLoc.addActor(actor)
+	actor.setLocation(newLoc)
+	z.actorsById[actor.ID()] = actor
+
+	oList := newLoc.Observers()
+
+	return actor, oList, nil
+}
+
+func (z *Zone) applyActorMoveEvent(e *ActorMoveEvent) (ObserverList, error) {
+	fromLoc := z.locationsById[e.fromLocationId]
+	toLoc := z.locationsById[e.toLocationId]
+	actor := z.actorsById[e.actorId]
+
+	if fromLoc == nil || toLoc == nil || actor == nil {
+		return nil, errors.New("cannot resolve From/To/Actor IDs in event")
+	}
+
+	fromLoc.removeActor(actor)
+	toLoc.addActor(actor)
 	actor.setLocation(toLoc)
 
 	var oList ObserverList
-	for _, o := range actor.Observers() {
-		oList = append(oList, o)
-	}
+	oList = actor.Observers()
 	for _, o := range fromLoc.Observers() {
 		oList = append(oList, o)
 	}
 	for _, o := range toLoc.Observers() {
 		oList = append(oList, o)
 	}
-	z.sendEventToObservers(e, oList)
 
-	return nil
+	return oList, nil
 }
 
-func (z *Zone) applyActorAdminRelocate(e ActorAdminRelocateEvent) error {
-	actor, found := z.actorsById[e.ActorID]
-	if !found {
-		return fmt.Errorf("no such Actor with ID %q in Zone", e.ActorID)
-	}
-	toLoc, found := z.locationsById[e.ToLocationID]
-	if !found {
-		return fmt.Errorf("no such Location with ID %q in Zone", e.ToLocationID)
+func (z *Zone) applyActorAdminRelocateEvent(e *ActorAdminRelocateEvent) (ObserverList, error) {
+	actor := z.actorsById[e.ActorID]
+	toLoc := z.locationsById[e.ToLocationID]
+	if actor == nil || toLoc == nil {
+		return nil, errors.New("cannot resolve Actor and to-Location IDs")
 	}
 
 	var oList ObserverList
@@ -376,110 +848,34 @@ func (z *Zone) applyActorAdminRelocate(e ActorAdminRelocateEvent) error {
 	// location.
 	fromLoc := actor.Location()
 	if fromLoc != nil {
-		err := fromLoc.removeActor(actor)
-		if err != nil {
-			return err
-		}
+		fromLoc.removeActor(actor)
 		oList = fromLoc.Observers()
 	}
-	err := toLoc.addActor(actor)
-	if err != nil {
-		return err
-	}
+	toLoc.addActor(actor)
 	actor.setLocation(toLoc)
 	oList = append(oList, toLoc.Observers()...)
-	z.sendEventToObservers(e, oList)
 
-	return nil
+	return oList, nil
 }
 
-func (z *Zone) AddActor(a *Actor) (*Actor, error) {
-	e := a.snapshot(0)
-	val, err := z.syncRequestToSelf(e)
-	newActor := val.(*Actor)
-	return newActor, err
-}
-
-// MigrateInActor is a wrapper for AddActor, ensuring the given Observer
-// receives the associated AddActorToZone event. Otherwise, since we're
-// returning a new Actor object, the Observer would not already be associated
-// with that new object and would never see the event.
-//
-// This function is never called when replaying our event-stream and there is
-// no corresponding Event type-- it is purely to ensure correct communication
-// as a migration is happening live.
-func (z *Zone) MigrateInActor(a *Actor, o Observer) (*Actor, error) {
-	a.Location().addObserver(o)
-	newActor, err := z.AddActor(a)
-	a.Location().removeObserver(o)
-	return newActor, err
-}
-
-func (z *Zone) applyActorAddToZoneEvent(e ActorAddToZoneEvent) (*Actor, error) {
-	newLoc, ok := z.locationsById[e.startingLocationId]
-	if !ok {
-		return nil, fmt.Errorf("unknown startingLocation %q", e.startingLocationId)
+func (z *Zone) applyActorRemoveEvent(e *ActorRemoveFromZoneEvent) (ObserverList, error) {
+	actor := z.actorsById[e.actorID]
+	if actor == nil {
+		return nil, errors.New("cannot find Actor to remove")
 	}
-	_, duplicate := z.actorsById[e.actorId]
-	if duplicate {
-		return nil, fmt.Errorf("Actor %q already present in zone", e.actorId)
-	}
-	actor := NewActor(e.ActorID(), e.name, newLoc, z)
 
-	err := newLoc.addActor(actor)
-	if err != nil {
-		return nil, err
-	}
-	actor.setLocation(newLoc)
-	z.actorsById[actor.ID()] = actor
-
-	oList := newLoc.Observers()
-	z.sendEventToObservers(e, oList)
-
-	return actor, nil
-}
-
-func (z *Zone) RemoveActor(a *Actor) error {
-	remEvent := NewActorRemoveFromZoneEvent(a.ID(), z.id)
-	_, err := z.syncRequestToSelf(remEvent)
-	return err
-}
-
-func (z *Zone) applyActorRemoveEvent(e ActorRemoveFromZoneEvent) error {
-	actor, found := z.actorsById[e.actorID]
-	if !found {
-		return fmt.Errorf("Actor %q not found in Zone", e.actorID)
-	}
 	oldLoc := actor.Location()
-	err := oldLoc.removeActor(actor)
-	if err != nil {
-		return err
-	}
+	oldLoc.removeActor(actor)
 	actor.setLocation(nil)
 	actor.setZone(nil)
 	delete(z.actorsById, e.actorID)
 
 	oList := oldLoc.Observers()
-	z.sendEventToObservers(e, oList)
 
-	return nil
+	return oList, nil
 }
 
-func (z *Zone) AddLocation(l *Location) (*Location, error) {
-	e := l.snapshot(0)
-	val, err := z.syncRequestToSelf(e)
-	if err != nil {
-		return nil, err
-	}
-	newLoc := val.(*Location)
-	return newLoc, nil
-}
-
-func (z *Zone) applyLocationAddToZoneEvent(e LocationAddToZoneEvent) (*Location, error) {
-	_, duplicate := z.locationsById[e.locationId]
-	if duplicate {
-		return nil, fmt.Errorf("location with ID %q already present in zone", e.locationId)
-	}
+func (z *Zone) applyLocationAddToZoneEvent(e *LocationAddToZoneEvent) (*Location, error) {
 	loc := NewLocation(
 		e.locationId,
 		z,
@@ -490,7 +886,7 @@ func (z *Zone) applyLocationAddToZoneEvent(e LocationAddToZoneEvent) (*Location,
 	return loc, nil
 }
 
-func (z *Zone) applyLocationUpdateEvent(e LocationUpdateEvent) error {
+func (z *Zone) applyLocationUpdateEvent(e *LocationUpdateEvent) error {
 	loc, ok := z.locationsById[e.locationID]
 	if !ok {
 		return fmt.Errorf("unknown Location %q", e.locationID)
@@ -501,42 +897,11 @@ func (z *Zone) applyLocationUpdateEvent(e LocationUpdateEvent) error {
 	return nil
 }
 
-func (z *Zone) RemoveLocation(l *Location) error {
-	e := NewLocationRemoveFromZoneEvent(l.ID(), z.id)
-	_, err := z.syncRequestToSelf(e)
-	return err
-}
-
-func (z *Zone) applyLocationRemoveFromZoneEvent(e LocationRemoveFromZoneEvent) error {
-	loc, found := z.locationsById[e.LocationID]
-	if !found {
-		return fmt.Errorf("no Location with ID %q found in Zone", e.LocationID)
-	}
-	if len(loc.OutExits()) != 0 {
-		return errors.New("Location has Exits which would be orphaned")
-	}
-	if len(loc.Actors()) != 0 {
-		return errors.New("Location has Actors which would be orphaned")
-	}
+func (z *Zone) applyLocationRemoveFromZoneEvent(e *LocationRemoveFromZoneEvent) {
 	delete(z.locationsById, e.LocationID)
-	return nil
 }
 
-func (z *Zone) AddExit(ex *Exit) (*Exit, error) {
-	e := ex.snapshot(0)
-	val, err := z.syncRequestToSelf(e)
-	if err != nil {
-		return nil, err
-	}
-	newExit := val.(*Exit)
-	return newExit, nil
-}
-
-func (z *Zone) applyExitAddToZoneEvent(e ExitAddToZoneEvent) (*Exit, error) {
-	_, duplicate := z.exitsById[e.ExitID]
-	if duplicate {
-		return nil, fmt.Errorf("Exit with ID %q already present in zone", e.ExitID)
-	}
+func (z *Zone) applyExitAddToZoneEvent(e *ExitAddToZoneEvent) (*Exit, error) {
 	srcLoc, ok := z.locationsById[e.SourceLocationId]
 	if !ok {
 		return nil, fmt.Errorf("unknown source location %q", e.SourceLocationId)
@@ -571,8 +936,8 @@ func (z *Zone) applyExitAddToZoneEvent(e ExitAddToZoneEvent) (*Exit, error) {
 	return exit, nil
 }
 
-func (z *Zone) applyExitUpdateEvent(e ExitUpdateEvent) error {
-	// Check for all invalid cases / dereferences
+func (z *Zone) applyExitUpdateEvent(e *ExitUpdateEvent) error {
+	// Do dereferences
 	exit, ok := z.exitsById[e.ExitID]
 	if !ok {
 		return fmt.Errorf("unknown Exit %q", e.ExitID)
@@ -590,42 +955,6 @@ func (z *Zone) applyExitUpdateEvent(e ExitUpdateEvent) error {
 		if !ok {
 			return fmt.Errorf("unknown destination Location %q", e.DestLocationId)
 		}
-		newDst = z.locationsById[e.DestLocationId]
-	}
-	// Truth table for destination updates
-	//| old otherZoneID | old otherZoneLocID | old Dest* | new otherZoneID | action                      | note                                               |
-	//|-----------------+--------------------+-----------+-----------------+-----------------------------+----------------------------------------------------|
-	//| nil             | nil                | non-nil   | nil             | resolve destination         | internal -> internal                               |
-	//|                 |                    |           |                 | exit.setDestination()       |                                                    |
-	//|                 |                    |           |                 |                             |                                                    |
-	//| nil             | nil                | non-nil   | non-nil         | exit.setDestination(nil)    | internal -> external                               |
-	//|                 |                    |           |                 | exit.setOtherZoneID()       |                                                    |
-	//|                 |                    |           |                 | exit.setotherZoneLocID()    |                                                    |
-	//|                 |                    |           |                 |                             |                                                    |
-	//| non-nil         | non-nil            | nil       | nil             | resolve destination         | external -> internal                               |
-	//|                 |                    |           |                 | exit.setDestination()       |                                                    |
-	//|                 |                    |           |                 | exit.setOtherZoneID(nil)    |                                                    |
-	//|                 |                    |           |                 | exit.setOtherZoneLocID(nil) |                                                    |
-	//|                 |                    |           |                 |                             |                                                    |
-	//| non-nil         | non-nil            | nil       | non-nil         | exit.setOtherZoneID()       | external -> external                               |
-	//|                 |                    |           |                 | exit.setOtherZoneLocID()    |                                                    |
-	//|                 |                    |           |                 |                             |                                                    |
-	//| nil             | nil                | nil       | *               | error                       | invalid prior state, no destination                |
-	//| non-nil         | non-nil            | non-nil   | *               | error                       | invalid prior state, internal+external destination |
-	//| nil             | non-nil            | *         | *               | error                       | invalid prior state, external loc ref w/o zone ref |
-	//| non-nil         | nil                | *         | *               | error                       | invalid prior state, external zone ref w/o loc ref |
-	///// Handle destination error cases
-	if uuid.Equal(exit.OtherZoneID(), uuid.Nil) && uuid.Equal(exit.OtherZoneLocID(), uuid.Nil) && exit.Destination() == nil {
-		return errors.New("invalid prior state, Exit has no internal/external destination")
-	}
-	if !uuid.Equal(exit.OtherZoneID(), uuid.Nil) && !uuid.Equal(exit.OtherZoneLocID(), uuid.Nil) && exit.Destination() != nil {
-		return errors.New("invalid prior state, Exit has both internal/external destinations")
-	}
-	if uuid.Equal(exit.OtherZoneID(), uuid.Nil) && !uuid.Equal(exit.OtherZoneLocID(), uuid.Nil) {
-		return errors.New("invalid prior state, Exit has external Location reference without Zone reference")
-	}
-	if !uuid.Equal(exit.OtherZoneID(), uuid.Nil) && uuid.Equal(exit.OtherZoneLocID(), uuid.Nil) {
-		return errors.New("invalid prior state, Exit has external Zone reference without Location reference")
 	}
 
 	// Handle destination update cases
@@ -655,11 +984,8 @@ func (z *Zone) applyExitUpdateEvent(e ExitUpdateEvent) error {
 	// Changing source location requires updating bi-directional pointers
 	if newSrc != exit.Source() {
 		oldSrc := exit.Source()
-		err := oldSrc.removeExit(exit)
-		if err != nil {
-			return err
-		}
-		err = newSrc.addOutExit(exit)
+		oldSrc.removeExit(exit)
+		err := newSrc.addOutExit(exit)
 		if err != nil {
 			return err
 		}
@@ -672,105 +998,53 @@ func (z *Zone) applyExitUpdateEvent(e ExitUpdateEvent) error {
 	return nil
 }
 
-func (z *Zone) RemoveExit(ex *Exit) error {
-	e := NewExitRemoveFromZoneEvent(ex.ID(), z.id)
-	_, err := z.syncRequestToSelf(e)
-	return err
-}
-
-func (z *Zone) applyExitRemoveFromZoneEvent(e ExitRemoveFromZoneEvent) error {
+func (z *Zone) applyExitRemoveFromZoneEvent(e *ExitRemoveFromZoneEvent) error {
 	ex, found := z.exitsById[e.ExitID]
 	if !found {
 		return fmt.Errorf("no such Exit with ID %q in Zone", e.ExitID)
 	}
 
-	err := ex.Source().removeExit(ex)
-	if err != nil {
-		return err
-	}
-
+	ex.Source().removeExit(ex)
 	delete(z.exitsById, e.ExitID)
 
 	return nil
 }
 
-func (z *Zone) AddObject(o *Object, startingLocation *Location) (*Object, error) {
-	e := o.snapshot(0)
-	val, err := z.syncRequestToSelf(e)
-	newObject := val.(*Object)
-	return newObject, err
-}
-
-func (z *Zone) applyObjectAddToZoneEvent(e ObjectAddToZoneEvent) (*Object, error) {
+func (z *Zone) applyObjectAddToZoneEvent(e *ObjectAddToZoneEvent) (*Object, ObserverList, error) {
 	newLoc, ok := z.locationsById[e.startingLocationId]
 	if !ok {
-		return nil, fmt.Errorf("unknown startingLocation %q", e.startingLocationId)
-	}
-	_, duplicate := z.objectsById[e.objectId]
-	if duplicate {
-		return nil, fmt.Errorf("Object with ID %q already present in zone", e.objectId)
+		return nil, nil, fmt.Errorf("unknown startingLocation %q", e.startingLocationId)
 	}
 
 	obj := NewObject(e.objectId, e.name, newLoc, z)
 	err := newLoc.addObject(obj)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	obj.setLocation(newLoc)
 	z.objectsById[obj.ID()] = obj
 
-	z.sendEventToObservers(e, newLoc.Observers())
-
-	return obj, nil
+	return obj, newLoc.Observers(), nil
 }
 
-func (z *Zone) RemoveObject(o *Object) error {
-	e := NewObjectRemoveFromZoneEvent(o.Name(), o.ID(), z.id)
-	_, err := z.syncRequestToSelf(e)
-	return err
-}
-
-func (z *Zone) applyObjectRemoveFromZoneEvent(e ObjectRemoveFromZoneEvent) error {
-	object, found := z.objectsById[e.ObjectID()]
-	if !found {
-		return fmt.Errorf("Object %q not found in Zone", e.ObjectID())
-	}
-	oldLoc := object.Location()
-	err := oldLoc.removeObject(object)
-	if err != nil {
-		return err
-	}
-	object.setLocation(nil)
-	object.setZone(nil)
-	delete(z.objectsById, object.ID())
-
-	oList := oldLoc.Observers()
-	z.sendEventToObservers(e, oList)
-
-	return nil
-}
-
-func (z *Zone) applyObjectMoveEvent(e ObjectMoveEvent) error {
+func (z *Zone) applyObjectMoveEvent(e *ObjectMoveEvent) (ObserverList, error) {
 	fromLoc, ok := z.locationsById[e.fromLocationId]
 	if !ok {
-		return fmt.Errorf("unknown from-location %q", e.fromLocationId)
+		return nil, fmt.Errorf("unknown from-location %q", e.fromLocationId)
 	}
 	toLoc, ok := z.locationsById[e.toLocationId]
 	if !ok {
-		return fmt.Errorf("unknown to-location %q", e.toLocationId)
+		return nil, fmt.Errorf("unknown to-location %q", e.toLocationId)
 	}
 	obj, ok := z.objectsById[e.objectId]
 	if !ok {
-		return fmt.Errorf("unknown Object %q", e.objectId)
+		return nil, fmt.Errorf("unknown Object %q", e.objectId)
 	}
 
-	err := fromLoc.removeObject(obj)
+	fromLoc.removeObject(obj)
+	err := toLoc.addObject(obj)
 	if err != nil {
-		return err
-	}
-	err = toLoc.addObject(obj)
-	if err != nil {
-		return err
+		return nil, err
 	}
 	obj.setLocation(toLoc)
 
@@ -781,19 +1055,18 @@ func (z *Zone) applyObjectMoveEvent(e ObjectMoveEvent) error {
 	for _, o := range toLoc.Observers() {
 		oList = append(oList, o)
 	}
-	z.sendEventToObservers(e, oList)
 
-	return nil
+	return oList, nil
 }
 
-func (z *Zone) applyObjectAdminRelocateEvent(e ObjectAdminRelocateEvent) error {
+func (z *Zone) applyObjectAdminRelocateEvent(e *ObjectAdminRelocateEvent) (ObserverList, error) {
 	obj, found := z.objectsById[e.ObjectID]
 	if !found {
-		return fmt.Errorf("no such Object with ID %q in Zone", e.ObjectID)
+		return nil, fmt.Errorf("no such Object with ID %q in Zone", e.ObjectID)
 	}
 	toLoc, found := z.locationsById[e.ToLocationID]
 	if !found {
-		return fmt.Errorf("no such Location with ID %q in Zone", e.ToLocationID)
+		return nil, fmt.Errorf("no such Location with ID %q in Zone", e.ToLocationID)
 	}
 
 	var oList ObserverList
@@ -802,20 +1075,43 @@ func (z *Zone) applyObjectAdminRelocateEvent(e ObjectAdminRelocateEvent) error {
 	// location.
 	fromLoc := obj.Location()
 	if fromLoc != nil {
-		err := fromLoc.removeObject(obj)
-		if err != nil {
-			return err
-		}
+		fromLoc.removeObject(obj)
 		oList = fromLoc.Observers()
 	}
 	err := toLoc.addObject(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	obj.setLocation(toLoc)
 	oList = append(oList, toLoc.Observers()...)
 	z.sendEventToObservers(e, oList)
 
+	return oList, nil
+}
+
+func (z *Zone) applyObjectRemoveFromZoneEvent(e *ObjectRemoveFromZoneEvent) (ObserverList, error) {
+	object, found := z.objectsById[e.ObjectID()]
+	if !found {
+		return nil, fmt.Errorf("Object %q not found in Zone", e.ObjectID())
+	}
+	oldLoc := object.Location()
+	oldLoc.removeObject(object)
+	object.setLocation(nil)
+	object.setZone(nil)
+	delete(z.objectsById, object.ID())
+
+	oList := oldLoc.Observers()
+
+	return oList, nil
+}
+
+func (z *Zone) applyZoneSetDefaultLocationEvent(e *ZoneSetDefaultLocationEvent) error {
+	loc, ok := z.locationsById[e.LocationID]
+	if !ok {
+		return fmt.Errorf("no such Location with ID %q in Zone", e.LocationID)
+	}
+
+	z.defaultLocation = loc
 	return nil
 }
 
@@ -861,7 +1157,7 @@ func dfsSnapshottableDepsOmittingVisited(this snapshottable, visitedMap map[snap
 	return ret
 }
 
-func newZoneSetDefaultLocationCommand(wrapped ZoneSetDefaultLocationEvent) zoneSetDefaultLocationCommand {
+func newZoneSetDefaultLocationCommand(wrapped *ZoneSetDefaultLocationEvent) zoneSetDefaultLocationCommand {
 	return zoneSetDefaultLocationCommand{
 		commandGeneric{commandType: CommandTypeZoneSetDefaultLocation},
 		wrapped,
@@ -870,11 +1166,11 @@ func newZoneSetDefaultLocationCommand(wrapped ZoneSetDefaultLocationEvent) zoneS
 
 type zoneSetDefaultLocationCommand struct {
 	commandGeneric
-	wrappedEvent ZoneSetDefaultLocationEvent
+	wrappedEvent *ZoneSetDefaultLocationEvent
 }
 
-func NewZoneSetDefaultLocationEvent(locID, zoneID uuid.UUID) ZoneSetDefaultLocationEvent {
-	return ZoneSetDefaultLocationEvent{
+func NewZoneSetDefaultLocationEvent(locID, zoneID uuid.UUID) *ZoneSetDefaultLocationEvent {
+	return &ZoneSetDefaultLocationEvent{
 		eventGeneric: &eventGeneric{
 			eventType:     EventTypeZoneSetDefaultLocation,
 			version:       1,

@@ -87,35 +87,24 @@ func (l Location) Actors() ActorList {
 	return l.actors.Copy()
 }
 
-func (l *Location) removeActor(actor *Actor) error {
-	idx, err := l.actors.IndexOf(actor)
-	if err != nil {
-		return fmt.Errorf("cannot remove Actor %q from location %q", actor.ID(), l.id)
-	}
-	l.actors = append(l.actors[:idx], l.actors[idx+1:]...)
-	return nil
+func (l *Location) removeActor(actor *Actor) {
+	l.actors = l.actors.Remove(actor)
 }
 
-func (l *Location) addActor(actor *Actor) error {
+func (l *Location) addActor(actor *Actor) {
 	_, err := l.actors.IndexOf(actor)
 	if err == nil {
-		return fmt.Errorf("Actor %q already present at location %q", actor.ID(), l.id)
+		return
 	}
 	l.actors = append(l.actors, actor)
-	return nil
 }
 
 func (l Location) Objects() ObjectList {
 	return l.objects.Copy()
 }
 
-func (l *Location) removeObject(object *Object) error {
-	idx, err := l.objects.IndexOf(object)
-	if err != nil {
-		return fmt.Errorf("cannot remove Object %q from location %q", object.ID(), l.id)
-	}
-	l.objects = append(l.objects[:idx], l.objects[idx+1:]...)
-	return nil
+func (l *Location) removeObject(object *Object) {
+	l.objects = l.objects.Remove(object)
 }
 
 func (l *Location) addObject(object *Object) error {
@@ -131,13 +120,8 @@ func (l Location) OutExits() ExitList {
 	return l.outExits.Copy()
 }
 
-func (l *Location) removeExit(exit *Exit) error {
-	idx, err := l.outExits.IndexOf(exit)
-	if err != nil {
-		return fmt.Errorf("cannot remove Exit %q from Location %q: %s", exit.ID(), l.id, err)
-	}
-	l.outExits = append(l.outExits[:idx], l.outExits[idx+1:]...)
-	return nil
+func (l *Location) removeExit(exit *Exit) {
+	l.outExits = l.outExits.Remove(exit)
 }
 
 func (l *Location) addOutExit(exit *Exit) error {
@@ -165,12 +149,13 @@ func (l Location) Update(shortDesc, desc string) error {
 		l.id,
 		l.zone.ID(),
 	)
-	_, err := l.syncRequestToZone(e)
+	cmd := newLocationUpdateCommand(e)
+	_, err := l.syncRequestToZone(cmd)
 	return err
 }
 
-func (l *Location) syncRequestToZone(e Event) (interface{}, error) {
-	req := rpc.NewRequest(e)
+func (l *Location) syncRequestToZone(c Command) (interface{}, error) {
+	req := rpc.NewRequest(c)
 	l.requestChan <- req
 	response := <-req.ResponseChan
 	return response.Value, response.Err
@@ -202,7 +187,7 @@ func (ll LocationList) IndexOf(loc *Location) (int, error) {
 	return -1, fmt.Errorf("location %q not found in list", loc.id)
 }
 
-func newLocationAddToZoneCommand(wrapped LocationAddToZoneEvent) locationAddToZoneCommand {
+func newLocationAddToZoneCommand(wrapped *LocationAddToZoneEvent) locationAddToZoneCommand {
 	return locationAddToZoneCommand{
 		commandGeneric{commandType: CommandTypeLocationAddToZone},
 		wrapped,
@@ -211,11 +196,11 @@ func newLocationAddToZoneCommand(wrapped LocationAddToZoneEvent) locationAddToZo
 
 type locationAddToZoneCommand struct {
 	commandGeneric
-	wrappedEvent LocationAddToZoneEvent
+	wrappedEvent *LocationAddToZoneEvent
 }
 
-func NewLocationAddToZoneEvent(shortDesc, desc string, locationId, zoneId uuid.UUID) LocationAddToZoneEvent {
-	return LocationAddToZoneEvent{
+func NewLocationAddToZoneEvent(shortDesc, desc string, locationId, zoneId uuid.UUID) *LocationAddToZoneEvent {
+	return &LocationAddToZoneEvent{
 		&eventGeneric{
 			eventType:     EventTypeLocationAddToZone,
 			version:       1,
@@ -247,7 +232,7 @@ func (latze LocationAddToZoneEvent) Description() string {
 	return latze.desc
 }
 
-func newLocationUpdateCommand(wrapped LocationUpdateEvent) locationUpdateCommand {
+func newLocationUpdateCommand(wrapped *LocationUpdateEvent) locationUpdateCommand {
 	return locationUpdateCommand{
 		commandGeneric{commandType: CommandTypeLocationUpdate},
 		wrapped,
@@ -256,11 +241,11 @@ func newLocationUpdateCommand(wrapped LocationUpdateEvent) locationUpdateCommand
 
 type locationUpdateCommand struct {
 	commandGeneric
-	wrappedEvent LocationUpdateEvent
+	wrappedEvent *LocationUpdateEvent
 }
 
-func NewLocationUpdateEvent(shortDesc, desc string, locationID, zoneID uuid.UUID) LocationUpdateEvent {
-	return LocationUpdateEvent{
+func NewLocationUpdateEvent(shortDesc, desc string, locationID, zoneID uuid.UUID) *LocationUpdateEvent {
+	return &LocationUpdateEvent{
 		&eventGeneric{
 			eventType:     EventTypeLocationUpdate,
 			version:       1,
@@ -292,7 +277,7 @@ func (lue LocationUpdateEvent) Description() string {
 	return lue.desc
 }
 
-func newLocationRemoveFromZoneCommand(wrapped LocationRemoveFromZoneEvent) locationRemoveFromZoneCommand {
+func newLocationRemoveFromZoneCommand(wrapped *LocationRemoveFromZoneEvent) locationRemoveFromZoneCommand {
 	return locationRemoveFromZoneCommand{
 		commandGeneric{commandType: CommandTypeLocationRemoveFromZone},
 		wrapped,
@@ -301,11 +286,11 @@ func newLocationRemoveFromZoneCommand(wrapped LocationRemoveFromZoneEvent) locat
 
 type locationRemoveFromZoneCommand struct {
 	commandGeneric
-	wrappedEvent LocationRemoveFromZoneEvent
+	wrappedEvent *LocationRemoveFromZoneEvent
 }
 
-func NewLocationRemoveFromZoneEvent(locID, zoneID uuid.UUID) LocationRemoveFromZoneEvent {
-	return LocationRemoveFromZoneEvent{
+func NewLocationRemoveFromZoneEvent(locID, zoneID uuid.UUID) *LocationRemoveFromZoneEvent {
+	return &LocationRemoveFromZoneEvent{
 		eventGeneric: &eventGeneric{
 			eventType:     EventTypeLocationRemoveFromZone,
 			version:       1,

@@ -5,20 +5,20 @@ type Command interface {
 }
 
 const (
-	CommandTypeActorMove = iota
+	CommandTypeActorAddToZone = iota
+	CommandTypeActorMove
 	CommandTypeActorAdminRelocate
-	CommandTypeActorAddToZone
 	CommandTypeActorRemoveFromZone
 	CommandTypeLocationAddToZone
-	CommandTypeLocationRemoveFromZone
 	CommandTypeLocationUpdate
+	CommandTypeLocationRemoveFromZone
 	CommandTypeExitAddToZone
 	CommandTypeExitUpdate
 	CommandTypeExitRemoveFromZone
 	CommandTypeObjectAddToZone
-	CommandTypeObjectRemoveFromZone
 	CommandTypeObjectMove
 	CommandTypeObjectAdminRelocate
+	CommandTypeObjectRemoveFromZone
 	CommandTypeZoneSetDefaultLocation
 )
 

@@ -46,7 +46,7 @@ type actorAdminRelocateEvent struct {
 }
 
 func (aare *actorAdminRelocateEvent) FromDomain(e core.Event) {
-	from := e.(core.ActorAdminRelocateEvent)
+	from := e.(*core.ActorAdminRelocateEvent)
 	*aare = actorAdminRelocateEvent{
 		header:       eventHeaderFromDomainEvent(from),
 		ActorID:      from.ActorID,
@@ -75,7 +75,7 @@ type actorAddToZoneEvent struct {
 }
 
 func (aatze *actorAddToZoneEvent) FromDomain(e core.Event) {
-	from := e.(core.ActorAddToZoneEvent)
+	from := e.(*core.ActorAddToZoneEvent)
 	*aatze = actorAddToZoneEvent{
 		header:             eventHeaderFromDomainEvent(from),
 		ActorID:            from.ActorID(),
@@ -109,7 +109,7 @@ type actorRemoveFromZoneEvent struct {
 }
 
 func (arfze *actorRemoveFromZoneEvent) FromDomain(e core.Event) {
-	from := e.(core.ActorRemoveFromZoneEvent)
+	from := e.(*core.ActorRemoveFromZoneEvent)
 	*arfze = actorRemoveFromZoneEvent{
 		header:  eventHeaderFromDomainEvent(from),
 		ActorID: from.ActorID(),
