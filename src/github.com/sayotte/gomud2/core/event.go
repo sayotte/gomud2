@@ -18,6 +18,7 @@ const (
 	EventTypeObjectAddToZone
 	EventTypeObjectRemoveFromZone
 	EventTypeObjectMove
+	EventTypeObjectAdminRelocate
 	EventTypeZoneSetDefaultLocation
 )
 

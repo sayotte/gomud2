@@ -110,3 +110,31 @@ func (ome objectMoveEvent) Header() eventHeader {
 func (ome *objectMoveEvent) SetHeader(h eventHeader) {
 	ome.header = h
 }
+
+type objectAdminRelocateEvent struct {
+	header                 eventHeader
+	ObjectID, ToLocationID uuid.UUID
+}
+
+func (oare *objectAdminRelocateEvent) FromDomain(e core.Event) {
+	from := e.(core.ObjectAdminRelocateEvent)
+	*oare = objectAdminRelocateEvent{
+		header:       eventHeaderFromDomainEvent(from),
+		ObjectID:     from.ObjectID,
+		ToLocationID: from.ToLocationID,
+	}
+}
+
+func (oare objectAdminRelocateEvent) ToDomain() core.Event {
+	e := core.NewObjectAdminRelocateEvent(oare.ObjectID, oare.ToLocationID, oare.header.AggregateId)
+	e.SetSequenceNumber(oare.header.SequenceNumber)
+	return e
+}
+
+func (oare objectAdminRelocateEvent) Header() eventHeader {
+	return oare.header
+}
+
+func (oare *objectAdminRelocateEvent) SetHeader(h eventHeader) {
+	oare.header = h
+}

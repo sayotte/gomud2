@@ -310,6 +310,9 @@ func (z *Zone) apply(e Event) (interface{}, error) {
 	case EventTypeObjectMove:
 		typedEvent := e.(ObjectMoveEvent)
 		return nil, z.applyObjectMoveEvent(typedEvent)
+	case EventTypeObjectAdminRelocate:
+		typedEvent := e.(ObjectAdminRelocateEvent)
+		return nil, z.applyObjectAdminRelocateEvent(typedEvent)
 	case EventTypeZoneSetDefaultLocation:
 		typedEvent := e.(ZoneSetDefaultLocationEvent)
 		return nil, z.applyZoneSetDefaultLocationEvent(typedEvent)
@@ -778,6 +781,39 @@ func (z *Zone) applyObjectMoveEvent(e ObjectMoveEvent) error {
 	for _, o := range toLoc.Observers() {
 		oList = append(oList, o)
 	}
+	z.sendEventToObservers(e, oList)
+
+	return nil
+}
+
+func (z *Zone) applyObjectAdminRelocateEvent(e ObjectAdminRelocateEvent) error {
+	obj, found := z.objectsById[e.ObjectID]
+	if !found {
+		return fmt.Errorf("no such Object with ID %q in Zone", e.ObjectID)
+	}
+	toLoc, found := z.locationsById[e.ToLocationID]
+	if !found {
+		return fmt.Errorf("no such Location with ID %q in Zone", e.ToLocationID)
+	}
+
+	var oList ObserverList
+	// It's possible the Object has been orphaned with no location, which is why we're
+	// relocating them. Otherwise, though, we need to remove them from their existing
+	// location.
+	fromLoc := obj.Location()
+	if fromLoc != nil {
+		err := fromLoc.removeObject(obj)
+		if err != nil {
+			return err
+		}
+		oList = fromLoc.Observers()
+	}
+	err := toLoc.addObject(obj)
+	if err != nil {
+		return err
+	}
+	obj.setLocation(toLoc)
+	oList = append(oList, toLoc.Observers()...)
 	z.sendEventToObservers(e, oList)
 
 	return nil

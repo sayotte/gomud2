@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/satori/go.uuid"
@@ -65,6 +66,16 @@ func (o *Object) Move(from, to *Location) error {
 		o.id,
 		o.zone.ID(),
 	)
+	_, err := o.syncRequestToZone(e)
+	return err
+}
+
+func (o *Object) AdminRelocate(to *Location) error {
+	fromLoc := o.location
+	if fromLoc != nil && fromLoc.Zone() != to.Zone() {
+		return errors.New("cannot AdminRelocate across Zones")
+	}
+	e := NewObjectAdminRelocateEvent(o.id, to.ID(), to.Zone().ID())
 	_, err := o.syncRequestToZone(e)
 	return err
 }
@@ -199,4 +210,23 @@ func (ome ObjectMoveEvent) ToLocationID() uuid.UUID {
 
 func (ome ObjectMoveEvent) ObjectID() uuid.UUID {
 	return ome.objectId
+}
+
+func NewObjectAdminRelocateEvent(objectID, locID, zoneID uuid.UUID) ObjectAdminRelocateEvent {
+	return ObjectAdminRelocateEvent{
+		eventGeneric: &eventGeneric{
+			eventType:     EventTypeObjectAdminRelocate,
+			version:       1,
+			aggregateId:   zoneID,
+			shouldPersist: true,
+		},
+		ObjectID:     objectID,
+		ToLocationID: locID,
+	}
+}
+
+type ObjectAdminRelocateEvent struct {
+	*eventGeneric
+	ObjectID     uuid.UUID
+	ToLocationID uuid.UUID
 }
