@@ -119,6 +119,18 @@ func (ol ObjectList) Copy() ObjectList {
 	return out
 }
 
+func newObjectAddToZoneCommand(wrapped ObjectAddToZoneEvent) objectAddToZoneCommand {
+	return objectAddToZoneCommand{
+		commandGeneric{commandType: CommandTypeObjectAddToZone},
+		wrapped,
+	}
+}
+
+type objectAddToZoneCommand struct {
+	commandGeneric
+	wrappedEvent ObjectAddToZoneEvent
+}
+
 func NewObjectAddToZoneEvent(name string, objectId, startingLocationId, zoneId uuid.UUID) ObjectAddToZoneEvent {
 	return ObjectAddToZoneEvent{
 		&eventGeneric{
@@ -152,6 +164,18 @@ func (oatze ObjectAddToZoneEvent) StartingLocationID() uuid.UUID {
 	return oatze.startingLocationId
 }
 
+func newObjectRemoveFromZoneCommand(wrapped ObjectRemoveFromZoneEvent) objectRemoveFromZoneCommand {
+	return objectRemoveFromZoneCommand{
+		commandGeneric{commandType: CommandTypeObjectRemoveFromZone},
+		wrapped,
+	}
+}
+
+type objectRemoveFromZoneCommand struct {
+	commandGeneric
+	wrappedEvent ObjectRemoveFromZoneEvent
+}
+
 func NewObjectRemoveFromZoneEvent(name string, objectID, zoneID uuid.UUID) ObjectRemoveFromZoneEvent {
 	return ObjectRemoveFromZoneEvent{
 		&eventGeneric{
@@ -177,6 +201,18 @@ func (orfze ObjectRemoveFromZoneEvent) ObjectID() uuid.UUID {
 
 func (orfze ObjectRemoveFromZoneEvent) Name() string {
 	return orfze.name
+}
+
+func newObjectMoveCommand(wrapped ObjectMoveEvent) objectMoveCommand {
+	return objectMoveCommand{
+		commandGeneric{commandType: CommandTypeObjectMove},
+		wrapped,
+	}
+}
+
+type objectMoveCommand struct {
+	commandGeneric
+	wrappedEvent ObjectMoveEvent
 }
 
 func NewObjectMoveEvent(fromLocationId, toLocationId, objectId, zoneId uuid.UUID) ObjectMoveEvent {
@@ -210,6 +246,18 @@ func (ome ObjectMoveEvent) ToLocationID() uuid.UUID {
 
 func (ome ObjectMoveEvent) ObjectID() uuid.UUID {
 	return ome.objectId
+}
+
+func newObjectAdminRelocateCommand(wrapped ObjectAdminRelocateEvent) objectAdminRelocateCommand {
+	return objectAdminRelocateCommand{
+		commandGeneric{commandType: CommandTypeObjectAdminRelocate},
+		wrapped,
+	}
+}
+
+type objectAdminRelocateCommand struct {
+	commandGeneric
+	wrappedEvent ObjectAdminRelocateEvent
 }
 
 func NewObjectAdminRelocateEvent(objectID, locID, zoneID uuid.UUID) ObjectAdminRelocateEvent {

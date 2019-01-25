@@ -861,6 +861,18 @@ func dfsSnapshottableDepsOmittingVisited(this snapshottable, visitedMap map[snap
 	return ret
 }
 
+func newZoneSetDefaultLocationCommand(wrapped ZoneSetDefaultLocationEvent) zoneSetDefaultLocationCommand {
+	return zoneSetDefaultLocationCommand{
+		commandGeneric{commandType: CommandTypeZoneSetDefaultLocation},
+		wrapped,
+	}
+}
+
+type zoneSetDefaultLocationCommand struct {
+	commandGeneric
+	wrappedEvent ZoneSetDefaultLocationEvent
+}
+
 func NewZoneSetDefaultLocationEvent(locID, zoneID uuid.UUID) ZoneSetDefaultLocationEvent {
 	return ZoneSetDefaultLocationEvent{
 		eventGeneric: &eventGeneric{

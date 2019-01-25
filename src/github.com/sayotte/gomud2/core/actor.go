@@ -162,6 +162,18 @@ func (al ActorList) Copy() ActorList {
 	return out
 }
 
+func newActorMoveCommand(wrapped ActorMoveEvent) actorMoveCommand {
+	return actorMoveCommand{
+		commandGeneric{commandType: CommandTypeActorMove},
+		wrapped,
+	}
+}
+
+type actorMoveCommand struct {
+	commandGeneric
+	wrappedEvent ActorMoveEvent
+}
+
 func NewActorMoveEvent(fromLocationId, toLocationId, actorId, zoneId uuid.UUID) *ActorMoveEvent {
 	return &ActorMoveEvent{
 		&eventGeneric{
@@ -196,6 +208,18 @@ func (ame *ActorMoveEvent) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
+func newActorAdminRelocateCommand(wrapped ActorAdminRelocateEvent) actorAdminRelocateCommand {
+	return actorAdminRelocateCommand{
+		commandGeneric{commandType: CommandTypeActorAdminRelocate},
+		wrapped,
+	}
+}
+
+type actorAdminRelocateCommand struct {
+	commandGeneric
+	wrappedEvent ActorAdminRelocateEvent
+}
+
 func NewActorAdminRelocateEvent(actorID, locID, zoneID uuid.UUID) ActorAdminRelocateEvent {
 	return ActorAdminRelocateEvent{
 		eventGeneric: &eventGeneric{
@@ -213,6 +237,18 @@ type ActorAdminRelocateEvent struct {
 	*eventGeneric
 	ActorID      uuid.UUID
 	ToLocationID uuid.UUID
+}
+
+func newActorAddToZoneCommand(wrapped ActorAddToZoneEvent) actorAddToZoneCommand {
+	return actorAddToZoneCommand{
+		commandGeneric{commandType: CommandTypeActorAddToZone},
+		wrapped,
+	}
+}
+
+type actorAddToZoneCommand struct {
+	commandGeneric
+	wrappedEvent ActorAddToZoneEvent
 }
 
 func NewActorAddToZoneEvent(name string, actorId, startingLocationId, zoneId uuid.UUID) ActorAddToZoneEvent {
@@ -246,6 +282,18 @@ func (aatze ActorAddToZoneEvent) Name() string {
 
 func (aatze ActorAddToZoneEvent) StartingLocationID() uuid.UUID {
 	return aatze.startingLocationId
+}
+
+func newActorRemoveFromZoneCommand(wrapped ActorRemoveFromZoneEvent) actorRemoveFromZoneCommand {
+	return actorRemoveFromZoneCommand{
+		commandGeneric{commandType: CommandTypeActorRemoveFromZone},
+		wrapped,
+	}
+}
+
+type actorRemoveFromZoneCommand struct {
+	commandGeneric
+	wrappedEvent ActorRemoveFromZoneEvent
 }
 
 func NewActorRemoveFromZoneEvent(actorID, zoneID uuid.UUID) ActorRemoveFromZoneEvent {

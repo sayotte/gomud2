@@ -202,6 +202,18 @@ func (ll LocationList) IndexOf(loc *Location) (int, error) {
 	return -1, fmt.Errorf("location %q not found in list", loc.id)
 }
 
+func newLocationAddToZoneCommand(wrapped LocationAddToZoneEvent) locationAddToZoneCommand {
+	return locationAddToZoneCommand{
+		commandGeneric{commandType: CommandTypeLocationAddToZone},
+		wrapped,
+	}
+}
+
+type locationAddToZoneCommand struct {
+	commandGeneric
+	wrappedEvent LocationAddToZoneEvent
+}
+
 func NewLocationAddToZoneEvent(shortDesc, desc string, locationId, zoneId uuid.UUID) LocationAddToZoneEvent {
 	return LocationAddToZoneEvent{
 		&eventGeneric{
@@ -235,6 +247,18 @@ func (latze LocationAddToZoneEvent) Description() string {
 	return latze.desc
 }
 
+func newLocationUpdateCommand(wrapped LocationUpdateEvent) locationUpdateCommand {
+	return locationUpdateCommand{
+		commandGeneric{commandType: CommandTypeLocationUpdate},
+		wrapped,
+	}
+}
+
+type locationUpdateCommand struct {
+	commandGeneric
+	wrappedEvent LocationUpdateEvent
+}
+
 func NewLocationUpdateEvent(shortDesc, desc string, locationID, zoneID uuid.UUID) LocationUpdateEvent {
 	return LocationUpdateEvent{
 		&eventGeneric{
@@ -266,6 +290,18 @@ func (lue LocationUpdateEvent) ShortDescription() string {
 
 func (lue LocationUpdateEvent) Description() string {
 	return lue.desc
+}
+
+func newLocationRemoveFromZoneCommand(wrapped LocationRemoveFromZoneEvent) locationRemoveFromZoneCommand {
+	return locationRemoveFromZoneCommand{
+		commandGeneric{commandType: CommandTypeLocationRemoveFromZone},
+		wrapped,
+	}
+}
+
+type locationRemoveFromZoneCommand struct {
+	commandGeneric
+	wrappedEvent LocationRemoveFromZoneEvent
 }
 
 func NewLocationRemoveFromZoneEvent(locID, zoneID uuid.UUID) LocationRemoveFromZoneEvent {

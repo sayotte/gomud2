@@ -184,6 +184,18 @@ func (el ExitList) Copy() ExitList {
 	return out
 }
 
+func newExitAddToZoneCommand(wrapped ExitAddToZoneEvent) exitAddToZoneCommand {
+	return exitAddToZoneCommand{
+		commandGeneric{commandType: CommandTypeExitAddToZone},
+		wrapped,
+	}
+}
+
+type exitAddToZoneCommand struct {
+	commandGeneric
+	wrappedEvent ExitAddToZoneEvent
+}
+
 func NewExitAddToZoneEvent(desc, direction string, exitId, sourceId, destLocId, srcZoneId, destZoneID uuid.UUID) ExitAddToZoneEvent {
 	return ExitAddToZoneEvent{
 		&eventGeneric{
@@ -209,6 +221,18 @@ type ExitAddToZoneEvent struct {
 	SourceLocationId uuid.UUID
 	DestZoneID       uuid.UUID
 	DestLocationId   uuid.UUID
+}
+
+func newExitUpdateCommand(wrapped ExitUpdateEvent) exitUpdateCommand {
+	return exitUpdateCommand{
+		commandGeneric{commandType: CommandTypeExitUpdate},
+		wrapped,
+	}
+}
+
+type exitUpdateCommand struct {
+	commandGeneric
+	wrappedEvent ExitUpdateEvent
 }
 
 func NewExitUpdateEvent(desc, direction string, exitID, sourceID, destID, srcZoneID, extZoneID uuid.UUID) ExitUpdateEvent {
@@ -237,6 +261,18 @@ type ExitUpdateEvent struct {
 	SourceLocationId uuid.UUID
 	DestZoneID       uuid.UUID
 	DestLocationId   uuid.UUID
+}
+
+func newExitRemoveFromZoneCommand(wrapped ExitRemoveFromZoneEvent) exitRemoveFromZoneCommand {
+	return exitRemoveFromZoneCommand{
+		commandGeneric{commandType: CommandTypeExitRemoveFromZone},
+		wrapped,
+	}
+}
+
+type exitRemoveFromZoneCommand struct {
+	commandGeneric
+	wrappedEvent ExitRemoveFromZoneEvent
 }
 
 func NewExitRemoveFromZoneEvent(exitID, zoneID uuid.UUID) ExitRemoveFromZoneEvent {
