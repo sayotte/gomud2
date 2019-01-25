@@ -201,8 +201,13 @@ func (s *Service) spawnZone(zone *core.Zone) {
 		}
 		if targetLoc == nil {
 			// failing any empty Locations, just spawn them in a random Location
-			idx := s.rando.Intn(len(zoneLocs) - 1)
-			targetLoc = zoneLocs[idx]
+			if len(zoneLocs) == 1 {
+				// special case-- if the zone has only one location, spawn there:
+				targetLoc = zoneLocs[0]
+			} else {
+				idx := s.rando.Intn(len(zoneLocs) - 1)
+				targetLoc = zoneLocs[idx]
+			}
 		}
 
 		// spawn
