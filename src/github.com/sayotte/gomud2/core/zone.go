@@ -787,6 +787,9 @@ func (z *Zone) applyEvent(e Event) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	z.nextSequenceId = e.SequenceNumber() + 1
+
 	z.sendEventToObservers(e, oList)
 	return out, nil
 }
