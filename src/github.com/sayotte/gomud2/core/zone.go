@@ -489,13 +489,45 @@ func (z *Zone) processLocationRemoveFromZoneCommand(c Command) ([]Event, error) 
 	if !found {
 		return nil, fmt.Errorf("no Location with ID %q found in Zone", e.LocationID)
 	}
-	if len(loc.OutExits()) != 0 {
-		return nil, errors.New("Location has Exits which would be orphaned")
-	}
-	if len(loc.Actors()) != 0 {
-		return nil, errors.New("Location has Actors which would be orphaned")
+	if z.defaultLocation == nil {
+		if len(loc.Actors()) != 0 || len(loc.Objects()) != 0 {
+			return nil, fmt.Errorf("")
+		}
 	}
 
+	var outEvents []Event
+
+	// First remove all exits
+	for _, outExit := range append(loc.OutExits(), z.ExitsToLocation(loc)...) {
+		e := NewExitRemoveFromZoneEvent(outExit.ID(), z.id)
+		subCmd := newExitRemoveFromZoneCommand(e)
+		newEvents, err := z.processExitRemoveFromZoneCommand(subCmd)
+		if err != nil {
+			return nil, err
+		}
+		outEvents = append(outEvents, newEvents...)
+	}
+	// Relocate Actors and Objects so they aren't orphaned
+	for _, actor := range loc.Actors() {
+		e := NewActorAdminRelocateEvent(actor.id, z.defaultLocation.ID(), z.id)
+		subCmd := newActorAdminRelocateCommand(e)
+		newEvents, err := z.processActorAdminRelocateCommand(subCmd)
+		if err != nil {
+			return nil, err
+		}
+		outEvents = append(outEvents, newEvents...)
+	}
+	for _, object := range loc.Objects() {
+		e := NewObjectAdminRelocateEvent(object.id, z.defaultLocation.ID(), z.id)
+		subCmd := newObjectAdminRelocateCommand(e)
+		newEvents, err := z.processObjectAdminRelocateCommand(subCmd)
+		if err != nil {
+			return nil, err
+		}
+		outEvents = append(outEvents, newEvents...)
+	}
+
+	// Remove the empty, unlinked Location
 	e.SetSequenceNumber(z.nextSequenceId)
 	z.nextSequenceId = e.SequenceNumber() + 1
 	_, err := z.applyEvent(e)

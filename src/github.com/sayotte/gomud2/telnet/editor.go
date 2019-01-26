@@ -533,35 +533,6 @@ func (weh *worldEditHandler) getRemLocationHandler() worldEditCommandHandler {
 			return []byte("No default location set for Zone, use 'setdefaultlocation' to set one first.\n"), nil
 		}
 
-		// Remove the exits in/out first so that Actors don't wander in while we're
-		// in the middle of relocating them out
-		for _, outExit := range loc.OutExits() {
-			err = weh.zoneUnderEdit.RemoveExit(outExit)
-			if err != nil {
-				return []byte("Whoops..."), fmt.Errorf("Zone.RemoveExit(out): %s", err)
-			}
-		}
-		for _, inExit := range weh.zoneUnderEdit.ExitsToLocation(loc) {
-			err = weh.zoneUnderEdit.RemoveExit(inExit)
-			if err != nil {
-				return []byte("Whoops..."), fmt.Errorf("Zone.RemoveExit(in): %s", err)
-			}
-		}
-		// Relocate Actors and Objects so they aren't orphaned
-		for _, actor := range loc.Actors() {
-			err = actor.AdminRelocate(dstLoc)
-			if err != nil {
-				return []byte("Whoops..."), fmt.Errorf("Actor.AdminRelocate(): %s", err)
-			}
-		}
-		for _, object := range loc.Objects() {
-			err = object.AdminRelocate(dstLoc)
-			if err != nil {
-				return []byte("Whoops..."), fmt.Errorf("Object.AdminRelocate(): %s", err)
-			}
-		}
-
-		// Remove the now-empty, unlinked, Location
 		err = weh.zoneUnderEdit.RemoveLocation(loc)
 		if err != nil {
 			return []byte("Whoops..."), fmt.Errorf("Zone.RemoveLocation(): %s", err)
