@@ -11,6 +11,8 @@ import (
 	myuuid "github.com/sayotte/gomud2/uuid"
 )
 
+const actorInventoryCapacity = 15
+
 func NewActor(id uuid.UUID, name string, location *Location, zone *Zone) *Actor {
 	newID := id
 	if uuid.Equal(id, uuid.Nil) {
@@ -32,7 +34,10 @@ type Actor struct {
 	location  *Location
 	zone      *Zone
 	observers ObserverList
-	rwlock    *sync.RWMutex
+
+	inventoryObjects ObjectList
+
+	rwlock *sync.RWMutex
 	// This is the channel where the Zone picks up new events related to this
 	// actor. This should never be directly exposed by an accessor; public methods
 	// should create events and send them to the channel.
@@ -43,7 +48,7 @@ func (a *Actor) ID() uuid.UUID {
 	return a.id
 }
 
-func (a *Actor) Observers() []Observer {
+func (a *Actor) Observers() ObserverList {
 	a.rwlock.RLock()
 	defer a.rwlock.RUnlock()
 	return a.observers.Copy()
@@ -73,6 +78,32 @@ func (a *Actor) Location() *Location {
 
 func (a *Actor) setLocation(loc *Location) {
 	a.location = loc
+}
+
+func (a *Actor) Capacity() int {
+	return actorInventoryCapacity
+}
+
+func (a *Actor) Objects() ObjectList {
+	return a.inventoryObjects.Copy()
+}
+
+func (a *Actor) ContainsObject(o *Object) bool {
+	_, err := a.inventoryObjects.IndexOf(o)
+	return err == nil
+}
+
+func (a *Actor) addObject(o *Object) error {
+	_, err := a.inventoryObjects.IndexOf(o)
+	if err == nil {
+		return fmt.Errorf("Object %q already present in inventory for Actor %q", o.ID(), a.id)
+	}
+	a.inventoryObjects = append(a.inventoryObjects, o)
+	return nil
+}
+
+func (a *Actor) removeObject(o *Object) {
+	a.inventoryObjects = a.inventoryObjects.Remove(o)
 }
 
 func (a *Actor) Move(from, to *Location) error {

@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/satori/go.uuid"
@@ -10,7 +9,7 @@ import (
 	myuuid "github.com/sayotte/gomud2/uuid"
 )
 
-func NewObject(id uuid.UUID, name string, loc *Location, zone *Zone) *Object {
+func NewObject(id uuid.UUID, name string, container Container, zone *Zone) *Object {
 	newID := id
 	if uuid.Equal(id, uuid.Nil) {
 		newID = myuuid.NewId()
@@ -18,17 +17,20 @@ func NewObject(id uuid.UUID, name string, loc *Location, zone *Zone) *Object {
 	return &Object{
 		id:          newID,
 		name:        name,
-		location:    loc,
+		container:   container,
 		zone:        zone,
 		requestChan: make(chan rpc.Request),
 	}
 }
 
 type Object struct {
-	id       uuid.UUID
-	name     string
-	location *Location
-	zone     *Zone
+	id        uuid.UUID
+	name      string
+	container Container
+	zone      *Zone
+
+	containerCapacity int
+	containedObjects  ObjectList
 	// This is the channel where the Zone picks up new events related to this
 	// Object. This should never be directly exposed by an accessor; public methods
 	// should create events and send them to the channel.
@@ -43,39 +45,69 @@ func (o Object) Name() string {
 	return o.name
 }
 
-func (o Object) Location() *Location {
-	return o.location
+func (o Object) Container() Container {
+	return o.container
 }
 
-func (o *Object) setLocation(loc *Location) {
-	o.location = loc
+func (o *Object) setContainer(c Container) {
+	o.container = c
+}
+
+func (o *Object) Zone() *Zone {
+	return o.zone
 }
 
 func (o *Object) setZone(zone *Zone) {
 	o.zone = zone
 }
 
-func (o *Object) Move(from, to *Location) error {
-	if from.Zone() != to.Zone() {
-		return fmt.Errorf("cross-zone moves not yet supported")
+func (o *Object) Objects() ObjectList {
+	return o.containedObjects.Copy()
+}
+
+func (o *Object) addObject(object *Object) error {
+	_, err := o.containedObjects.IndexOf(object)
+	if err == nil {
+		return fmt.Errorf("Object %q already present in Object/Container %q", object.ID(), o.id)
 	}
-	e := NewObjectMoveEvent(
-		from.ID(),
-		to.ID(),
-		o.id,
-		o.zone.ID(),
-	)
-	cmd := newObjectMoveCommand(e)
+	o.containedObjects = append(o.containedObjects, object)
+	return nil
+}
+
+func (o *Object) removeObject(object *Object) {
+	o.containedObjects = o.containedObjects.Remove(object)
+}
+
+func (o *Object) Capacity() int {
+	return o.containerCapacity
+}
+
+func (o *Object) ContainsObject(object *Object) bool {
+	_, err := o.containedObjects.IndexOf(object)
+	return err == nil
+}
+
+func (o *Object) Observers() ObserverList {
+	return o.container.Observers()
+}
+
+func (o *Object) Move(from, to Container) error {
+	cmd := newObjectMoveCommand(o, from, to)
 	_, err := o.syncRequestToZone(cmd)
 	return err
 }
 
-func (o *Object) AdminRelocate(to *Location) error {
-	fromLoc := o.location
-	if fromLoc != nil && fromLoc.Zone() != to.Zone() {
-		return errors.New("cannot AdminRelocate across Zones")
+func (o *Object) AdminRelocate(to Container) error {
+	e := NewObjectAdminRelocateEvent(o.id, o.Zone().ID())
+	switch to.(type) {
+	case *Location:
+		e.ToLocationContainerID = o.container.ID()
+	case *Actor:
+		e.ToActorContainerID = o.container.ID()
+	case *Object:
+		e.ToObjectContainerID = o.container.ID()
 	}
-	e := NewObjectAdminRelocateEvent(o.id, to.ID(), to.Zone().ID())
+
 	cmd := newObjectAdminRelocateCommand(e)
 	_, err := o.syncRequestToZone(cmd)
 	return err
@@ -92,15 +124,25 @@ func (o Object) snapshot(sequenceNum uint64) Event {
 	e := NewObjectAddToZoneEvent(
 		o.name,
 		o.id,
-		o.location.ID(),
+		uuid.Nil,
+		uuid.Nil,
+		uuid.Nil,
 		o.zone.ID(),
 	)
+	switch o.container.(type) {
+	case *Location:
+		e.LocationContainerID = o.container.ID()
+	case *Actor:
+		e.ActorContainerID = o.container.ID()
+	case *Object:
+		e.ObjectContainerID = o.container.ID()
+	}
 	e.SetSequenceNumber(sequenceNum)
 	return e
 }
 
 func (o Object) snapshotDependencies() []snapshottable {
-	return []snapshottable{o.location}
+	return []snapshottable{o.container.(snapshottable)}
 }
 
 type ObjectList []*Object
@@ -140,37 +182,27 @@ type objectAddToZoneCommand struct {
 	wrappedEvent *ObjectAddToZoneEvent
 }
 
-func NewObjectAddToZoneEvent(name string, objectId, startingLocationId, zoneId uuid.UUID) *ObjectAddToZoneEvent {
+func NewObjectAddToZoneEvent(name string, objectId, locationContainerID, actorContainerID, objectContainerID, zoneId uuid.UUID) *ObjectAddToZoneEvent {
 	return &ObjectAddToZoneEvent{
-		&eventGeneric{
+		eventGeneric: &eventGeneric{
 			eventType:     EventTypeObjectAddToZone,
 			version:       1,
 			aggregateId:   zoneId,
 			shouldPersist: true,
 		},
-		objectId,
-		name,
-		startingLocationId,
+		ObjectID:            objectId,
+		Name:                name,
+		LocationContainerID: locationContainerID,
+		ActorContainerID:    actorContainerID,
+		ObjectContainerID:   objectContainerID,
 	}
 }
 
 type ObjectAddToZoneEvent struct {
 	*eventGeneric
-	objectId           uuid.UUID
-	name               string
-	startingLocationId uuid.UUID
-}
-
-func (oatze ObjectAddToZoneEvent) ObjectID() uuid.UUID {
-	return oatze.objectId
-}
-
-func (oatze ObjectAddToZoneEvent) Name() string {
-	return oatze.name
-}
-
-func (oatze ObjectAddToZoneEvent) StartingLocationID() uuid.UUID {
-	return oatze.startingLocationId
+	ObjectID                                                 uuid.UUID
+	Name                                                     string
+	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
 }
 
 func newObjectRemoveFromZoneCommand(wrapped *ObjectRemoveFromZoneEvent) objectRemoveFromZoneCommand {
@@ -200,61 +232,43 @@ func NewObjectRemoveFromZoneEvent(name string, objectID, zoneID uuid.UUID) *Obje
 
 type ObjectRemoveFromZoneEvent struct {
 	*eventGeneric
-	objectID uuid.UUID
-	name     string
+	ObjectID uuid.UUID
+	Name     string
 }
 
-func (orfze ObjectRemoveFromZoneEvent) ObjectID() uuid.UUID {
-	return orfze.objectID
-}
-
-func (orfze ObjectRemoveFromZoneEvent) Name() string {
-	return orfze.name
-}
-
-func newObjectMoveCommand(wrapped *ObjectMoveEvent) objectMoveCommand {
+func newObjectMoveCommand(obj *Object, fromContainer, toContainer Container) objectMoveCommand {
 	return objectMoveCommand{
-		commandGeneric{commandType: CommandTypeObjectMove},
-		wrapped,
+		commandGeneric: commandGeneric{commandType: CommandTypeObjectMove},
+		obj:            obj,
+		fromContainer:  fromContainer,
+		toContainer:    toContainer,
 	}
 }
 
 type objectMoveCommand struct {
 	commandGeneric
-	wrappedEvent *ObjectMoveEvent
+	obj           *Object
+	fromContainer Container
+	toContainer   Container
 }
 
-func NewObjectMoveEvent(fromLocationId, toLocationId, objectId, zoneId uuid.UUID) *ObjectMoveEvent {
+func NewObjectMoveEvent(objID, zoneID uuid.UUID) *ObjectMoveEvent {
 	return &ObjectMoveEvent{
-		&eventGeneric{
+		eventGeneric: &eventGeneric{
 			eventType:     EventTypeObjectMove,
 			version:       1,
-			aggregateId:   zoneId,
+			aggregateId:   zoneID,
 			shouldPersist: true,
 		},
-		fromLocationId,
-		toLocationId,
-		objectId,
+		ObjectID: objID,
 	}
 }
 
 type ObjectMoveEvent struct {
 	*eventGeneric
-	fromLocationId uuid.UUID
-	toLocationId   uuid.UUID
-	objectId       uuid.UUID
-}
-
-func (ome ObjectMoveEvent) FromLocationID() uuid.UUID {
-	return ome.fromLocationId
-}
-
-func (ome ObjectMoveEvent) ToLocationID() uuid.UUID {
-	return ome.toLocationId
-}
-
-func (ome ObjectMoveEvent) ObjectID() uuid.UUID {
-	return ome.objectId
+	ObjectID                                                             uuid.UUID
+	FromLocationContainerID, FromActorContainerID, FromObjectContainerID uuid.UUID
+	ToLocationContainerID, ToActorContainerID, ToObjectContainerID       uuid.UUID
 }
 
 func newObjectAdminRelocateCommand(wrapped *ObjectAdminRelocateEvent) objectAdminRelocateCommand {
@@ -269,7 +283,7 @@ type objectAdminRelocateCommand struct {
 	wrappedEvent *ObjectAdminRelocateEvent
 }
 
-func NewObjectAdminRelocateEvent(objectID, locID, zoneID uuid.UUID) *ObjectAdminRelocateEvent {
+func NewObjectAdminRelocateEvent(objectID, zoneID uuid.UUID) *ObjectAdminRelocateEvent {
 	return &ObjectAdminRelocateEvent{
 		eventGeneric: &eventGeneric{
 			eventType:     EventTypeObjectAdminRelocate,
@@ -277,13 +291,12 @@ func NewObjectAdminRelocateEvent(objectID, locID, zoneID uuid.UUID) *ObjectAdmin
 			aggregateId:   zoneID,
 			shouldPersist: true,
 		},
-		ObjectID:     objectID,
-		ToLocationID: locID,
+		ObjectID: objectID,
 	}
 }
 
 type ObjectAdminRelocateEvent struct {
 	*eventGeneric
-	ObjectID     uuid.UUID
-	ToLocationID uuid.UUID
+	ObjectID                                                       uuid.UUID
+	ToLocationContainerID, ToActorContainerID, ToObjectContainerID uuid.UUID
 }

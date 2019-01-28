@@ -108,16 +108,20 @@ func (arfzeb *ActorRemoveFromZoneEventBody) populateFromDomain(e core.Event) {
 }
 
 type ObjectAddToZoneEventBody struct {
-	ObjectID           uuid.UUID `json:"objectID"`
-	Name               string    `json:"name"`
-	StartingLocationID uuid.UUID `json:"startingLocationID"`
+	ObjectID            uuid.UUID `json:"objectID"`
+	Name                string    `json:"name"`
+	LocationContainerID uuid.UUID `json:"locationContainerID"`
+	ActorContainerID    uuid.UUID `json:"actorContainerID"`
+	ObjectContainerID   uuid.UUID `json:"objectContainerID"`
 }
 
 func (oatzeb *ObjectAddToZoneEventBody) populateFromDomain(e core.Event) {
 	typedEvent := e.(core.ObjectAddToZoneEvent)
-	oatzeb.ObjectID = typedEvent.ObjectID()
-	oatzeb.Name = typedEvent.Name()
-	oatzeb.StartingLocationID = typedEvent.StartingLocationID()
+	oatzeb.ObjectID = typedEvent.ObjectID
+	oatzeb.Name = typedEvent.Name
+	oatzeb.LocationContainerID = typedEvent.LocationContainerID
+	oatzeb.ActorContainerID = typedEvent.ActorContainerID
+	oatzeb.ObjectContainerID = typedEvent.ObjectContainerID
 }
 
 type ObjectRemoveFromZoneEventBody struct {
@@ -127,19 +131,27 @@ type ObjectRemoveFromZoneEventBody struct {
 
 func (orfzeb *ObjectRemoveFromZoneEventBody) populateFromDomain(e core.Event) {
 	typedEvent := e.(core.ObjectRemoveFromZoneEvent)
-	orfzeb.ObjectID = typedEvent.ObjectID()
-	orfzeb.Name = typedEvent.Name()
+	orfzeb.ObjectID = typedEvent.ObjectID
+	orfzeb.Name = typedEvent.Name
 }
 
 type ObjectMoveEventBody struct {
-	FromLocationID uuid.UUID `json:"fromLocationID"`
-	ToLocationID   uuid.UUID `json:"toLocationID"`
-	ObjectID       uuid.UUID `json:"objectID"`
+	ObjectID                uuid.UUID `json:"objectID"`
+	FromLocationContainerID uuid.UUID `json:"fromLocationContainerID"`
+	FromActorContainerID    uuid.UUID `json:"fromActorContainerID"`
+	FromObjectContainerID   uuid.UUID `json:"fromObjectContainerID"`
+	ToLocationContainerID   uuid.UUID `json:"toLocationContainerID"`
+	ToActorContainerID      uuid.UUID `json:"toActorContainerID"`
+	ToObjectContainerID     uuid.UUID `json:"toObjectContainerID"`
 }
 
 func (omeb *ObjectMoveEventBody) populateFromDomain(e core.Event) {
 	typedEvent := e.(core.ObjectMoveEvent)
-	omeb.FromLocationID = typedEvent.FromLocationID()
-	omeb.ToLocationID = typedEvent.ToLocationID()
-	omeb.ObjectID = typedEvent.ObjectID()
+	omeb.ObjectID = typedEvent.ObjectID
+	omeb.FromLocationContainerID = typedEvent.FromLocationContainerID
+	omeb.FromActorContainerID = typedEvent.FromActorContainerID
+	omeb.FromObjectContainerID = typedEvent.FromObjectContainerID
+	omeb.ToLocationContainerID = typedEvent.ToLocationContainerID
+	omeb.ToActorContainerID = typedEvent.ToActorContainerID
+	omeb.ToObjectContainerID = typedEvent.ToObjectContainerID
 }

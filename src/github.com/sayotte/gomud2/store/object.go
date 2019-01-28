@@ -6,10 +6,10 @@ import (
 )
 
 type objectAddToZoneEvent struct {
-	header             eventHeader
-	ObjectId           uuid.UUID
-	Name               string
-	StartingLocationId uuid.UUID
+	header                                                   eventHeader
+	ObjectId                                                 uuid.UUID
+	Name                                                     string
+	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
 }
 
 func (oatze *objectAddToZoneEvent) FromDomain(e core.Event) {
@@ -21,9 +21,11 @@ func (oatze *objectAddToZoneEvent) FromDomain(e core.Event) {
 			AggregateId:    from.AggregateId(),
 			SequenceNumber: from.SequenceNumber(),
 		},
-		ObjectId:           from.ObjectID(),
-		Name:               from.Name(),
-		StartingLocationId: from.StartingLocationID(),
+		ObjectId:            from.ObjectID,
+		Name:                from.Name,
+		LocationContainerID: from.LocationContainerID,
+		ActorContainerID:    from.ActorContainerID,
+		ObjectContainerID:   from.ObjectContainerID,
 	}
 }
 
@@ -31,7 +33,9 @@ func (oatze objectAddToZoneEvent) ToDomain() core.Event {
 	e := core.NewObjectAddToZoneEvent(
 		oatze.Name,
 		oatze.ObjectId,
-		oatze.StartingLocationId,
+		oatze.LocationContainerID,
+		oatze.ActorContainerID,
+		oatze.ObjectContainerID,
 		oatze.header.AggregateId,
 	)
 	e.SetSequenceNumber(oatze.header.SequenceNumber)
@@ -56,8 +60,8 @@ func (orfze *objectRemoveFromZoneEvent) FromDomain(e core.Event) {
 	from := e.(*core.ObjectRemoveFromZoneEvent)
 	*orfze = objectRemoveFromZoneEvent{
 		header:   eventHeaderFromDomainEvent(e),
-		ObjectID: from.ObjectID(),
-		Name:     from.Name(),
+		ObjectID: from.ObjectID,
+		Name:     from.Name,
 	}
 }
 
@@ -76,29 +80,38 @@ func (orfze *objectRemoveFromZoneEvent) SetHeader(h eventHeader) {
 }
 
 type objectMoveEvent struct {
-	header         eventHeader
-	FromLocationId uuid.UUID
-	ToLocationID   uuid.UUID
-	ObjectID       uuid.UUID
+	header                                                               eventHeader
+	ObjectID                                                             uuid.UUID
+	FromLocationContainerID, FromActorContainerID, FromObjectContainerID uuid.UUID
+	ToLocationContainerID, ToActorContainerID, ToObjectContainerID       uuid.UUID
 }
 
 func (ome *objectMoveEvent) FromDomain(e core.Event) {
 	from := e.(*core.ObjectMoveEvent)
 	*ome = objectMoveEvent{
-		header:         eventHeaderFromDomainEvent(from),
-		FromLocationId: from.FromLocationID(),
-		ToLocationID:   from.ToLocationID(),
-		ObjectID:       from.ObjectID(),
+		header:                  eventHeaderFromDomainEvent(from),
+		ObjectID:                from.ObjectID,
+		FromLocationContainerID: from.FromLocationContainerID,
+		FromActorContainerID:    from.FromActorContainerID,
+		FromObjectContainerID:   from.FromObjectContainerID,
+		ToLocationContainerID:   from.ToLocationContainerID,
+		ToActorContainerID:      from.ToActorContainerID,
+		ToObjectContainerID:     from.ToObjectContainerID,
 	}
 }
 
 func (ome objectMoveEvent) ToDomain() core.Event {
 	e := core.NewObjectMoveEvent(
-		ome.FromLocationId,
-		ome.ToLocationID,
 		ome.ObjectID,
 		ome.header.AggregateId,
 	)
+	e.FromLocationContainerID = ome.FromLocationContainerID
+	e.FromActorContainerID = ome.FromActorContainerID
+	e.FromObjectContainerID = ome.FromObjectContainerID
+	e.ToLocationContainerID = ome.ToLocationContainerID
+	e.ToActorContainerID = ome.ToActorContainerID
+	e.ToObjectContainerID = ome.ToObjectContainerID
+
 	e.SetSequenceNumber(ome.header.SequenceNumber)
 	return e
 }
@@ -112,22 +125,29 @@ func (ome *objectMoveEvent) SetHeader(h eventHeader) {
 }
 
 type objectAdminRelocateEvent struct {
-	header                 eventHeader
-	ObjectID, ToLocationID uuid.UUID
+	header                                                         eventHeader
+	ObjectID                                                       uuid.UUID
+	ToLocationContainerID, ToActorContainerID, ToObjectContainerID uuid.UUID
 }
 
 func (oare *objectAdminRelocateEvent) FromDomain(e core.Event) {
 	from := e.(*core.ObjectAdminRelocateEvent)
 	*oare = objectAdminRelocateEvent{
-		header:       eventHeaderFromDomainEvent(from),
-		ObjectID:     from.ObjectID,
-		ToLocationID: from.ToLocationID,
+		header:                eventHeaderFromDomainEvent(from),
+		ObjectID:              from.ObjectID,
+		ToLocationContainerID: from.ToLocationContainerID,
+		ToActorContainerID:    from.ToActorContainerID,
+		ToObjectContainerID:   from.ToObjectContainerID,
 	}
 }
 
 func (oare objectAdminRelocateEvent) ToDomain() core.Event {
-	e := core.NewObjectAdminRelocateEvent(oare.ObjectID, oare.ToLocationID, oare.header.AggregateId)
+	e := core.NewObjectAdminRelocateEvent(oare.ObjectID, oare.header.AggregateId)
+	e.ToLocationContainerID = oare.ToLocationContainerID
+	e.ToActorContainerID = oare.ToActorContainerID
+	e.ToObjectContainerID = oare.ToObjectContainerID
 	e.SetSequenceNumber(oare.header.SequenceNumber)
+
 	return e
 }
 

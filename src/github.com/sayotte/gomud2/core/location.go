@@ -2,12 +2,15 @@ package core
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/satori/go.uuid"
 
 	"github.com/sayotte/gomud2/rpc"
 	myuuid "github.com/sayotte/gomud2/uuid"
 )
+
+const locationObjectCapacity = int(math.MaxInt16)
 
 func NewLocation(id uuid.UUID, zone *Zone, shortDesc, longDesc string) *Location {
 	newID := id
@@ -114,6 +117,15 @@ func (l *Location) addObject(object *Object) error {
 	}
 	l.objects = append(l.objects, object)
 	return nil
+}
+
+func (l *Location) Capacity() int {
+	return locationObjectCapacity
+}
+
+func (l *Location) ContainsObject(o *Object) bool {
+	_, err := l.objects.IndexOf(o)
+	return err == nil
 }
 
 func (l Location) OutExits() ExitList {

@@ -31,3 +31,14 @@ func (ol ObserverList) Copy() ObserverList {
 	copy(out, ol)
 	return out
 }
+
+func (ol ObserverList) Dedupe() ObserverList {
+	out := make(ObserverList, len(ol))
+	present := make(map[Observer]bool, len(ol))
+	for _, o := range ol {
+		if !present[o] {
+			out = append(out, o)
+		}
+	}
+	return out
+}

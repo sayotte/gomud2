@@ -342,7 +342,7 @@ func (z *Zone) processCommand(c Command) (interface{}, error) {
 	case CommandTypeExitRemoveFromZone:
 		outEvents, err = z.processExitRemoveFromZoneCommand(c)
 	case CommandTypeObjectAddToZone:
-		out, outEvents, err = z.processObjectAddToZoneEvent(c)
+		out, outEvents, err = z.processObjectAddToZoneCommand(c)
 	case CommandTypeObjectMove:
 		outEvents, err = z.processObjectMoveCommand(c)
 	case CommandTypeObjectAdminRelocate:
@@ -518,7 +518,8 @@ func (z *Zone) processLocationRemoveFromZoneCommand(c Command) ([]Event, error) 
 		outEvents = append(outEvents, newEvents...)
 	}
 	for _, object := range loc.Objects() {
-		e := NewObjectAdminRelocateEvent(object.id, z.defaultLocation.ID(), z.id)
+		e := NewObjectAdminRelocateEvent(object.id, z.id)
+		e.ToLocationContainerID = z.defaultLocation.ID()
 		subCmd := newObjectAdminRelocateCommand(e)
 		newEvents, err := z.processObjectAdminRelocateCommand(subCmd)
 		if err != nil {
@@ -645,17 +646,26 @@ func (z *Zone) processExitRemoveFromZoneCommand(c Command) ([]Event, error) {
 	return []Event{e}, err
 }
 
-func (z *Zone) processObjectAddToZoneEvent(c Command) (interface{}, []Event, error) {
+func (z *Zone) processObjectAddToZoneCommand(c Command) (interface{}, []Event, error) {
 	cmd := c.(objectAddToZoneCommand)
 	e := cmd.wrappedEvent
 
-	_, ok := z.locationsById[e.startingLocationId]
-	if !ok {
-		return nil, nil, fmt.Errorf("unknown startingLocation %q", e.startingLocationId)
-	}
-	_, duplicate := z.objectsById[e.objectId]
+	_, duplicate := z.objectsById[e.ObjectID]
 	if duplicate {
-		return nil, nil, fmt.Errorf("Object with ID %q already present in zone", e.objectId)
+		return nil, nil, fmt.Errorf("Object with ID %q already present in zone", e.ObjectID)
+	}
+
+	var found bool
+	switch {
+	case !uuid.Equal(e.LocationContainerID, uuid.Nil):
+		_, found = z.locationsById[e.LocationContainerID]
+	case !uuid.Equal(e.ActorContainerID, uuid.Nil):
+		_, found = z.actorsById[e.ActorContainerID]
+	case !uuid.Equal(e.ObjectContainerID, uuid.Nil):
+		_, found = z.objectsById[e.ObjectContainerID]
+	}
+	if !found {
+		return nil, nil, fmt.Errorf("no resolvable container")
 	}
 
 	e.SetSequenceNumber(z.nextSequenceId)
@@ -666,19 +676,71 @@ func (z *Zone) processObjectAddToZoneEvent(c Command) (interface{}, []Event, err
 
 func (z *Zone) processObjectMoveCommand(c Command) ([]Event, error) {
 	cmd := c.(objectMoveCommand)
-	e := cmd.wrappedEvent
+	_, found := z.objectsById[cmd.obj.ID()]
+	if !found || cmd.obj.Zone() != z {
+		return nil, errors.New("Object not found / this Zone cannot move objects in other Zones")
+	}
 
-	_, ok := z.locationsById[e.fromLocationId]
-	if !ok {
-		return nil, fmt.Errorf("unknown from-location %q", e.fromLocationId)
+	if cmd.fromContainer == cmd.toContainer {
+		return nil, errors.New("'from' and 'to' Containers are the same")
 	}
-	_, ok = z.locationsById[e.toLocationId]
-	if !ok {
-		return nil, fmt.Errorf("unknown to-location %q", e.toLocationId)
+
+	if !cmd.fromContainer.ContainsObject(cmd.obj) {
+		return nil, errors.New("'from' Container does not currently contain Object")
 	}
-	_, ok = z.objectsById[e.objectId]
-	if !ok {
-		return nil, fmt.Errorf("unknown Object %q", e.objectId)
+
+	e := NewObjectMoveEvent(cmd.obj.ID(), z.id)
+
+	fromID := cmd.fromContainer.ID()
+	switch cmd.fromContainer.(type) {
+	case *Location:
+		_, found := z.locationsById[fromID]
+		if !found {
+			return nil, fmt.Errorf("unknown 'from' Container/Location %q", fromID)
+		}
+		e.FromLocationContainerID = fromID
+	case *Actor:
+		_, found := z.actorsById[fromID]
+		if !found {
+			return nil, fmt.Errorf("unknown 'from' Container/Actor %q", fromID)
+		}
+		e.FromActorContainerID = fromID
+	case *Object:
+		_, found := z.objectsById[fromID]
+		if !found {
+			return nil, fmt.Errorf("unknown 'from' Container/Object %q", fromID)
+		}
+		e.FromObjectContainerID = fromID
+	default:
+		return nil, fmt.Errorf("don't know how to handle 'from' Container type %T", cmd.fromContainer)
+	}
+
+	toID := cmd.toContainer.ID()
+	switch cmd.toContainer.(type) {
+	case *Location:
+		_, found := z.locationsById[toID]
+		if !found {
+			return nil, fmt.Errorf("unknown 'to' Container/Location %q", toID)
+		}
+		e.ToLocationContainerID = toID
+	case *Actor:
+		_, found := z.actorsById[toID]
+		if !found {
+			return nil, fmt.Errorf("unknown 'to' Container/Actor %q", toID)
+		}
+		e.ToActorContainerID = toID
+	case *Object:
+		_, found := z.objectsById[toID]
+		if !found {
+			return nil, fmt.Errorf("unknown 'to' Container/Object %q", toID)
+		}
+		e.ToObjectContainerID = toID
+	default:
+		return nil, fmt.Errorf("don't know how to handle 'to' Container type %T", cmd.toContainer)
+	}
+
+	if len(cmd.fromContainer.Objects()) == cmd.fromContainer.Capacity() {
+		return nil, errors.New("")
 	}
 
 	e.SetSequenceNumber(z.nextSequenceId)
@@ -691,13 +753,22 @@ func (z *Zone) processObjectAdminRelocateCommand(c Command) ([]Event, error) {
 	cmd := c.(objectAdminRelocateCommand)
 	e := cmd.wrappedEvent
 
-	_, found := z.objectsById[e.ObjectID]
+	var found bool
+	_, found = z.objectsById[e.ObjectID]
 	if !found {
 		return nil, fmt.Errorf("no such Object with ID %q in Zone", e.ObjectID)
 	}
-	_, found = z.locationsById[e.ToLocationID]
+
+	switch {
+	case !uuid.Equal(e.ToLocationContainerID, uuid.Nil):
+		_, found = z.locationsById[e.ToLocationContainerID]
+	case !uuid.Equal(e.ToActorContainerID, uuid.Nil):
+		_, found = z.actorsById[e.ToActorContainerID]
+	case !uuid.Equal(e.ToObjectContainerID, uuid.Nil):
+		_, found = z.objectsById[e.ToObjectContainerID]
+	}
 	if !found {
-		return nil, fmt.Errorf("no such Location with ID %q in Zone", e.ToLocationID)
+		return nil, fmt.Errorf("no resolvable to-Container ID")
 	}
 
 	e.SetSequenceNumber(z.nextSequenceId)
@@ -710,9 +781,9 @@ func (z *Zone) processObjectRemoveFromZoneCommand(c Command) ([]Event, error) {
 	cmd := c.(objectRemoveFromZoneCommand)
 	e := cmd.wrappedEvent
 
-	_, found := z.objectsById[e.ObjectID()]
+	_, found := z.objectsById[e.ObjectID]
 	if !found {
-		return nil, fmt.Errorf("Object %q not found in Zone", e.ObjectID())
+		return nil, fmt.Errorf("Object %q not found in Zone", e.ObjectID)
 	}
 
 	e.SetSequenceNumber(z.nextSequenceId)
@@ -1046,50 +1117,79 @@ func (z *Zone) applyExitRemoveFromZoneEvent(e *ExitRemoveFromZoneEvent) error {
 }
 
 func (z *Zone) applyObjectAddToZoneEvent(e *ObjectAddToZoneEvent) (*Object, ObserverList, error) {
-	newLoc, ok := z.locationsById[e.startingLocationId]
-	if !ok {
-		return nil, nil, fmt.Errorf("unknown startingLocation %q", e.startingLocationId)
+	var container Container
+	var oList ObserverList
+
+	switch {
+	case !uuid.Equal(e.LocationContainerID, uuid.Nil):
+		container = z.locationsById[e.LocationContainerID]
+	case !uuid.Equal(e.ActorContainerID, uuid.Nil):
+		container = z.actorsById[e.ActorContainerID]
+	case !uuid.Equal(e.ObjectContainerID, uuid.Nil):
+		container = z.objectsById[e.ObjectContainerID]
 	}
 
-	obj := NewObject(e.objectId, e.name, newLoc, z)
-	err := newLoc.addObject(obj)
-	if err != nil {
-		return nil, nil, err
+	obj := NewObject(e.ObjectID, e.Name, container, z)
+	if container != nil {
+		err := container.addObject(obj)
+		if err != nil {
+			return nil, nil, err
+		}
+		oList = container.Observers()
+	} else {
+		fmt.Printf("WARNING: processing ObjectAddToZoneEvent with no resolvable Container\n")
 	}
-	obj.setLocation(newLoc)
+
+	obj.setContainer(container)
 	z.objectsById[obj.ID()] = obj
 
-	return obj, newLoc.Observers(), nil
+	return obj, oList, nil
 }
 
 func (z *Zone) applyObjectMoveEvent(e *ObjectMoveEvent) (ObserverList, error) {
-	fromLoc, ok := z.locationsById[e.fromLocationId]
-	if !ok {
-		return nil, fmt.Errorf("unknown from-location %q", e.fromLocationId)
-	}
-	toLoc, ok := z.locationsById[e.toLocationId]
-	if !ok {
-		return nil, fmt.Errorf("unknown to-location %q", e.toLocationId)
-	}
-	obj, ok := z.objectsById[e.objectId]
-	if !ok {
-		return nil, fmt.Errorf("unknown Object %q", e.objectId)
-	}
-
-	fromLoc.removeObject(obj)
-	err := toLoc.addObject(obj)
-	if err != nil {
-		return nil, err
-	}
-	obj.setLocation(toLoc)
-
+	var from, to Container
 	var oList ObserverList
-	for _, o := range fromLoc.Observers() {
-		oList = append(oList, o)
+
+	obj, found := z.objectsById[e.ObjectID]
+	if !found {
+		return nil, fmt.Errorf("cannot move non-existent object %q", e.ObjectID)
 	}
-	for _, o := range toLoc.Observers() {
-		oList = append(oList, o)
+
+	switch {
+	case !uuid.Equal(e.FromLocationContainerID, uuid.Nil):
+		from = z.locationsById[e.FromLocationContainerID]
+	case !uuid.Equal(e.FromActorContainerID, uuid.Nil):
+		from = z.actorsById[e.FromActorContainerID]
+	case !uuid.Equal(e.FromObjectContainerID, uuid.Nil):
+		from = z.objectsById[e.FromObjectContainerID]
 	}
+
+	switch {
+	case !uuid.Equal(e.ToLocationContainerID, uuid.Nil):
+		to = z.locationsById[e.ToLocationContainerID]
+	case !uuid.Equal(e.ToActorContainerID, uuid.Nil):
+		to = z.actorsById[e.ToActorContainerID]
+	case !uuid.Equal(e.ToObjectContainerID, uuid.Nil):
+		to = z.objectsById[e.ToObjectContainerID]
+	}
+
+	if from != nil {
+		from.removeObject(obj)
+		oList = from.Observers()
+	} else {
+		fmt.Printf("WARNING: applying ObjectMoveEvent with no resolvable 'from'\n")
+	}
+
+	if to != nil {
+		_ = to.addObject(obj)
+		oList = append(oList, to.Observers()...)
+	} else {
+		fmt.Printf("WARNING: applying ObjectMoveEvent with no resolvable 'to'\n")
+	}
+
+	obj.setContainer(to)
+
+	oList = oList.Dedupe()
 
 	return oList, nil
 }
@@ -1099,43 +1199,50 @@ func (z *Zone) applyObjectAdminRelocateEvent(e *ObjectAdminRelocateEvent) (Obser
 	if !found {
 		return nil, fmt.Errorf("no such Object with ID %q in Zone", e.ObjectID)
 	}
-	toLoc, found := z.locationsById[e.ToLocationID]
-	if !found {
-		return nil, fmt.Errorf("no such Location with ID %q in Zone", e.ToLocationID)
+	var to Container
+	switch {
+	case !uuid.Equal(e.ToLocationContainerID, uuid.Nil):
+		to = z.locationsById[e.ToLocationContainerID]
+	case !uuid.Equal(e.ToActorContainerID, uuid.Nil):
+		to = z.actorsById[e.ToActorContainerID]
+	case !uuid.Equal(e.ToObjectContainerID, uuid.Nil):
+		to = z.objectsById[e.ToObjectContainerID]
+	}
+	if to == nil {
+		return nil, fmt.Errorf("no resolvable to-Container")
 	}
 
 	var oList ObserverList
-	// It's possible the Object has been orphaned with no location, which is why we're
+	// It's possible the Object has been orphaned with no container, which is why we're
 	// relocating them. Otherwise, though, we need to remove them from their existing
-	// location.
-	fromLoc := obj.Location()
-	if fromLoc != nil {
-		fromLoc.removeObject(obj)
-		oList = fromLoc.Observers()
+	// container.
+	from := obj.Container()
+	if from != nil {
+		from.removeObject(obj)
+		oList = from.Observers()
 	}
-	err := toLoc.addObject(obj)
+	err := to.addObject(obj)
 	if err != nil {
 		return nil, err
 	}
-	obj.setLocation(toLoc)
-	oList = append(oList, toLoc.Observers()...)
-	z.sendEventToObservers(e, oList)
+	obj.setContainer(to)
+	oList = append(oList, to.Observers()...)
 
 	return oList, nil
 }
 
 func (z *Zone) applyObjectRemoveFromZoneEvent(e *ObjectRemoveFromZoneEvent) (ObserverList, error) {
-	object, found := z.objectsById[e.ObjectID()]
+	object, found := z.objectsById[e.ObjectID]
 	if !found {
-		return nil, fmt.Errorf("Object %q not found in Zone", e.ObjectID())
+		return nil, fmt.Errorf("Object %q not found in Zone", e.ObjectID)
 	}
-	oldLoc := object.Location()
-	oldLoc.removeObject(object)
-	object.setLocation(nil)
+	oldContainer := object.Container()
+	oldContainer.removeObject(object)
+	object.setContainer(nil)
 	object.setZone(nil)
 	delete(z.objectsById, object.ID())
 
-	oList := oldLoc.Observers()
+	oList := oldContainer.Observers()
 
 	return oList, nil
 }

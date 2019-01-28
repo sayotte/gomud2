@@ -150,7 +150,7 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMove
 }
 
 func (gh *gameHandler) handleEventObjectRemoved(terminalWidth int, e core.ObjectRemoveFromZoneEvent) ([]byte, error) {
-	return []byte(fmt.Sprintf("%s finally crumbles into dust.\n", e.Name())), nil
+	return []byte(fmt.Sprintf("%s finally crumbles into dust.\n", e.Name)), nil
 }
 
 var locationExitDisplayOrder = []string{
