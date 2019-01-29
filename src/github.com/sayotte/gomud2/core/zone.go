@@ -689,7 +689,13 @@ func (z *Zone) processObjectMoveCommand(c Command) ([]Event, error) {
 		return nil, errors.New("'from' Container does not currently contain Object")
 	}
 
-	e := NewObjectMoveEvent(cmd.obj.ID(), z.id)
+	if cmd.fromContainer.Location() != cmd.toContainer.Location() {
+		return nil, errors.New("cannot move an Object directly between Containers in different Locations")
+	}
+
+	if len(cmd.fromContainer.Objects()) >= cmd.fromContainer.Capacity() {
+		return nil, errors.New("would overflow container")
+	}
 
 	var actorID uuid.UUID
 	if cmd.actor != nil {
@@ -745,8 +751,15 @@ func (z *Zone) processObjectMoveCommand(c Command) ([]Event, error) {
 		return nil, fmt.Errorf("don't know how to handle 'to' Container type %T", cmd.toContainer)
 	}
 
-	if len(cmd.fromContainer.Objects()) == cmd.fromContainer.Capacity() {
-		return nil, errors.New("")
+	if uuid.Equal(e.FromActorContainerID, uuid.Nil) && uuid.Equal(e.ToActorContainerID, uuid.Nil) {
+		return nil, errors.New("illegal Object movement, must be to/from an Actor")
+	}
+
+	if !uuid.Equal(e.FromActorContainerID, uuid.Nil) && !uuid.Equal(e.ToActorContainerID, uuid.Nil) {
+		// actor -> actor movement, and recipient actor is also the one doing the movement
+		if uuid.Equal(e.ToActorContainerID, e.ActorID) {
+			return nil, errors.New("illegal Object movement, stealing not allowed")
+		}
 	}
 
 	e.SetSequenceNumber(z.nextSequenceId)
