@@ -33,11 +33,12 @@ func (ol ObserverList) Copy() ObserverList {
 }
 
 func (ol ObserverList) Dedupe() ObserverList {
-	out := make(ObserverList, len(ol))
+	out := make(ObserverList, 0, len(ol))
 	present := make(map[Observer]bool, len(ol))
 	for _, o := range ol {
 		if !present[o] {
 			out = append(out, o)
+			present[o] = true
 		}
 	}
 	return out

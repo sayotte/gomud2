@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/derekparker/trie"
 	"github.com/mitchellh/go-wordwrap"
+	"github.com/satori/go.uuid"
 	"github.com/sayotte/gomud2/auth"
 	"github.com/sayotte/gomud2/commands"
 	"github.com/sayotte/gomud2/core"
@@ -31,6 +32,7 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 	gh.cmdTrie.Add("look", gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandLook(terminalWidth)
 	}))
+	gh.cmdTrie.Add("take", gh.getTakeHandler())
 
 	gh.cmdTrie.Add(core.ExitDirectionNorth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionNorth)
@@ -54,6 +56,10 @@ func (gh *gameHandler) handleEvent(e core.Event, terminalWidth, terminalHeight i
 		typedE := e.(*core.ActorMoveEvent)
 		out, err := gh.handleEventActorMove(terminalWidth, typedE)
 		return out, gh, err
+	case core.EventTypeObjectMove:
+		typedE := e.(*core.ObjectMoveEvent)
+		out, err := gh.handleEventObjectMove(terminalWidth, typedE)
+		return out, gh, err
 	case core.EventTypeObjectRemoveFromZone:
 		typedE := e.(core.ObjectRemoveFromZoneEvent)
 		out, err := gh.handleEventObjectRemoved(terminalWidth, typedE)
@@ -74,6 +80,7 @@ func (gh *gameHandler) handleRxLine(lineB []byte, terminalWidth, terminalHeight 
 	if len(terms) == 0 {
 		return []byte(fmt.Sprintf("Unrecognized command %q, try \"commands\".\n", firstTerm)), gh, nil
 	}
+	sort.Strings(terms)
 	node, _ := gh.cmdTrie.Find(terms[0])
 	cmdHandler := node.Meta().(gameHandlerCommandHandler)
 
@@ -149,8 +156,127 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMove
 	}
 }
 
+func (gh *gameHandler) handleEventObjectMove(terminalWidth int, e *core.ObjectMoveEvent) ([]byte, error) {
+	var out string
+
+	zone := gh.actor.Zone()
+
+	resolveActor := func(id uuid.UUID, defaultVal string) string {
+		ret := defaultVal
+		actor := zone.ActorByID(id)
+		if actor != nil {
+			ret = actor.Name()
+		}
+		return ret
+	}
+	resolveObj := func(id uuid.UUID) string {
+		ret := "something"
+		obj := zone.ObjectByID(id)
+		if obj != nil {
+			ret = obj.Name()
+		}
+		return ret
+	}
+
+	who := resolveActor(e.ActorID, "Someone")
+	what := resolveObj(e.ObjectID)
+
+	// These are the valid cases, which should be guaranteed by the command handler.
+	// We simply ignore other cases-- they might be interesting, but this is a pretty annoying function
+	// as it is.
+	//| who == me? | fromActor | toActor | fromObject | toObject | fromLocation | toLocation | Description                                  |
+	//|------------+-----------+---------+------------+----------+--------------+------------+----------------------------------------------|
+	//| true       | me        | other   |            |          |              |            | You give X to <who>.                         |
+	//| true       | me        |         |            | Y        |              |            | You put X in Y.                              |
+	//| true       |           | me      | Y          |          |              |            | You take X from Y.                           |
+	//| true       | me        |         |            |          |              | Y          | You drop X on the ground.                    |
+	//| true       |           | me      |            |          | Y            |            | You pick up X from the ground.               |
+	//| false      | other     | me      |            |          |              |            | <who> gives you X.                           |
+	//| false      | other     |         |            | Y        |              |            | <who> puts X in Y.                           |
+	//| false      |           | other   | Y          |          |              |            | <who> takes X from Y.                        |
+	//| false      | other     |         |            |          |              | Y          | <who> drops X on the ground.                 |
+	//| false      |           | other   |            |          | Y            |            | <who> picks up X from the ground.            |
+
+	if uuid.Equal(e.ActorID, gh.actor.ID()) {
+		switch {
+		case !uuid.Equal(e.FromActorContainerID, uuid.Nil) && !uuid.Equal(e.ToActorContainerID, uuid.Nil):
+			// me -> actor
+			toWhom := resolveActor(e.ToActorContainerID, "someone")
+			out = fmt.Sprintf("You give %s to %s.\n", what, toWhom)
+		case !uuid.Equal(e.ToObjectContainerID, uuid.Nil):
+			// me -> container
+			intoWhat := resolveObj(e.ToObjectContainerID)
+			out = fmt.Sprintf("You put %s into %s.\n", what, intoWhat)
+		case !uuid.Equal(e.FromObjectContainerID, uuid.Nil):
+			// container -> me
+			fromWhat := resolveObj(e.FromObjectContainerID)
+			out = fmt.Sprintf("You take %s from %s.\n", what, fromWhat)
+		case !uuid.Equal(e.ToLocationContainerID, uuid.Nil):
+			// me -> ground
+			out = fmt.Sprintf("You drop %s on the ground.\n", what)
+		case !uuid.Equal(e.FromLocationContainerID, uuid.Nil):
+			// ground -> me
+			out = fmt.Sprintf("You pick up %s from the ground.\n", what)
+		}
+	} else {
+		switch {
+		case !uuid.Equal(e.FromActorContainerID, uuid.Nil) && !uuid.Equal(e.ToActorContainerID, uuid.Nil):
+			// actor -> me
+			out = fmt.Sprintf("%s gives you %s.\n", who, what)
+		case !uuid.Equal(e.ToObjectContainerID, uuid.Nil):
+			// actor -> container
+			intoWhat := resolveObj(e.ToObjectContainerID)
+			out = fmt.Sprintf("%s puts %s into %s.\n", who, what, intoWhat)
+		case !uuid.Equal(e.FromActorContainerID, uuid.Nil):
+			// container -> actor
+			fromWhat := resolveObj(e.FromObjectContainerID)
+			out = fmt.Sprintf("%s takes %s from %s.\n", who, what, fromWhat)
+		case !uuid.Equal(e.ToLocationContainerID, uuid.Nil):
+			// actor -> ground
+			out = fmt.Sprintf("%s drops %s on the ground.\n", who, what)
+		case !uuid.Equal(e.FromLocationContainerID, uuid.Nil):
+			// ground -> actor
+			out = fmt.Sprintf("%s picks up %s from the ground.\n", who, what)
+		}
+	}
+
+	return []byte(out), nil
+}
+
 func (gh *gameHandler) handleEventObjectRemoved(terminalWidth int, e core.ObjectRemoveFromZoneEvent) ([]byte, error) {
 	return []byte(fmt.Sprintf("%s finally crumbles into dust.\n", e.Name)), nil
+}
+
+func (gh *gameHandler) getTakeHandler() gameHandlerCommandHandler {
+	return func(line string, terminalWidth int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) == 0 {
+			return []byte("Usage: take <object keyword>\n"), nil
+		}
+
+		targetKeyword := strings.ToLower(params[0])
+		var targetObj *core.Object
+		for _, obj := range gh.actor.Location().Objects() {
+			if strings.HasPrefix(obj.Name(), targetKeyword) {
+				targetObj = obj
+				break
+			}
+		}
+		if targetObj == nil {
+			return []byte(fmt.Sprintf("Take what again? I can't find a %q.\n", targetKeyword)), nil
+		}
+
+		if len(gh.actor.Objects()) >= gh.actor.Capacity() {
+			return []byte("You have no room for that in your inventory!\n"), nil
+		}
+
+		err := targetObj.Move(gh.actor.Location(), gh.actor, gh.actor)
+		if err != nil {
+			return []byte("Whoops...\n"), fmt.Errorf("Object.Move(Location, Actor): %s", err)
+		}
+
+		return nil, nil
+	}
 }
 
 var locationExitDisplayOrder = []string{
