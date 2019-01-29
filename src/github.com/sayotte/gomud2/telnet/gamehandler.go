@@ -33,6 +33,7 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 		return gh.handleCommandLook(terminalWidth)
 	}))
 	gh.cmdTrie.Add("take", gh.getTakeHandler())
+	gh.cmdTrie.Add("inventory", gh.getInventoryHandler())
 
 	gh.cmdTrie.Add(core.ExitDirectionNorth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionNorth)
@@ -276,6 +277,17 @@ func (gh *gameHandler) getTakeHandler() gameHandlerCommandHandler {
 		}
 
 		return nil, nil
+	}
+}
+
+func (gh *gameHandler) getInventoryHandler() gameHandlerCommandHandler {
+	return func(line string, terminalWidth int) ([]byte, error) {
+		var objNames []string
+		for _, obj := range gh.actor.Objects() {
+			objNames = append(objNames, obj.Name())
+		}
+
+		return []byte(fmt.Sprintf("Inventory contents:\n%s\n\n", strings.Join(objNames, "\n"))), nil
 	}
 }
 
