@@ -53,6 +53,10 @@ func (o *Object) setContainer(c Container) {
 	o.container = c
 }
 
+func (o *Object) Location() *Location {
+	return o.container.Location()
+}
+
 func (o *Object) Zone() *Zone {
 	return o.zone
 }
@@ -91,8 +95,8 @@ func (o *Object) Observers() ObserverList {
 	return o.container.Observers()
 }
 
-func (o *Object) Move(from, to Container) error {
-	cmd := newObjectMoveCommand(o, from, to)
+func (o *Object) Move(from, to Container, who *Actor) error {
+	cmd := newObjectMoveCommand(o, who, from, to)
 	_, err := o.syncRequestToZone(cmd)
 	return err
 }
@@ -236,10 +240,11 @@ type ObjectRemoveFromZoneEvent struct {
 	Name     string
 }
 
-func newObjectMoveCommand(obj *Object, fromContainer, toContainer Container) objectMoveCommand {
+func newObjectMoveCommand(obj *Object, actor *Actor, fromContainer, toContainer Container) objectMoveCommand {
 	return objectMoveCommand{
 		commandGeneric: commandGeneric{commandType: CommandTypeObjectMove},
 		obj:            obj,
+		actor:          actor,
 		fromContainer:  fromContainer,
 		toContainer:    toContainer,
 	}
@@ -248,11 +253,12 @@ func newObjectMoveCommand(obj *Object, fromContainer, toContainer Container) obj
 type objectMoveCommand struct {
 	commandGeneric
 	obj           *Object
+	actor         *Actor
 	fromContainer Container
 	toContainer   Container
 }
 
-func NewObjectMoveEvent(objID, zoneID uuid.UUID) *ObjectMoveEvent {
+func NewObjectMoveEvent(objID, actorID, zoneID uuid.UUID) *ObjectMoveEvent {
 	return &ObjectMoveEvent{
 		eventGeneric: &eventGeneric{
 			eventType:     EventTypeObjectMove,
@@ -261,12 +267,14 @@ func NewObjectMoveEvent(objID, zoneID uuid.UUID) *ObjectMoveEvent {
 			shouldPersist: true,
 		},
 		ObjectID: objID,
+		ActorID:  actorID,
 	}
 }
 
 type ObjectMoveEvent struct {
 	*eventGeneric
 	ObjectID                                                             uuid.UUID
+	ActorID                                                              uuid.UUID
 	FromLocationContainerID, FromActorContainerID, FromObjectContainerID uuid.UUID
 	ToLocationContainerID, ToActorContainerID, ToObjectContainerID       uuid.UUID
 }

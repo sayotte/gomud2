@@ -128,6 +128,12 @@ func (l *Location) ContainsObject(o *Object) bool {
 	return err == nil
 }
 
+// Location() implements the Container interface, by returning the receiver
+// *Location.
+func (l *Location) Location() *Location {
+	return l
+}
+
 func (l Location) OutExits() ExitList {
 	return l.outExits.Copy()
 }

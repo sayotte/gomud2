@@ -691,6 +691,12 @@ func (z *Zone) processObjectMoveCommand(c Command) ([]Event, error) {
 
 	e := NewObjectMoveEvent(cmd.obj.ID(), z.id)
 
+	var actorID uuid.UUID
+	if cmd.actor != nil {
+		actorID = cmd.actor.ID()
+	}
+	e := NewObjectMoveEvent(cmd.obj.ID(), actorID, z.id)
+
 	fromID := cmd.fromContainer.ID()
 	switch cmd.fromContainer.(type) {
 	case *Location:

@@ -82,6 +82,7 @@ func (orfze *objectRemoveFromZoneEvent) SetHeader(h eventHeader) {
 type objectMoveEvent struct {
 	header                                                               eventHeader
 	ObjectID                                                             uuid.UUID
+	ActorID                                                              uuid.UUID
 	FromLocationContainerID, FromActorContainerID, FromObjectContainerID uuid.UUID
 	ToLocationContainerID, ToActorContainerID, ToObjectContainerID       uuid.UUID
 }
@@ -91,6 +92,7 @@ func (ome *objectMoveEvent) FromDomain(e core.Event) {
 	*ome = objectMoveEvent{
 		header:                  eventHeaderFromDomainEvent(from),
 		ObjectID:                from.ObjectID,
+		ActorID:                 from.ActorID,
 		FromLocationContainerID: from.FromLocationContainerID,
 		FromActorContainerID:    from.FromActorContainerID,
 		FromObjectContainerID:   from.FromObjectContainerID,
@@ -103,6 +105,7 @@ func (ome *objectMoveEvent) FromDomain(e core.Event) {
 func (ome objectMoveEvent) ToDomain() core.Event {
 	e := core.NewObjectMoveEvent(
 		ome.ObjectID,
+		ome.ActorID,
 		ome.header.AggregateId,
 	)
 	e.FromLocationContainerID = ome.FromLocationContainerID
