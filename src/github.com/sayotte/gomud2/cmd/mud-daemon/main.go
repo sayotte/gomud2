@@ -157,6 +157,7 @@ func initStartingWorld(worldConfigFile string) error {
 	objPrim := core.NewObject(
 		gouuid.Nil,
 		"a crumpled up napkin",
+		[]string{"napkin"},
 		loc1,
 		z,
 	)
