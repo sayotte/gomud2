@@ -259,9 +259,12 @@ func (gh *gameHandler) getTakeHandler() gameHandlerCommandHandler {
 		targetKeyword := strings.ToLower(params[0])
 		var targetObj *core.Object
 		for _, obj := range gh.actor.Location().Objects() {
-			if strings.HasPrefix(obj.Name(), targetKeyword) {
-				targetObj = obj
-				break
+			keywords := obj.Keywords()
+			for _, kw := range keywords {
+				if strings.HasPrefix(kw, targetKeyword) {
+					targetObj = obj
+					break
+				}
 			}
 		}
 		if targetObj == nil {
@@ -291,9 +294,11 @@ func (gh *gameHandler) getDropHandler() gameHandlerCommandHandler {
 		targetKeyword := strings.ToLower(params[0])
 		var targetObj *core.Object
 		for _, obj := range gh.actor.Objects() {
-			if strings.HasPrefix(obj.Name(), targetKeyword) {
-				targetObj = obj
-				break
+			for _, kw := range obj.Keywords() {
+				if strings.HasPrefix(kw, targetKeyword) {
+					targetObj = obj
+					break
+				}
 			}
 		}
 		if targetObj == nil {
