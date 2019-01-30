@@ -157,6 +157,7 @@ func initStartingWorld(worldConfigFile string) error {
 	objPrim := core.NewObject(
 		gouuid.Nil,
 		"a crumpled up napkin",
+		"This was once the sort of napkin that bartenders put down so your drink doesn't leave a wet ring on the bar. Now it's crumpled into a ball.",
 		[]string{"napkin"},
 		loc1,
 		0,
@@ -170,6 +171,7 @@ func initStartingWorld(worldConfigFile string) error {
 	bagPrim := core.NewObject(
 		gouuid.Nil,
 		"a shopping bag",
+		"A brown-paper bag, with the little twisted-paper handles that bougie department stores like to use so their customers can feel like they're not harming the environment when they purchase products made of processed, bleached baby animal souls.",
 		[]string{"bag"},
 		loc1,
 		20,

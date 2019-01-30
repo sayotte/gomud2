@@ -9,7 +9,7 @@ import (
 	myuuid "github.com/sayotte/gomud2/uuid"
 )
 
-func NewObject(id uuid.UUID, name string, keywords []string, container Container, capacity int, zone *Zone) *Object {
+func NewObject(id uuid.UUID, name, desc string, keywords []string, container Container, capacity int, zone *Zone) *Object {
 	newID := id
 	if uuid.Equal(id, uuid.Nil) {
 		newID = myuuid.NewId()
@@ -17,6 +17,7 @@ func NewObject(id uuid.UUID, name string, keywords []string, container Container
 	return &Object{
 		id:                newID,
 		name:              name,
+		description:       desc,
 		keywords:          keywords,
 		container:         container,
 		containerCapacity: capacity,
@@ -26,11 +27,12 @@ func NewObject(id uuid.UUID, name string, keywords []string, container Container
 }
 
 type Object struct {
-	id        uuid.UUID
-	name      string
-	keywords  []string
-	container Container
-	zone      *Zone
+	id          uuid.UUID
+	name        string
+	description string
+	keywords    []string
+	container   Container
+	zone        *Zone
 
 	containerCapacity int
 	containedObjects  ObjectList
@@ -46,6 +48,10 @@ func (o Object) ID() uuid.UUID {
 
 func (o Object) Name() string {
 	return o.name
+}
+
+func (o Object) Description() string {
+	return o.description
 }
 
 func (o Object) Keywords() []string {
@@ -136,6 +142,7 @@ func (o *Object) syncRequestToZone(c Command) (interface{}, error) {
 func (o Object) snapshot(sequenceNum uint64) Event {
 	e := NewObjectAddToZoneEvent(
 		o.name,
+		o.description,
 		o.keywords,
 		o.containerCapacity,
 		o.id,
@@ -197,7 +204,7 @@ type objectAddToZoneCommand struct {
 	wrappedEvent *ObjectAddToZoneEvent
 }
 
-func NewObjectAddToZoneEvent(name string, keywords []string, capacity int, objectId, locationContainerID, actorContainerID, objectContainerID, zoneId uuid.UUID) *ObjectAddToZoneEvent {
+func NewObjectAddToZoneEvent(name, desc string, keywords []string, capacity int, objectId, locationContainerID, actorContainerID, objectContainerID, zoneId uuid.UUID) *ObjectAddToZoneEvent {
 	return &ObjectAddToZoneEvent{
 		eventGeneric: &eventGeneric{
 			eventType:     EventTypeObjectAddToZone,
@@ -207,6 +214,7 @@ func NewObjectAddToZoneEvent(name string, keywords []string, capacity int, objec
 		},
 		ObjectID:            objectId,
 		Name:                name,
+		Description:         desc,
 		Keywords:            keywords,
 		LocationContainerID: locationContainerID,
 		ActorContainerID:    actorContainerID,
@@ -218,7 +226,7 @@ func NewObjectAddToZoneEvent(name string, keywords []string, capacity int, objec
 type ObjectAddToZoneEvent struct {
 	*eventGeneric
 	ObjectID                                                 uuid.UUID
-	Name                                                     string
+	Name, Description                                        string
 	Keywords                                                 []string
 	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
 	Capacity                                                 int
@@ -324,7 +332,7 @@ type ObjectAdminRelocateEvent struct {
 	ToLocationContainerID, ToActorContainerID, ToObjectContainerID uuid.UUID
 }
 
-func NewObjectMigrateInEvent(name string, keywords []string, capacity int, objID, fromZoneID, locContainerID, actorContainerID, objContainerID, zoneID uuid.UUID) *ObjectMigrateInEvent {
+func NewObjectMigrateInEvent(name, desc string, keywords []string, capacity int, objID, fromZoneID, locContainerID, actorContainerID, objContainerID, zoneID uuid.UUID) *ObjectMigrateInEvent {
 	return &ObjectMigrateInEvent{
 		eventGeneric: &eventGeneric{
 			eventType:     EventTypeObjectMigrateIn,
@@ -334,6 +342,7 @@ func NewObjectMigrateInEvent(name string, keywords []string, capacity int, objID
 		},
 		ObjectID:            objID,
 		Name:                name,
+		Description:         desc,
 		Keywords:            keywords,
 		FromZoneID:          fromZoneID,
 		LocationContainerID: locContainerID,
@@ -346,7 +355,7 @@ func NewObjectMigrateInEvent(name string, keywords []string, capacity int, objID
 type ObjectMigrateInEvent struct {
 	*eventGeneric
 	ObjectID                                                 uuid.UUID
-	Name                                                     string
+	Name, Description                                        string
 	Keywords                                                 []string
 	FromZoneID                                               uuid.UUID
 	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID

@@ -8,7 +8,7 @@ import (
 type objectAddToZoneEvent struct {
 	header                                                   eventHeader
 	ObjectId                                                 uuid.UUID
-	Name                                                     string
+	Name, Description                                        string
 	Keywords                                                 []string
 	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
 	Capacity                                                 int
@@ -25,6 +25,7 @@ func (oatze *objectAddToZoneEvent) FromDomain(e core.Event) {
 		},
 		ObjectId:            from.ObjectID,
 		Name:                from.Name,
+		Description:         from.Description,
 		Keywords:            from.Keywords,
 		LocationContainerID: from.LocationContainerID,
 		ActorContainerID:    from.ActorContainerID,
@@ -36,6 +37,7 @@ func (oatze *objectAddToZoneEvent) FromDomain(e core.Event) {
 func (oatze objectAddToZoneEvent) ToDomain() core.Event {
 	e := core.NewObjectAddToZoneEvent(
 		oatze.Name,
+		oatze.Description,
 		oatze.Keywords,
 		oatze.Capacity,
 		oatze.ObjectId,
@@ -171,7 +173,7 @@ func (oare *objectAdminRelocateEvent) SetHeader(h eventHeader) {
 type objectMigrateInEvent struct {
 	header                                                   eventHeader
 	ObjectID                                                 uuid.UUID
-	Name                                                     string
+	Name, Description                                        string
 	Keywords                                                 []string
 	FromZoneID                                               uuid.UUID
 	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
@@ -184,6 +186,7 @@ func (omie *objectMigrateInEvent) FromDomain(e core.Event) {
 		header:              eventHeaderFromDomainEvent(from),
 		ObjectID:            from.ObjectID,
 		Name:                from.Name,
+		Description:         from.Description,
 		Keywords:            from.Keywords,
 		FromZoneID:          from.FromZoneID,
 		LocationContainerID: from.LocationContainerID,
@@ -196,6 +199,7 @@ func (omie *objectMigrateInEvent) FromDomain(e core.Event) {
 func (omie objectMigrateInEvent) ToDomain() core.Event {
 	e := core.NewObjectMigrateInEvent(
 		omie.Name,
+		omie.Description,
 		omie.Keywords,
 		omie.Capacity,
 		omie.ObjectID,
