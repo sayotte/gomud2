@@ -11,6 +11,7 @@ type objectAddToZoneEvent struct {
 	Name                                                     string
 	Keywords                                                 []string
 	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
+	Capacity                                                 int
 }
 
 func (oatze *objectAddToZoneEvent) FromDomain(e core.Event) {
@@ -28,6 +29,7 @@ func (oatze *objectAddToZoneEvent) FromDomain(e core.Event) {
 		LocationContainerID: from.LocationContainerID,
 		ActorContainerID:    from.ActorContainerID,
 		ObjectContainerID:   from.ObjectContainerID,
+		Capacity:            from.Capacity,
 	}
 }
 
@@ -35,6 +37,7 @@ func (oatze objectAddToZoneEvent) ToDomain() core.Event {
 	e := core.NewObjectAddToZoneEvent(
 		oatze.Name,
 		oatze.Keywords,
+		oatze.Capacity,
 		oatze.ObjectId,
 		oatze.LocationContainerID,
 		oatze.ActorContainerID,
@@ -172,6 +175,7 @@ type objectMigrateInEvent struct {
 	Keywords                                                 []string
 	FromZoneID                                               uuid.UUID
 	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
+	Capacity                                                 int
 }
 
 func (omie *objectMigrateInEvent) FromDomain(e core.Event) {
@@ -185,6 +189,7 @@ func (omie *objectMigrateInEvent) FromDomain(e core.Event) {
 		LocationContainerID: from.LocationContainerID,
 		ActorContainerID:    from.ActorContainerID,
 		ObjectContainerID:   from.ObjectContainerID,
+		Capacity:            from.Capacity,
 	}
 }
 
@@ -192,6 +197,7 @@ func (omie objectMigrateInEvent) ToDomain() core.Event {
 	e := core.NewObjectMigrateInEvent(
 		omie.Name,
 		omie.Keywords,
+		omie.Capacity,
 		omie.ObjectID,
 		omie.FromZoneID,
 		omie.LocationContainerID,

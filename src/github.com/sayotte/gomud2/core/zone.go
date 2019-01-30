@@ -508,6 +508,7 @@ func (z *Zone) processActorMigrateInCommand(c Command) (interface{}, []Event, er
 		objEv := NewObjectMigrateInEvent(
 			objContTuple.obj.Name(),
 			objContTuple.obj.Keywords(),
+			objContTuple.obj.Capacity(),
 			objContTuple.obj.ID(),
 			cmd.from.Zone().ID(),
 			locContID,
@@ -1307,7 +1308,7 @@ func (z *Zone) applyObjectAddToZoneEvent(e *ObjectAddToZoneEvent) (*Object, Obse
 		container = z.objectsById[e.ObjectContainerID]
 	}
 
-	obj := NewObject(e.ObjectID, e.Name, e.Keywords, container, z)
+	obj := NewObject(e.ObjectID, e.Name, e.Keywords, container, e.Capacity, z)
 	if container != nil {
 		err := container.addObject(obj)
 		if err != nil {
@@ -1437,7 +1438,7 @@ func (z *Zone) applyObjectMigrateInEvent(e *ObjectMigrateInEvent) error {
 		container = z.objectsById[e.ObjectContainerID]
 	}
 
-	obj := NewObject(e.ObjectID, e.Name, e.Keywords, container, z)
+	obj := NewObject(e.ObjectID, e.Name, e.Keywords, container, e.Capacity, z)
 	if container != nil {
 		err := container.addObject(obj)
 		if err != nil {

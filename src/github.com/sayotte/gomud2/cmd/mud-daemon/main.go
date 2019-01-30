@@ -159,9 +159,23 @@ func initStartingWorld(worldConfigFile string) error {
 		"a crumpled up napkin",
 		[]string{"napkin"},
 		loc1,
+		0,
 		z,
 	)
 	_, err = z.AddObject(objPrim, loc1)
+	if err != nil {
+		panic(err)
+	}
+
+	bagPrim := core.NewObject(
+		gouuid.Nil,
+		"a shopping bag",
+		[]string{"bag"},
+		loc1,
+		20,
+		z,
+	)
+	_, err = z.AddObject(bagPrim, loc1)
 	if err != nil {
 		panic(err)
 	}
