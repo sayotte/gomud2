@@ -34,6 +34,7 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 	gh.cmdTrie.Add("look", gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandLook(terminalWidth)
 	}))
+	gh.cmdTrie.Add("put", gh.getPutHandler())
 	gh.cmdTrie.Add("take", gh.getTakeHandler())
 
 	gh.cmdTrie.Add(core.ExitDirectionNorth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
@@ -318,6 +319,52 @@ func (gh *gameHandler) getDropHandler() gameHandlerCommandHandler {
 		err := targetObj.Move(gh.actor, gh.actor.Location(), gh.actor)
 		if err != nil {
 			return []byte("Whoops...\n"), fmt.Errorf("Object.Move(Actor, Location): %s", err)
+		}
+
+		return nil, nil
+	}
+}
+
+func (gh *gameHandler) getPutHandler() gameHandlerCommandHandler {
+	return func(line string, terminalWidth int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) <= 1 {
+			return []byte("Usage: put <object keyword> <container keyword>\n"), nil
+		}
+
+		// Decide which object we're putting
+		targetKeyword := strings.ToLower(params[0])
+		targetObj := keywordMatch(targetKeyword, gh.actor.Objects())
+		if targetObj == nil {
+			return []byte(fmt.Sprintf("Put what, exactly? There's no %q in your inventory.\n", targetKeyword)), nil
+		}
+
+		// Decide where we're putting it
+		var container core.Container
+		contKeyword := strings.ToLower(params[1])
+		// first check inventory
+		// note I'm working around a weirdness with nil-checking interface variables, see: https://gist.github.com/sayotte/450e5105f5004487646f84b3dc48e910
+		contObj := keywordMatch(contKeyword, gh.actor.Objects())
+		if contObj != nil {
+			container = contObj
+			goto foundContainer
+		}
+		// if that fails, check containers on the ground
+		contObj = keywordMatch(contKeyword, gh.actor.Location().Objects())
+		if contObj != nil {
+			container = contObj
+			goto foundContainer
+		}
+		return []byte(fmt.Sprintf("Put it where, exactly? I can't find a %q container.\n", contKeyword)), nil
+	foundContainer:
+
+		if len(container.Objects()) >= container.Capacity() {
+			return []byte("That container can't hold any more.\n"), nil
+		}
+
+		err := targetObj.Move(targetObj.Container(), container, gh.actor)
+		if err != nil {
+			return []byte("Whoops...\n"), fmt.Errorf("Object.Move(Actor, Container): %s", err)
 		}
 
 		return nil, nil
