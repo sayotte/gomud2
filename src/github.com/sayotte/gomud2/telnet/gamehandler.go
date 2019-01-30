@@ -256,17 +256,35 @@ func (gh *gameHandler) getTakeHandler() gameHandlerCommandHandler {
 			return []byte("Usage: take <object keyword>\n"), nil
 		}
 
+		// Decide where we're taking the object from
+		var container core.Container
+		if len(params) == 1 {
+			container = gh.actor.Location() // default to the ground
+		} else {
+			contKeyword := strings.ToLower(params[1])
+
+			// first check inventory
+			contObj := keywordMatch(contKeyword, gh.actor.Objects())
+			if contObj != nil {
+				container = contObj
+				goto foundContainer
+			}
+
+			// if that fails, check containers on the ground
+			contObj = keywordMatch(contKeyword, gh.actor.Location().Objects())
+			if contObj != nil {
+				container = contObj
+				goto foundContainer
+			}
+
+			return []byte(fmt.Sprintf("Take from where? I can't find a %q.\n", contKeyword)), nil
+		}
+	foundContainer:
+
+		// Decide which object we're taking
 		targetKeyword := strings.ToLower(params[0])
 		var targetObj *core.Object
-		for _, obj := range gh.actor.Location().Objects() {
-			keywords := obj.Keywords()
-			for _, kw := range keywords {
-				if strings.HasPrefix(kw, targetKeyword) {
-					targetObj = obj
-					break
-				}
-			}
-		}
+		targetObj = keywordMatch(targetKeyword, container.Objects())
 		if targetObj == nil {
 			return []byte(fmt.Sprintf("Take what again? I can't find a %q.\n", targetKeyword)), nil
 		}
@@ -275,9 +293,9 @@ func (gh *gameHandler) getTakeHandler() gameHandlerCommandHandler {
 			return []byte("You have no room for that in your inventory!\n"), nil
 		}
 
-		err := targetObj.Move(gh.actor.Location(), gh.actor, gh.actor)
+		err := targetObj.Move(container, gh.actor, gh.actor)
 		if err != nil {
-			return []byte("Whoops...\n"), fmt.Errorf("Object.Move(Location, Actor): %s", err)
+			return []byte("Whoops...\n"), fmt.Errorf("Object.Move(Container, Actor): %s", err)
 		}
 
 		return nil, nil
@@ -292,15 +310,7 @@ func (gh *gameHandler) getDropHandler() gameHandlerCommandHandler {
 		}
 
 		targetKeyword := strings.ToLower(params[0])
-		var targetObj *core.Object
-		for _, obj := range gh.actor.Objects() {
-			for _, kw := range obj.Keywords() {
-				if strings.HasPrefix(kw, targetKeyword) {
-					targetObj = obj
-					break
-				}
-			}
-		}
+		targetObj := keywordMatch(targetKeyword, gh.actor.Objects())
 		if targetObj == nil {
 			return []byte(fmt.Sprintf("Drop what again? I can't find a %q.\n", targetKeyword)), nil
 		}
@@ -430,4 +440,15 @@ func summarizeCommands(cmdTrie *trie.Trie, terminalWidth int) []byte {
 	output += "\n"
 
 	return []byte(output)
+}
+
+func keywordMatch(keyword string, candidateObjs []*core.Object) *core.Object {
+	for _, obj := range candidateObjs {
+		for _, kw := range obj.Keywords() {
+			if strings.HasPrefix(kw, keyword) {
+				return obj
+			}
+		}
+	}
+	return nil
 }
