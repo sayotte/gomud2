@@ -9,6 +9,8 @@ const (
 	EventTypeActorAdminRelocate
 	EventTypeActorAddToZone
 	EventTypeActorRemoveFromZone
+	EventTypeActorMigrateIn
+	EventTypeActorMigrateOut
 	EventTypeLocationAddToZone
 	EventTypeLocationRemoveFromZone
 	EventTypeLocationUpdate
@@ -19,6 +21,8 @@ const (
 	EventTypeObjectRemoveFromZone
 	EventTypeObjectMove
 	EventTypeObjectAdminRelocate
+	EventTypeObjectMigrateIn
+	EventTypeObjectMigrateOut
 	EventTypeZoneSetDefaultLocation
 )
 

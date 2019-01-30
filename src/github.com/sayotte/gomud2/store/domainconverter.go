@@ -31,6 +31,10 @@ func writeEvent(e core.Event, outStream io.Writer, useCompression bool) error {
 		frommer = &actorAdminRelocateEvent{}
 	case core.EventTypeActorRemoveFromZone:
 		frommer = &actorRemoveFromZoneEvent{}
+	case core.EventTypeActorMigrateIn:
+		frommer = &actorMigrateInEvent{}
+	case core.EventTypeActorMigrateOut:
+		frommer = &actorMigrateOutEvent{}
 	case core.EventTypeLocationAddToZone:
 		frommer = &locationAddToZoneEvent{}
 	case core.EventTypeLocationRemoveFromZone:
@@ -51,6 +55,10 @@ func writeEvent(e core.Event, outStream io.Writer, useCompression bool) error {
 		frommer = &objectMoveEvent{}
 	case core.EventTypeObjectAdminRelocate:
 		frommer = &objectAdminRelocateEvent{}
+	case core.EventTypeObjectMigrateIn:
+		frommer = &objectMigrateInEvent{}
+	case core.EventTypeObjectMigrateOut:
+		frommer = &objectMigrateOutEvent{}
 	case core.EventTypeZoneSetDefaultLocation:
 		frommer = &zoneSetDefaultLocationEvent{}
 	default:
@@ -132,6 +140,10 @@ func readEvent(inStream io.Reader) (core.Event, error) {
 		toEr = &actorAdminRelocateEvent{}
 	case core.EventTypeActorRemoveFromZone:
 		toEr = &actorRemoveFromZoneEvent{}
+	case core.EventTypeActorMigrateIn:
+		toEr = &actorMigrateInEvent{}
+	case core.EventTypeActorMigrateOut:
+		toEr = &actorMigrateOutEvent{}
 	case core.EventTypeLocationAddToZone:
 		toEr = &locationAddToZoneEvent{}
 	case core.EventTypeLocationRemoveFromZone:
@@ -152,6 +164,10 @@ func readEvent(inStream io.Reader) (core.Event, error) {
 		toEr = &objectMoveEvent{}
 	case core.EventTypeObjectAdminRelocate:
 		toEr = &objectAdminRelocateEvent{}
+	case core.EventTypeObjectMigrateIn:
+		toEr = &objectMigrateInEvent{}
+	case core.EventTypeObjectMigrateOut:
+		toEr = &objectMigrateOutEvent{}
 	case core.EventTypeZoneSetDefaultLocation:
 		toEr = &zoneSetDefaultLocationEvent{}
 	}

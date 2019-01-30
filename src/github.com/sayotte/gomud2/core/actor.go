@@ -338,3 +338,81 @@ type ActorRemoveFromZoneEvent struct {
 func (arfze ActorRemoveFromZoneEvent) ActorID() uuid.UUID {
 	return arfze.actorID
 }
+
+func newActorMigrateInCommand(actor *Actor, from, to *Location, oList ObserverList) *actorMigrateInCommand {
+	return &actorMigrateInCommand{
+		commandGeneric{commandType: CommandTypeActorMigrateIn},
+		actor,
+		from,
+		to,
+		oList,
+	}
+}
+
+type actorMigrateInCommand struct {
+	commandGeneric
+	actor     *Actor
+	from, to  *Location
+	observers ObserverList
+}
+
+func NewActorMigrateInEvent(name string, actorID, fromLocID, fromZoneID, toLocID, zoneID uuid.UUID) *ActorMigrateInEvent {
+	return &ActorMigrateInEvent{
+		eventGeneric: &eventGeneric{
+			eventType:     EventTypeActorMigrateIn,
+			version:       1,
+			aggregateId:   zoneID,
+			shouldPersist: true,
+		},
+		Name:       name,
+		ActorID:    actorID,
+		FromLocID:  fromLocID,
+		FromZoneID: fromZoneID,
+		ToLocID:    toLocID,
+	}
+}
+
+type ActorMigrateInEvent struct {
+	*eventGeneric
+	ActorID               uuid.UUID
+	Name                  string
+	FromLocID, FromZoneID uuid.UUID
+	ToLocID               uuid.UUID
+}
+
+func newActorMigrateOutCommand(actor *Actor, from, to *Location) *actorMigrateOutCommand {
+	return &actorMigrateOutCommand{
+		commandGeneric{commandType: CommandTypeActorMigrateOut},
+		actor,
+		from,
+		to,
+	}
+}
+
+type actorMigrateOutCommand struct {
+	commandGeneric
+	actor    *Actor
+	from, to *Location
+}
+
+func NewActorMigrateOutEvent(actorID, fromLocID, toLocID, toZoneID, zoneID uuid.UUID) *ActorMigrateOutEvent {
+	return &ActorMigrateOutEvent{
+		eventGeneric: &eventGeneric{
+			eventType:     EventTypeActorMigrateOut,
+			version:       1,
+			aggregateId:   zoneID,
+			shouldPersist: true,
+		},
+		ActorID:   actorID,
+		FromLocID: fromLocID,
+		ToLocID:   toLocID,
+		ToZoneID:  toZoneID,
+	}
+}
+
+type ActorMigrateOutEvent struct {
+	*eventGeneric
+	ActorID           uuid.UUID
+	FromLocID         uuid.UUID
+	ToLocID, ToZoneID uuid.UUID
+}

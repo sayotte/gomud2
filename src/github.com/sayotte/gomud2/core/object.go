@@ -308,3 +308,49 @@ type ObjectAdminRelocateEvent struct {
 	ObjectID                                                       uuid.UUID
 	ToLocationContainerID, ToActorContainerID, ToObjectContainerID uuid.UUID
 }
+
+func NewObjectMigrateInEvent(name string, objID, fromZoneID, locContainerID, actorContainerID, objContainerID, zoneID uuid.UUID) *ObjectMigrateInEvent {
+	return &ObjectMigrateInEvent{
+		eventGeneric: &eventGeneric{
+			eventType:     EventTypeObjectMigrateIn,
+			version:       1,
+			aggregateId:   zoneID,
+			shouldPersist: true,
+		},
+		ObjectID:            objID,
+		Name:                name,
+		FromZoneID:          fromZoneID,
+		LocationContainerID: locContainerID,
+		ActorContainerID:    actorContainerID,
+		ObjectContainerID:   objContainerID,
+	}
+}
+
+type ObjectMigrateInEvent struct {
+	*eventGeneric
+	ObjectID                                                 uuid.UUID
+	Name                                                     string
+	FromZoneID                                               uuid.UUID
+	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
+}
+
+func NewObjectMigrateOutEvent(name string, objID, toZoneID, zoneID uuid.UUID) *ObjectMigrateOutEvent {
+	return &ObjectMigrateOutEvent{
+		eventGeneric: &eventGeneric{
+			eventType:     EventTypeObjectMigrateOut,
+			version:       1,
+			aggregateId:   zoneID,
+			shouldPersist: true,
+		},
+		ObjectID: objID,
+		Name:     name,
+		ToZoneID: toZoneID,
+	}
+}
+
+type ObjectMigrateOutEvent struct {
+	*eventGeneric
+	ObjectID uuid.UUID
+	Name     string
+	ToZoneID uuid.UUID
+}

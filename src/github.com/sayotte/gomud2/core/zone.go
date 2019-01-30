@@ -145,19 +145,33 @@ func (z *Zone) RemoveActor(a *Actor) error {
 	return err
 }
 
-// MigrateInActor is a wrapper for AddActor, ensuring the given Observer
-// receives the associated AddActorToZone event. Otherwise, since we're
-// returning a new Actor object, the Observer would not already be associated
-// with that new object and would never see the event.
-//
-// This function is never called when replaying our event-stream and there is
-// no corresponding Event type-- it is purely to ensure correct communication
-// as a migration is happening live.
-func (z *Zone) MigrateInActor(a *Actor, o Observer) (*Actor, error) {
-	a.Location().addObserver(o)
-	newActor, err := z.AddActor(a)
-	a.Location().removeObserver(o)
-	return newActor, err
+func (z *Zone) MigrateInActor(a *Actor, fromLoc, toLoc *Location) (*Actor, error) {
+	// We have to do some hijinks with the Observers here, as the new Actor
+	// object being created in this zone will not initially have any Observers,
+	// so any API/Telnet clients connected to the old object won't see the events
+	// generated within this zone.
+	//
+	// To work around that, we add them temporarily as Observers to the new
+	// Location, so they witness the events. After the events are processed,
+	// the command-handler will properly add them as Observers to the new Actor,
+	// so we can remove them from the Location.
+
+	currentObservers := a.Observers()
+	for _, o := range currentObservers {
+		toLoc.addObserver(o)
+	}
+	cmd := newActorMigrateInCommand(a, fromLoc, toLoc, a.Observers())
+	out, err := z.syncRequestToSelf(cmd)
+	for _, o := range currentObservers {
+		toLoc.removeObserver(o)
+	}
+	return out.(*Actor), err
+}
+
+func (z *Zone) MigrateOutActor(a *Actor, fromLoc, toLoc *Location) error {
+	cmd := newActorMigrateOutCommand(a, fromLoc, toLoc)
+	_, err := z.syncRequestToSelf(cmd)
+	return err
 }
 
 func (z *Zone) AddLocation(l *Location) (*Location, error) {
@@ -329,6 +343,10 @@ func (z *Zone) processCommand(c Command) (interface{}, error) {
 		outEvents, err = z.processActorAdminRelocateCommand(c)
 	case CommandTypeActorRemoveFromZone:
 		outEvents, err = z.processActorRemoveCommand(c)
+	case CommandTypeActorMigrateIn:
+		out, outEvents, err = z.processActorMigrateInCommand(c)
+	case CommandTypeActorMigrateOut:
+		outEvents, err = z.processActorMigrateOutCommand(c)
 	case CommandTypeLocationAddToZone:
 		out, outEvents, err = z.processLocationAddToZoneCommand(c)
 	case CommandTypeLocationUpdate:
@@ -450,6 +468,101 @@ func (z *Zone) processActorRemoveCommand(c Command) ([]Event, error) {
 	z.nextSequenceId = e.SequenceNumber() + 1
 	_, err := z.applyEvent(e)
 	return []Event{e}, err
+}
+
+func (z *Zone) processActorMigrateInCommand(c Command) (interface{}, []Event, error) {
+	cmd := c.(*actorMigrateInCommand)
+
+	var outEvents []Event
+
+	actorEv := NewActorMigrateInEvent(
+		cmd.actor.Name(),
+		cmd.actor.ID(),
+		cmd.from.ID(),
+		cmd.from.Zone().ID(),
+		cmd.to.ID(),
+		z.id,
+	)
+	actorEv.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = actorEv.SequenceNumber() + 1
+	out, err := z.applyEvent(actorEv)
+	if err != nil {
+		return nil, nil, err
+	}
+	newActor := out.(*Actor)
+	for _, o := range cmd.observers {
+		newActor.AddObserver(o)
+	}
+	outEvents = []Event{actorEv}
+
+	for _, objContTuple := range getObjectContainerTuplesRecursive(cmd.actor) {
+		var locContID, actorContID, objContID uuid.UUID
+		switch objContTuple.cont.(type) {
+		case *Location:
+			locContID = objContTuple.cont.ID()
+		case *Actor:
+			actorContID = objContTuple.cont.ID()
+		case *Object:
+			objContID = objContTuple.cont.ID()
+		}
+		objEv := NewObjectMigrateInEvent(
+			objContTuple.obj.Name(),
+			objContTuple.obj.ID(),
+			cmd.from.Zone().ID(),
+			locContID,
+			actorContID,
+			objContID,
+			z.id,
+		)
+		objEv.SetSequenceNumber(z.nextSequenceId)
+		z.nextSequenceId = objEv.SequenceNumber() + 1
+		_, err := z.applyEvent(objEv)
+		if err != nil {
+			return nil, nil, err
+		}
+		outEvents = append(outEvents, objEv)
+	}
+
+	return newActor, outEvents, nil
+}
+
+func (z *Zone) processActorMigrateOutCommand(c Command) ([]Event, error) {
+	cmd := c.(*actorMigrateOutCommand)
+
+	var outEvents []Event
+
+	for _, objContTuple := range getObjectContainerTuplesRecursive(cmd.actor) {
+		objEv := NewObjectMigrateOutEvent(
+			objContTuple.obj.Name(),
+			objContTuple.obj.ID(),
+			cmd.to.Zone().ID(),
+			z.id,
+		)
+		objEv.SetSequenceNumber(z.nextSequenceId)
+		z.nextSequenceId = objEv.SequenceNumber() + 1
+		_, err := z.applyEvent(objEv)
+		if err != nil {
+			return nil, err
+		}
+		outEvents = append(outEvents, objEv)
+	}
+
+	actorEv := NewActorMigrateOutEvent(
+		cmd.actor.ID(),
+		cmd.from.ID(),
+		cmd.to.ID(),
+		cmd.to.Zone().ID(),
+		z.id,
+	)
+	actorEv.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = actorEv.SequenceNumber() + 1
+	_, err := z.applyEvent(actorEv)
+	if err != nil {
+		return nil, err
+	}
+	outEvents = append(outEvents, actorEv)
+
+	return outEvents, nil
 }
 
 func (z *Zone) processLocationAddToZoneCommand(c Command) (interface{}, []Event, error) {
@@ -869,6 +982,12 @@ func (z *Zone) applyEvent(e Event) (interface{}, error) {
 	case EventTypeActorRemoveFromZone:
 		typedEvent := e.(*ActorRemoveFromZoneEvent)
 		oList, err = z.applyActorRemoveEvent(typedEvent)
+	case EventTypeActorMigrateIn:
+		typedEvent := e.(*ActorMigrateInEvent)
+		out, oList, err = z.applyActorMigrateInEvent(typedEvent)
+	case EventTypeActorMigrateOut:
+		typedEvent := e.(*ActorMigrateOutEvent)
+		oList, err = z.applyActorMigrateOutEvent(typedEvent)
 	case EventTypeLocationAddToZone:
 		typedEvent := e.(*LocationAddToZoneEvent)
 		out, err = z.applyLocationAddToZoneEvent(typedEvent)
@@ -899,6 +1018,12 @@ func (z *Zone) applyEvent(e Event) (interface{}, error) {
 	case EventTypeObjectRemoveFromZone:
 		typedEvent := e.(*ObjectRemoveFromZoneEvent)
 		oList, err = z.applyObjectRemoveFromZoneEvent(typedEvent)
+	case EventTypeObjectMigrateIn:
+		typedEvent := e.(*ObjectMigrateInEvent)
+		err = z.applyObjectMigrateInEvent(typedEvent)
+	case EventTypeObjectMigrateOut:
+		typedEvent := e.(*ObjectMigrateOutEvent)
+		err = z.applyObjectMigrateOutEvent(typedEvent)
 	case EventTypeZoneSetDefaultLocation:
 		typedEvent := e.(*ZoneSetDefaultLocationEvent)
 		err = z.applyZoneSetDefaultLocationEvent(typedEvent)
@@ -996,6 +1121,39 @@ func (z *Zone) applyActorRemoveEvent(e *ActorRemoveFromZoneEvent) (ObserverList,
 	delete(z.actorsById, e.actorID)
 
 	oList := oldLoc.Observers()
+
+	return oList, nil
+}
+
+func (z *Zone) applyActorMigrateInEvent(e *ActorMigrateInEvent) (*Actor, ObserverList, error) {
+	newLoc := z.locationsById[e.ToLocID]
+	actor := NewActor(e.ActorID, e.Name, newLoc, z)
+
+	var oList ObserverList
+	if newLoc != nil {
+		newLoc.addActor(actor)
+		oList = newLoc.Observers()
+	} else {
+		fmt.Printf("WARNING: processing ActorMigrateInEvent with no resolvable Location\n")
+	}
+	actor.setLocation(newLoc)
+	z.actorsById[actor.ID()] = actor
+
+	return actor, oList, nil
+}
+
+func (z *Zone) applyActorMigrateOutEvent(e *ActorMigrateOutEvent) (ObserverList, error) {
+	actor, found := z.actorsById[e.ActorID]
+	if !found {
+		return nil, fmt.Errorf("cannot find Actor %q to migrate out of Zone", e.ActorID)
+	}
+
+	oList := append(actor.Observers(), actor.Location().Observers()...)
+
+	actor.Location().removeActor(actor)
+	actor.setLocation(nil)
+	actor.setZone(nil)
+	delete(z.actorsById, actor.ID())
 
 	return oList, nil
 }
@@ -1264,6 +1422,47 @@ func (z *Zone) applyObjectRemoveFromZoneEvent(e *ObjectRemoveFromZoneEvent) (Obs
 	oList := oldContainer.Observers()
 
 	return oList, nil
+}
+
+func (z *Zone) applyObjectMigrateInEvent(e *ObjectMigrateInEvent) error {
+	var container Container
+
+	switch {
+	case !uuid.Equal(e.LocationContainerID, uuid.Nil):
+		container = z.locationsById[e.LocationContainerID]
+	case !uuid.Equal(e.ActorContainerID, uuid.Nil):
+		container = z.actorsById[e.ActorContainerID]
+	case !uuid.Equal(e.ObjectContainerID, uuid.Nil):
+		container = z.objectsById[e.ObjectContainerID]
+	}
+
+	obj := NewObject(e.ObjectID, e.Name, container, z)
+	if container != nil {
+		err := container.addObject(obj)
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("WARNING: processing ObjectMigrateInEvent with no resolvable Container\n")
+	}
+
+	obj.setContainer(container)
+	z.objectsById[obj.ID()] = obj
+
+	return nil
+}
+
+func (z *Zone) applyObjectMigrateOutEvent(e *ObjectMigrateOutEvent) error {
+	object, found := z.objectsById[e.ObjectID]
+	if !found {
+		return fmt.Errorf("cannot find Object %q to migrate out of Zone", e.ObjectID)
+	}
+	object.Container().removeObject(object)
+	object.setContainer(nil)
+	object.setZone(nil)
+	delete(z.objectsById, object.ID())
+
+	return nil
 }
 
 func (z *Zone) applyZoneSetDefaultLocationEvent(e *ZoneSetDefaultLocationEvent) error {

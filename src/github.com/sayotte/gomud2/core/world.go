@@ -149,13 +149,7 @@ func (w *World) processCommandsLoop() {
 				res.Value, res.Err = w.handleAddActor(waac.actor)
 			case worldMigrateActorCommand:
 				wmac := req.Payload.(worldMigrateActorCommand)
-				res.Value, res.Err = w.handleMigrateActor(
-					wmac.actor,
-					wmac.fromZone,
-					wmac.toZone,
-					wmac.toLoc,
-					wmac.observer,
-				)
+				res.Value, res.Err = w.handleMigrateActorCommand(wmac)
 			case worldAddZoneCommand:
 				wazc := req.Payload.(worldAddZoneCommand)
 				res.Err = w.handleAddZone(wazc.zone)
@@ -205,21 +199,15 @@ func (w *World) handleAddActor(a *Actor) (*Actor, error) {
 	return w.frontDoorZone.AddActor(a)
 }
 
-func (w *World) MigrateActor(a *Actor, fromZone *Zone, toZoneID, toLocID uuid.UUID, o Observer) (*Actor, error) {
-	toZone, found := w.zonesByID[toZoneID]
-	if !found {
-		return nil, fmt.Errorf("no such Zone %q", toZoneID)
+func (w *World) MigrateActor(a *Actor, fromLoc, toLoc *Location) (*Actor, error) {
+	if fromLoc.Zone() == toLoc.Zone() {
+		return nil, errors.New("World.MigrateActor() doesn't make sense within the same Zone; use Actor.Move()")
 	}
-	toLoc := toZone.LocationByID(toLocID)
-	if toLoc == nil {
-		return nil, fmt.Errorf("no such Location %q", toLocID)
-	}
+
 	cmd := worldMigrateActorCommand{
-		actor:    a,
-		fromZone: fromZone,
-		toZone:   toZone,
-		toLoc:    toLoc,
-		observer: o,
+		actor:   a,
+		fromLoc: fromLoc,
+		toLoc:   toLoc,
 	}
 	out, err := w.syncRequestToSelf(cmd)
 	if err != nil {
@@ -228,27 +216,35 @@ func (w *World) MigrateActor(a *Actor, fromZone *Zone, toZoneID, toLocID uuid.UU
 	return out.(*Actor), nil
 }
 
-func (w *World) handleMigrateActor(a *Actor, fromZone, toZone *Zone, toLoc *Location, o Observer) (*Actor, error) {
-	undoActorRemove := a.snapshot(0)
-	transactionID, err := w.IntentLog.WriteIntent(nil, []Event{undoActorRemove})
+func (w *World) handleMigrateActorCommand(cmd worldMigrateActorCommand) (*Actor, error) {
+	//undoActorRemove := a.snapshot(0)
+	//transactionID, err := w.IntentLog.WriteIntent(nil, []Event{undoActorRemove})
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	newActor, err := cmd.toLoc.Zone().MigrateInActor(
+		cmd.actor,
+		cmd.fromLoc,
+		cmd.toLoc,
+	)
+	if err != nil {
+		return nil, err
+	}
+	err = cmd.fromLoc.Zone().MigrateOutActor(
+		cmd.actor,
+		cmd.fromLoc,
+		cmd.toLoc,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	err = fromZone.RemoveActor(a)
-	if err != nil {
-		return nil, err
-	}
-	a.setLocation(toLoc)
-	a.setZone(toZone)
-	newActor, err := toZone.MigrateInActor(a, o)
-	if err != nil {
-		return nil, err
-	}
-	err = w.IntentLog.ConfirmIntentCompletion(transactionID)
-	if err != nil {
-		return newActor, err
-	}
+	//err = w.IntentLog.ConfirmIntentCompletion(transactionID)
+	//if err != nil {
+	//	return newActor, err
+	//}
+
 	return newActor, nil
 }
 
@@ -341,10 +337,8 @@ type worldAddActorCommand struct {
 }
 
 type worldMigrateActorCommand struct {
-	actor            *Actor
-	fromZone, toZone *Zone
-	toLoc            *Location
-	observer         Observer
+	actor          *Actor
+	fromLoc, toLoc *Location
 }
 
 type worldAddZoneCommand struct {

@@ -161,3 +161,82 @@ func (oare objectAdminRelocateEvent) Header() eventHeader {
 func (oare *objectAdminRelocateEvent) SetHeader(h eventHeader) {
 	oare.header = h
 }
+
+type objectMigrateInEvent struct {
+	header                                                   eventHeader
+	ObjectID                                                 uuid.UUID
+	Name                                                     string
+	FromZoneID                                               uuid.UUID
+	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
+}
+
+func (omie *objectMigrateInEvent) FromDomain(e core.Event) {
+	from := e.(*core.ObjectMigrateInEvent)
+	*omie = objectMigrateInEvent{
+		header:              eventHeaderFromDomainEvent(from),
+		ObjectID:            from.ObjectID,
+		Name:                from.Name,
+		FromZoneID:          from.FromZoneID,
+		LocationContainerID: from.LocationContainerID,
+		ActorContainerID:    from.ActorContainerID,
+		ObjectContainerID:   from.ObjectContainerID,
+	}
+}
+
+func (omie objectMigrateInEvent) ToDomain() core.Event {
+	e := core.NewObjectMigrateInEvent(
+		omie.Name,
+		omie.ObjectID,
+		omie.FromZoneID,
+		omie.LocationContainerID,
+		omie.ActorContainerID,
+		omie.ObjectContainerID,
+		omie.header.AggregateId,
+	)
+	e.SetSequenceNumber(omie.header.SequenceNumber)
+	return e
+}
+
+func (omie objectMigrateInEvent) Header() eventHeader {
+	return omie.header
+}
+
+func (omie *objectMigrateInEvent) SetHeader(h eventHeader) {
+	omie.header = h
+}
+
+type objectMigrateOutEvent struct {
+	header   eventHeader
+	ObjectID uuid.UUID
+	Name     string
+	ToZoneID uuid.UUID
+}
+
+func (omoe *objectMigrateOutEvent) FromDomain(e core.Event) {
+	from := e.(*core.ObjectMigrateOutEvent)
+	*omoe = objectMigrateOutEvent{
+		header:   eventHeaderFromDomainEvent(from),
+		ObjectID: from.ObjectID,
+		Name:     from.Name,
+		ToZoneID: from.ToZoneID,
+	}
+}
+
+func (omoe objectMigrateOutEvent) ToDomain() core.Event {
+	e := core.NewObjectMigrateOutEvent(
+		omoe.Name,
+		omoe.ObjectID,
+		omoe.ToZoneID,
+		omoe.header.AggregateId,
+	)
+	e.SetSequenceNumber(omoe.header.SequenceNumber)
+	return e
+}
+
+func (omoe objectMigrateOutEvent) Header() eventHeader {
+	return omoe.header
+}
+
+func (omoe *objectMigrateOutEvent) SetHeader(h eventHeader) {
+	omoe.header = h
+}

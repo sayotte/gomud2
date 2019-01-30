@@ -27,7 +27,16 @@ func MoveActor(actor *core.Actor, direction string, observer core.Observer) (*co
 	}
 
 	// Inter-zone migration
-	newActor, err := actor.Zone().World().MigrateActor(actor, actor.Zone(), outExit.OtherZoneID(), outExit.OtherZoneLocID(), observer)
+	world := actor.Zone().World()
+	remoteZone := world.ZoneByID(outExit.OtherZoneID())
+	if remoteZone == nil {
+		return nil, errors.New(ErrorMigrationFailed)
+	}
+	remoteLoc := remoteZone.LocationByID(outExit.OtherZoneLocID())
+	if remoteLoc == nil {
+		return nil, errors.New(ErrorMigrationFailed)
+	}
+	newActor, err := world.MigrateActor(actor, actor.Location(), remoteLoc)
 	if err != nil {
 		return actor, errors.New(ErrorMigrationFailed)
 	}

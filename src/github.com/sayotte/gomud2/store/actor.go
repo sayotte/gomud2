@@ -129,3 +129,83 @@ func (arfze actorRemoveFromZoneEvent) Header() eventHeader {
 func (arfze *actorRemoveFromZoneEvent) SetHeader(h eventHeader) {
 	arfze.header = h
 }
+
+type actorMigrateInEvent struct {
+	header                eventHeader
+	ActorID               uuid.UUID
+	Name                  string
+	FromLocID, FromZoneID uuid.UUID
+	ToLocID               uuid.UUID
+}
+
+func (amie *actorMigrateInEvent) FromDomain(e core.Event) {
+	from := e.(*core.ActorMigrateInEvent)
+	*amie = actorMigrateInEvent{
+		header:     eventHeaderFromDomainEvent(from),
+		ActorID:    from.ActorID,
+		Name:       from.Name,
+		FromLocID:  from.FromLocID,
+		FromZoneID: from.FromZoneID,
+		ToLocID:    from.ToLocID,
+	}
+	return
+}
+
+func (amie actorMigrateInEvent) ToDomain() core.Event {
+	e := core.NewActorMigrateInEvent(
+		amie.Name,
+		amie.ActorID,
+		amie.FromLocID,
+		amie.FromZoneID,
+		amie.ToLocID,
+		amie.header.AggregateId,
+	)
+	e.SetSequenceNumber(amie.header.SequenceNumber)
+	return e
+}
+
+func (amie actorMigrateInEvent) Header() eventHeader {
+	return amie.header
+}
+
+func (amie *actorMigrateInEvent) SetHeader(h eventHeader) {
+	amie.header = h
+}
+
+type actorMigrateOutEvent struct {
+	header            eventHeader
+	ActorID           uuid.UUID
+	FromLocID         uuid.UUID
+	ToLocID, ToZoneID uuid.UUID
+}
+
+func (amoe *actorMigrateOutEvent) FromDomain(e core.Event) {
+	from := e.(*core.ActorMigrateOutEvent)
+	*amoe = actorMigrateOutEvent{
+		header:    eventHeaderFromDomainEvent(from),
+		ActorID:   from.ActorID,
+		FromLocID: from.FromLocID,
+		ToLocID:   from.ToLocID,
+		ToZoneID:  from.ToZoneID,
+	}
+}
+
+func (amoe actorMigrateOutEvent) ToDomain() core.Event {
+	e := core.NewActorMigrateOutEvent(
+		amoe.ActorID,
+		amoe.FromLocID,
+		amoe.ToLocID,
+		amoe.ToZoneID,
+		amoe.header.AggregateId,
+	)
+	e.SetSequenceNumber(amoe.header.SequenceNumber)
+	return e
+}
+
+func (amoe actorMigrateOutEvent) Header() eventHeader {
+	return amoe.header
+}
+
+func (amoe *actorMigrateOutEvent) SetHeader(h eventHeader) {
+	amoe.header = h
+}

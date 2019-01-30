@@ -9,6 +9,8 @@ const (
 	CommandTypeActorMove
 	CommandTypeActorAdminRelocate
 	CommandTypeActorRemoveFromZone
+	CommandTypeActorMigrateIn
+	CommandTypeActorMigrateOut
 	CommandTypeLocationAddToZone
 	CommandTypeLocationUpdate
 	CommandTypeLocationRemoveFromZone
