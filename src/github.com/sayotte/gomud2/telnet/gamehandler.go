@@ -29,11 +29,12 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 	gh.cmdTrie.Add("commands", gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandCommands(terminalWidth)
 	}))
+	gh.cmdTrie.Add("drop", gh.getDropHandler())
+	gh.cmdTrie.Add("inventory", gh.getInventoryHandler())
 	gh.cmdTrie.Add("look", gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandLook(terminalWidth)
 	}))
 	gh.cmdTrie.Add("take", gh.getTakeHandler())
-	gh.cmdTrie.Add("inventory", gh.getInventoryHandler())
 
 	gh.cmdTrie.Add(core.ExitDirectionNorth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionNorth)
@@ -274,6 +275,34 @@ func (gh *gameHandler) getTakeHandler() gameHandlerCommandHandler {
 		err := targetObj.Move(gh.actor.Location(), gh.actor, gh.actor)
 		if err != nil {
 			return []byte("Whoops...\n"), fmt.Errorf("Object.Move(Location, Actor): %s", err)
+		}
+
+		return nil, nil
+	}
+}
+
+func (gh *gameHandler) getDropHandler() gameHandlerCommandHandler {
+	return func(line string, terminalWidth int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) == 0 {
+			return []byte("Usage: drop <object keyword>\n"), nil
+		}
+
+		targetKeyword := strings.ToLower(params[0])
+		var targetObj *core.Object
+		for _, obj := range gh.actor.Objects() {
+			if strings.HasPrefix(obj.Name(), targetKeyword) {
+				targetObj = obj
+				break
+			}
+		}
+		if targetObj == nil {
+			return []byte(fmt.Sprintf("Drop what again? I can't find a %q.\n", targetKeyword)), nil
+		}
+
+		err := targetObj.Move(gh.actor, gh.actor.Location(), gh.actor)
+		if err != nil {
+			return []byte("Whoops...\n"), fmt.Errorf("Object.Move(Actor, Location): %s", err)
 		}
 
 		return nil, nil
