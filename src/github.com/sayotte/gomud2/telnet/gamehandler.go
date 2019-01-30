@@ -31,9 +31,7 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 	}))
 	gh.cmdTrie.Add("drop", gh.getDropHandler())
 	gh.cmdTrie.Add("inventory", gh.getInventoryHandler())
-	gh.cmdTrie.Add("look", gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
-		return gh.handleCommandLook(terminalWidth)
-	}))
+	gh.cmdTrie.Add("look", gh.getLookHandler())
 	gh.cmdTrie.Add("put", gh.getPutHandler())
 	gh.cmdTrie.Add("take", gh.getTakeHandler())
 
@@ -97,8 +95,29 @@ func (gh *gameHandler) deinit() {
 	gh.actor.RemoveObserver(gh.session)
 }
 
-func (gh *gameHandler) handleCommandLook(terminalWidth int) ([]byte, error) {
-	return lookAtLocation(core.ActorList{gh.actor}, terminalWidth, gh.actor.Location()), nil
+func (gh *gameHandler) getLookHandler() gameHandlerCommandHandler {
+	return func(line string, terminalWidth int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		// If no args, just look at the location
+		if len(params) == 0 || params[0] == "" {
+			return lookAtLocation(core.ActorList{gh.actor}, terminalWidth, gh.actor.Location()), nil
+		}
+
+		// Otherwise, look at a particular object
+		// Start by looking for a kw match in the inventory
+		targetKW := strings.ToLower(params[0])
+		var targetObj *core.Object
+		targetObj = keywordMatch(targetKW, gh.actor.Objects())
+		if targetObj == nil {
+			// Failing that, look for a kw match on the ground
+			targetObj = keywordMatch(targetKW, gh.actor.Location().Objects())
+			if targetObj == nil {
+				return []byte(fmt.Sprintf("Look at what, exactly? I can't find a %q.\n", targetKW)), nil
+			}
+		}
+
+		return lookAtObject(terminalWidth, targetObj), nil
+	}
 }
 
 func (gh *gameHandler) handleCommandCommands(terminalWidth int) ([]byte, error) {
@@ -454,6 +473,31 @@ func lookAtLocation(ignoreActors core.ActorList, terminalWidth int, loc *core.Lo
 		objClause,
 		actClause,
 		exitClause,
+	)
+
+	return []byte(lookOutput)
+}
+
+func lookAtObject(terminalWidth int, obj *core.Object) []byte {
+	// name (short description)
+	// long description
+	// (optional) list of contained objects
+	lookFmt := "%s\n%s\n%s\n"
+
+	var containedObjsClause string
+	if obj.Capacity() > 0 {
+		var objNames []string
+		for _, o := range obj.Objects() {
+			objNames = append(objNames, o.Name())
+		}
+		containedObjsClause = fmt.Sprintf("\nPeering inside, you see:\n%s\n", strings.Join(objNames, "\n"))
+	}
+
+	lookOutput := fmt.Sprintf(
+		lookFmt,
+		obj.Name(),
+		wordwrap.WrapString(obj.Description(), uint(terminalWidth)),
+		containedObjsClause,
 	)
 
 	return []byte(lookOutput)
