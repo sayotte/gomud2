@@ -261,6 +261,9 @@ func (z *Zone) apply(e Event) (interface{}, error) {
 	case EventTypeExitUpdate:
 		typedEvent := e.(ExitUpdateEvent)
 		return nil, z.applyExitUpdateEvent(typedEvent)
+	case EventTypeExitRemoveFromZone:
+		typedEvent := e.(ExitRemoveFromZoneEvent)
+		return nil, z.applyExitRemoveFromZoneEvent(typedEvent)
 	case EventTypeObjectAddToZone:
 		typedEvent := e.(ObjectAddToZoneEvent)
 		return z.applyObjectAddToZoneEvent(typedEvent)
@@ -568,6 +571,28 @@ func (z *Zone) applyExitUpdateEvent(e ExitUpdateEvent) error {
 
 	exit.setDescription(e.Description)
 	exit.setDirection(e.Direction)
+
+	return nil
+}
+
+func (z *Zone) RemoveExit(ex *Exit) error {
+	e := NewExitRemoveFromZoneEvent(ex.ID(), z.id)
+	_, err := z.syncRequestToSelf(e)
+	return err
+}
+
+func (z *Zone) applyExitRemoveFromZoneEvent(e ExitRemoveFromZoneEvent) error {
+	ex, found := z.exitsById[e.ExitID]
+	if !found {
+		return fmt.Errorf("no such Exit with ID %q in Zone", e.ExitID)
+	}
+
+	err := ex.Source().removeExit(ex)
+	if err != nil {
+		return err
+	}
+
+	delete(z.exitsById, e.ExitID)
 
 	return nil
 }

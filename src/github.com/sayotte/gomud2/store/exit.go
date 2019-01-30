@@ -86,3 +86,30 @@ func (exue exitUpdateEvent) Header() eventHeader {
 func (exue *exitUpdateEvent) SetHeader(h eventHeader) {
 	exue.header = h
 }
+
+type exitRemoveFromZoneEvent struct {
+	header eventHeader
+	ExitID uuid.UUID
+}
+
+func (erfz exitRemoveFromZoneEvent) ToDomain() core.Event {
+	e := core.NewExitRemoveFromZoneEvent(erfz.ExitID, erfz.header.AggregateId)
+	e.SetSequenceNumber(erfz.header.SequenceNumber)
+	return e
+}
+
+func (erfz *exitRemoveFromZoneEvent) FromDomain(e core.Event) {
+	from := e.(core.ExitRemoveFromZoneEvent)
+	*erfz = exitRemoveFromZoneEvent{
+		header: eventHeaderFromDomainEvent(from),
+		ExitID: from.ExitID,
+	}
+}
+
+func (erfz exitRemoveFromZoneEvent) Header() eventHeader {
+	return erfz.header
+}
+
+func (erfz *exitRemoveFromZoneEvent) SetHeader(h eventHeader) {
+	erfz.header = h
+}

@@ -238,3 +238,20 @@ type ExitUpdateEvent struct {
 	DestZoneID       uuid.UUID
 	DestLocationId   uuid.UUID
 }
+
+func NewExitRemoveFromZoneEvent(exitID, zoneID uuid.UUID) ExitRemoveFromZoneEvent {
+	return ExitRemoveFromZoneEvent{
+		eventGeneric: &eventGeneric{
+			eventType:     EventTypeExitRemoveFromZone,
+			version:       1,
+			aggregateId:   zoneID,
+			shouldPersist: true,
+		},
+		ExitID: exitID,
+	}
+}
+
+type ExitRemoveFromZoneEvent struct {
+	*eventGeneric
+	ExitID uuid.UUID
+}

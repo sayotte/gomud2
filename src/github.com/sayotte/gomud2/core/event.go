@@ -12,6 +12,7 @@ const (
 	EventTypeLocationUpdate
 	EventTypeExitAddToZone
 	EventTypeExitUpdate
+	EventTypeExitRemoveFromZone
 	EventTypeObjectAddToZone
 	EventTypeObjectRemoveFromZone
 	EventTypeObjectMove
