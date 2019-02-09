@@ -16,13 +16,17 @@ type AuthService interface {
 }
 
 const (
-	DefaultMessageSendQueueLen = 15
+	DefaultMessageSendQueueLen = 4
 	DefaultListenAddr          = ":4001"
 )
 
 type Server struct {
-	ListenAddrString    string
-	AuthService         AuthService
+	ListenAddrString string
+	AuthService      AuthService
+	// This is the length of outstanding messages we're willing to queue to send
+	// to a single client. If we back up farther than this, we will disconnect
+	// the client to protect our core (which will be making blocking calls to
+	// add items to our queue-channel).
 	MessageSendQueueLen int
 	World               *core.World
 	httpServer          *http.Server
@@ -93,10 +97,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	sess := &session{
 		conn:         conn,
+		sendQueueLen: s.MessageSendQueueLen,
 		authService:  s.AuthService,
 		accountID:    acctID,
 		authZDesc:    authZDesc,
-		sendQueueLen: s.MessageSendQueueLen,
 		world:        s.World,
 	}
 	sess.start()
