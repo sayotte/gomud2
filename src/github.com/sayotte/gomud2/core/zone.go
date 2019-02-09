@@ -1040,12 +1040,19 @@ func (z *Zone) applyActorMoveEvent(e *ActorMoveEvent) (ObserverList, error) {
 	toLoc.addActor(actor)
 	actor.setLocation(toLoc)
 
-	var oList ObserverList
-	oList = actor.Observers()
+	observerSet := make(map[Observer]bool)
+	for _, o := range actor.Observers() {
+		observerSet[o] = true
+	}
 	for _, o := range fromLoc.Observers() {
-		oList = append(oList, o)
+		observerSet[o] = true
 	}
 	for _, o := range toLoc.Observers() {
+		observerSet[o] = true
+	}
+
+	oList := make(ObserverList, 0, len(observerSet))
+	for o := range observerSet {
 		oList = append(oList, o)
 	}
 
@@ -1115,14 +1122,13 @@ func (z *Zone) applyActorMigrateOutEvent(e *ActorMigrateOutEvent) (ObserverList,
 		return nil, fmt.Errorf("cannot find Actor %q to migrate out of Zone", e.ActorID)
 	}
 
-	oList := append(actor.Observers(), actor.Location().Observers()...)
-
+	oldLoc := actor.Location()
 	actor.Location().removeActor(actor)
 	actor.setLocation(nil)
 	actor.setZone(nil)
 	delete(z.actorsById, actor.ID())
 
-	return oList, nil
+	return oldLoc.Observers(), nil
 }
 
 func (z *Zone) applyLocationAddToZoneEvent(e *LocationAddToZoneEvent) (*Location, error) {
