@@ -3,10 +3,19 @@ package core
 import (
 	"errors"
 	"fmt"
-	"github.com/satori/go.uuid"
-	"github.com/sayotte/gomud2/rpc"
 	"strings"
 	"sync"
+
+	"github.com/satori/go.uuid"
+
+	"github.com/sayotte/gomud2/rpc"
+)
+
+const (
+	// FIXME this braintype should be specified via config file, not a const
+	// FIXME once that's done, be sure to delete this const to find all places
+	// FIXME that need to use the configurable value instead
+	PlayerParkingBrainType = "player-parking"
 )
 
 type IntentLogger interface {
@@ -126,7 +135,7 @@ func (w *World) handleIncompleteTransactions(redo, undo []Event) error {
 			return fmt.Errorf("no such Location with ID %q", readdEvent.startingLocationId)
 		}
 
-		actor := NewActor(readdEvent.actorId, readdEvent.Name(), oldLoc, oldZone)
+		actor := NewActor(readdEvent.actorId, readdEvent.Name(), readdEvent.BrainType, oldLoc, oldZone)
 		_, err := oldZone.AddActor(actor)
 		if err != nil {
 			return err

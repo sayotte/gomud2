@@ -16,7 +16,7 @@ const actorInventoryCapacity = 15
 
 var actorMoveDelay = time.Millisecond * 500
 
-func NewActor(id uuid.UUID, name string, location *Location, zone *Zone) *Actor {
+func NewActor(id uuid.UUID, name, brainType string, location *Location, zone *Zone) *Actor {
 	newID := id
 	if uuid.Equal(id, uuid.Nil) {
 		newID = myuuid.NewId()
@@ -26,6 +26,7 @@ func NewActor(id uuid.UUID, name string, location *Location, zone *Zone) *Actor 
 		name:     name,
 		location: location,
 		zone:     zone,
+		brainType: brainType,
 		rwlock:   &sync.RWMutex{},
 	}
 }
@@ -37,6 +38,8 @@ type Actor struct {
 	zone                   *Zone
 	observers              ObserverList
 	nextDelayedActionStart time.Time
+
+	brainType string
 
 	inventoryObjects ObjectList
 
@@ -77,6 +80,10 @@ func (a *Actor) Location() *Location {
 
 func (a *Actor) setLocation(loc *Location) {
 	a.location = loc
+}
+
+func (a *Actor) BrainType() string {
+	return a.brainType
 }
 
 func (a *Actor) Capacity() int {
@@ -163,7 +170,8 @@ func (a *Actor) syncRequestToZone(c Command) (interface{}, error) {
 
 func (a Actor) snapshot(sequenceNum uint64) Event {
 	e := NewActorAddToZoneEvent(
-		a.Name(),
+		a.name,
+		a.brainType,
 		a.id,
 		a.location.ID(),
 		a.zone.ID(),
@@ -281,7 +289,7 @@ type actorAddToZoneCommand struct {
 	wrappedEvent *ActorAddToZoneEvent
 }
 
-func NewActorAddToZoneEvent(name string, actorId, startingLocationId, zoneId uuid.UUID) *ActorAddToZoneEvent {
+func NewActorAddToZoneEvent(name, brainType string, actorId, startingLocationId, zoneId uuid.UUID) *ActorAddToZoneEvent {
 	return &ActorAddToZoneEvent{
 		&eventGeneric{
 			eventType:     EventTypeActorAddToZone,
@@ -291,6 +299,7 @@ func NewActorAddToZoneEvent(name string, actorId, startingLocationId, zoneId uui
 		},
 		actorId,
 		name,
+		brainType,
 		startingLocationId,
 	}
 }
@@ -298,7 +307,7 @@ func NewActorAddToZoneEvent(name string, actorId, startingLocationId, zoneId uui
 type ActorAddToZoneEvent struct {
 	*eventGeneric
 	actorId            uuid.UUID
-	name               string
+	name, BrainType    string
 	startingLocationId uuid.UUID
 }
 
@@ -364,7 +373,7 @@ type actorMigrateInCommand struct {
 	observers ObserverList
 }
 
-func NewActorMigrateInEvent(name string, actorID, fromLocID, fromZoneID, toLocID, zoneID uuid.UUID) *ActorMigrateInEvent {
+func NewActorMigrateInEvent(name, brainType string, actorID, fromLocID, fromZoneID, toLocID, zoneID uuid.UUID) *ActorMigrateInEvent {
 	return &ActorMigrateInEvent{
 		eventGeneric: &eventGeneric{
 			eventType:     EventTypeActorMigrateIn,
@@ -373,6 +382,7 @@ func NewActorMigrateInEvent(name string, actorID, fromLocID, fromZoneID, toLocID
 			shouldPersist: true,
 		},
 		Name:       name,
+		BrainType:  brainType,
 		ActorID:    actorID,
 		FromLocID:  fromLocID,
 		FromZoneID: fromZoneID,
@@ -383,7 +393,7 @@ func NewActorMigrateInEvent(name string, actorID, fromLocID, fromZoneID, toLocID
 type ActorMigrateInEvent struct {
 	*eventGeneric
 	ActorID               uuid.UUID
-	Name                  string
+	Name, BrainType       string
 	FromLocID, FromZoneID uuid.UUID
 	ToLocID               uuid.UUID
 }

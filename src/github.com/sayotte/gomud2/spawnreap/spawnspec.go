@@ -13,9 +13,10 @@ type SpawnSpecification struct {
 }
 
 type ActorPrototype struct {
-	Name string
+	Name      string
+	BrainType string
 }
 
 func (ap ActorPrototype) ToActor(loc *core.Location) *core.Actor {
-	return core.NewActor(uuid.Nil, ap.Name, loc, loc.Zone())
+	return core.NewActor(uuid.Nil, ap.Name, ap.BrainType, loc, loc.Zone())
 }

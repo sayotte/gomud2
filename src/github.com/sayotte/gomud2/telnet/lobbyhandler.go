@@ -123,7 +123,7 @@ func (lh *lobbyHandler) handleGetCharacterNameState(line []byte) ([]byte, handle
 		return []byte("We need a non-empty name, try again.\nCharacter name?: "), lh, nil
 	}
 
-	actorPre := core.NewActor(uuid.Nil, name, nil, nil)
+	actorPre := core.NewActor(uuid.Nil, name, core.PlayerParkingBrainType, nil, nil)
 	actor, err := lh.world.AddActor(actorPre)
 	if err != nil {
 		return nil, nil, fmt.Errorf("world.AddActor: %s", err)

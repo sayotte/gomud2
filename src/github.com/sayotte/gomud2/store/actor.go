@@ -71,7 +71,7 @@ func (aare *actorAdminRelocateEvent) SetHeader(h eventHeader) {
 type actorAddToZoneEvent struct {
 	header                      eventHeader
 	ActorID, StartingLocationID uuid.UUID
-	Name                        string
+	Name, BrainType             string
 }
 
 func (aatze *actorAddToZoneEvent) FromDomain(e core.Event) {
@@ -81,12 +81,14 @@ func (aatze *actorAddToZoneEvent) FromDomain(e core.Event) {
 		ActorID:            from.ActorID(),
 		StartingLocationID: from.StartingLocationID(),
 		Name:               from.Name(),
+		BrainType:          from.BrainType,
 	}
 }
 
 func (aatze actorAddToZoneEvent) ToDomain() core.Event {
 	e := core.NewActorAddToZoneEvent(
 		aatze.Name,
+		aatze.BrainType,
 		aatze.ActorID,
 		aatze.StartingLocationID,
 		aatze.header.AggregateId,
@@ -133,7 +135,7 @@ func (arfze *actorRemoveFromZoneEvent) SetHeader(h eventHeader) {
 type actorMigrateInEvent struct {
 	header                eventHeader
 	ActorID               uuid.UUID
-	Name                  string
+	Name, BrainType       string
 	FromLocID, FromZoneID uuid.UUID
 	ToLocID               uuid.UUID
 }
@@ -144,6 +146,7 @@ func (amie *actorMigrateInEvent) FromDomain(e core.Event) {
 		header:     eventHeaderFromDomainEvent(from),
 		ActorID:    from.ActorID,
 		Name:       from.Name,
+		BrainType:  from.BrainType,
 		FromLocID:  from.FromLocID,
 		FromZoneID: from.FromZoneID,
 		ToLocID:    from.ToLocID,
@@ -154,6 +157,7 @@ func (amie *actorMigrateInEvent) FromDomain(e core.Event) {
 func (amie actorMigrateInEvent) ToDomain() core.Event {
 	e := core.NewActorMigrateInEvent(
 		amie.Name,
+		amie.BrainType,
 		amie.ActorID,
 		amie.FromLocID,
 		amie.FromZoneID,
