@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/satori/go.uuid"
 
@@ -13,35 +14,33 @@ import (
 
 const actorInventoryCapacity = 15
 
+var actorMoveDelay = time.Millisecond * 500
+
 func NewActor(id uuid.UUID, name string, location *Location, zone *Zone) *Actor {
 	newID := id
 	if uuid.Equal(id, uuid.Nil) {
 		newID = myuuid.NewId()
 	}
 	return &Actor{
-		id:          newID,
-		name:        name,
-		location:    location,
-		zone:        zone,
-		rwlock:      &sync.RWMutex{},
-		requestChan: make(chan rpc.Request),
+		id:       newID,
+		name:     name,
+		location: location,
+		zone:     zone,
+		rwlock:   &sync.RWMutex{},
 	}
 }
 
 type Actor struct {
-	id        uuid.UUID
-	name      string
-	location  *Location
-	zone      *Zone
-	observers ObserverList
+	id                     uuid.UUID
+	name                   string
+	location               *Location
+	zone                   *Zone
+	observers              ObserverList
+	nextDelayedActionStart time.Time
 
 	inventoryObjects ObjectList
 
 	rwlock *sync.RWMutex
-	// This is the channel where the Zone picks up new events related to this
-	// actor. This should never be directly exposed by an accessor; public methods
-	// should create events and send them to the channel.
-	requestChan chan rpc.Request
 }
 
 func (a *Actor) ID() uuid.UUID {
@@ -111,6 +110,11 @@ func (a *Actor) Move(from, to *Location) error {
 		return fmt.Errorf("cross-zone moves should use the World.MigrateZone() API call")
 	}
 
+	delayTilActionStart := a.nextDelayedActionStart.Sub(time.Now())
+	if delayTilActionStart > 0 {
+		time.Sleep(delayTilActionStart)
+	}
+
 	e := NewActorMoveEvent(
 		from.ID(),
 		to.ID(),
@@ -119,6 +123,10 @@ func (a *Actor) Move(from, to *Location) error {
 	)
 	cmd := newActorMoveCommand(e)
 	_, err := a.syncRequestToZone(cmd)
+
+	if err == nil {
+		a.nextDelayedActionStart = time.Now().Add(actorMoveDelay)
+	}
 
 	return err
 }
@@ -148,7 +156,7 @@ func (a *Actor) setZone(z *Zone) {
 
 func (a *Actor) syncRequestToZone(c Command) (interface{}, error) {
 	req := rpc.NewRequest(c)
-	a.requestChan <- req
+	a.zone.requestChan() <- req
 	response := <-req.ResponseChan
 	return response.Value, response.Err
 }

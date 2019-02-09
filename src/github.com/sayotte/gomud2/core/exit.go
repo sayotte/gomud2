@@ -37,7 +37,6 @@ func NewExit(id uuid.UUID, desc, direction string, src, dest *Location, zone *Zo
 		zone:           zone,
 		otherZoneID:    otherZoneID,
 		otherZoneLocID: otherLocID,
-		requestChan:    make(chan rpc.Request),
 	}
 }
 
@@ -50,10 +49,6 @@ type Exit struct {
 	zone           *Zone
 	otherZoneID    uuid.UUID
 	otherZoneLocID uuid.UUID
-	// This is the channel where the Zone picks up new events related to this
-	// Exit. This should never be directly exposed by an accessor; public methods
-	// should create events and send them to the channel.
-	requestChan chan rpc.Request
 }
 
 func (ex Exit) ID() uuid.UUID {
@@ -135,7 +130,7 @@ func (ex Exit) Update(desc, direction string, source, dest *Location, extZoneID,
 
 func (ex Exit) syncRequestToZone(c Command) (interface{}, error) {
 	req := rpc.NewRequest(c)
-	ex.requestChan <- req
+	ex.zone.requestChan() <- req
 	response := <-req.ResponseChan
 	return response.Value, response.Err
 }

@@ -22,7 +22,6 @@ func NewObject(id uuid.UUID, name, desc string, keywords []string, container Con
 		container:         container,
 		containerCapacity: capacity,
 		zone:              zone,
-		requestChan:       make(chan rpc.Request),
 	}
 }
 
@@ -36,10 +35,6 @@ type Object struct {
 
 	containerCapacity int
 	containedObjects  ObjectList
-	// This is the channel where the Zone picks up new events related to this
-	// Object. This should never be directly exposed by an accessor; public methods
-	// should create events and send them to the channel.
-	requestChan chan rpc.Request
 }
 
 func (o Object) ID() uuid.UUID {
@@ -134,7 +129,7 @@ func (o *Object) AdminRelocate(to Container) error {
 
 func (o *Object) syncRequestToZone(c Command) (interface{}, error) {
 	req := rpc.NewRequest(c)
-	o.requestChan <- req
+	o.zone.requestChan() <- req
 	response := <-req.ResponseChan
 	return response.Value, response.Err
 }

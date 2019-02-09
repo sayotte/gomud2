@@ -13,6 +13,9 @@ import (
 	myuuid "github.com/sayotte/gomud2/uuid"
 )
 
+// Used to set the capacity of the channel to which commands are sent.
+const zoneRequestChannelCapacity = 4
+
 func NewZone(id uuid.UUID, nickname string, persister EventPersister) *Zone {
 	newID := id
 	if uuid.Equal(id, uuid.Nil) {
@@ -39,13 +42,12 @@ type Zone struct {
 	locationsById   map[uuid.UUID]*Location
 	exitsById       map[uuid.UUID]*Exit
 	objectsById     map[uuid.UUID]*Object
-	// This is the channel where the Zone picks up new events submitted by its
-	// own public methods. This should never be directly exposed by an accessor;
-	// public methods should create requests and send them to the channel.
-	internalRequestChan chan rpc.Request
-	stopChan            chan struct{}
-	stopWG              *sync.WaitGroup
-	persister           EventPersister
+	// This is the channel where the Zone picks up new events submitted by
+	// public methods.
+	privateRequestChan chan rpc.Request
+	stopChan           chan struct{}
+	stopWG             *sync.WaitGroup
+	persister          EventPersister
 }
 
 //////// getters + non-command-setters
@@ -126,6 +128,10 @@ func (z *Zone) World() *World {
 
 func (z *Zone) setWorld(world *World) {
 	z.world = world
+}
+
+func (z *Zone) requestChan() chan<- rpc.Request {
+	return z.privateRequestChan
 }
 
 //////// public command methods
@@ -236,69 +242,25 @@ func (z *Zone) SetDefaultLocation(loc *Location) error {
 
 func (z *Zone) syncRequestToSelf(c Command) (interface{}, error) {
 	req := rpc.NewRequest(c)
-	z.internalRequestChan <- req
+	z.privateRequestChan <- req
 	response := <-req.ResponseChan
 	return response.Value, response.Err
 }
 
 func (z *Zone) StartCommandProcessing() {
-	z.internalRequestChan = make(chan rpc.Request)
+	z.privateRequestChan = make(chan rpc.Request, zoneRequestChannelCapacity)
 	z.stopChan = make(chan struct{})
 	go func() {
 		for {
-			// terminate if we're supposed to do that
 			select {
 			case <-z.stopChan:
+				// terminate if we're supposed to do that
 				z.stopWG.Done()
 				return
-			default:
-			}
-
-			var requests []rpc.Request
-
-			// absorb *all* outstanding requests from the self-requests channel,
-			// which is used for creating new objects / zone transfers etc.
-		BreakLoop:
-			for {
-				select {
-				case req := <-z.internalRequestChan:
-					requests = append(requests, req)
-				default:
-					break BreakLoop
-				}
-			}
-
-			// absorb *one* request from each exit/location/object/actor
-			for _, exit := range z.exitsById {
-				select {
-				case req := <-exit.requestChan:
-					requests = append(requests, req)
-				default:
-				}
-			}
-			for _, loc := range z.locationsById {
-				select {
-				case req := <-loc.requestChan:
-					requests = append(requests, req)
-				default:
-				}
-			}
-			for _, obj := range z.objectsById {
-				select {
-				case req := <-obj.requestChan:
-					requests = append(requests, req)
-				default:
-				}
-			}
-			for _, actor := range z.actorsById {
-				select {
-				case req := <-actor.requestChan:
-					requests = append(requests, req)
-				default:
-				}
-			}
-
-			for _, req := range requests {
+			case req := <-z.privateRequestChan:
+				// FIXME add a CoDel-style delay here; our target latency should be 0.5ms
+				// FIXME unsure how wide the window should be, perhaps 100ms?
+				// FIXME unsure how much to delay, probably a function of average latency?
 				e := req.Payload.(Command)
 				value, err := z.processCommand(e)
 				response := rpc.Response{
@@ -306,9 +268,10 @@ func (z *Zone) StartCommandProcessing() {
 					Value: value,
 				}
 				req.ResponseChan <- response
+				//fmt.Printf("CORE STATS: command processing duration: %dus\n", duration/time.Microsecond)
 			}
+			//fmt.Printf("CORE STATS: zone %q queue-len is %d/%d\n", z.Tag(), len(z.privateRequestChan), cap(z.privateRequestChan))
 
-			time.Sleep(time.Second / 8)
 		}
 	}()
 }
@@ -966,11 +929,11 @@ func (z *Zone) ReplayEvents(inChan <-chan rpc.Response) error {
 }
 
 func (z *Zone) applyEvent(e Event) (interface{}, error) {
-	fmt.Printf("DEBUG: Zone applying event %d\n", e.SequenceNumber())
-
 	var out interface{}
 	var oList ObserverList
 	var err error
+
+	//fmt.Printf("CORE DEBUG: zone %s applying event %d\n", z.Tag(), e.SequenceNumber())
 
 	switch e.Type() {
 	case EventTypeActorAddToZone:

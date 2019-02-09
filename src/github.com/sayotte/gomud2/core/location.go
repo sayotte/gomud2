@@ -22,7 +22,6 @@ func NewLocation(id uuid.UUID, zone *Zone, shortDesc, longDesc string) *Location
 		zone:             zone,
 		shortDescription: shortDesc,
 		description:      longDesc,
-		requestChan:      make(chan rpc.Request),
 	}
 }
 
@@ -35,10 +34,6 @@ type Location struct {
 	objects          ObjectList
 	outExits         ExitList
 	observers        ObserverList
-	// This is the channel where the Zone picks up new events related to this
-	// Location. This should never be directly exposed by an accessor; public methods
-	// should create events and send them to the channel.
-	requestChan chan rpc.Request
 }
 
 func (l Location) ID() uuid.UUID {
@@ -174,7 +169,7 @@ func (l Location) Update(shortDesc, desc string) error {
 
 func (l *Location) syncRequestToZone(c Command) (interface{}, error) {
 	req := rpc.NewRequest(c)
-	l.requestChan <- req
+	l.zone.requestChan() <- req
 	response := <-req.ResponseChan
 	return response.Value, response.Err
 }
