@@ -36,6 +36,9 @@ func (s *Server) Start() error {
 		return errors.New("already started")
 	}
 
+	if s.MessageQueueLen == 0 {
+		s.MessageQueueLen = DefaultMessageQueueLen
+	}
 	if s.ListenAddr == "" {
 		s.ListenAddr = DefaultListenAddr
 	}

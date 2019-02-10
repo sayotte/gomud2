@@ -30,7 +30,14 @@ type session struct {
 }
 
 func (s *session) SendEvent(e core.Event) {
-	s.eventChan <- e
+	select {
+	case s.eventChan <- e:
+	default:
+		fmt.Println("TELNET ERROR: handler event-queue overflowed, terminating connection\n")
+		// FIXME this kill-message is never seen by the client
+		s.bufferedConn.Send([]byte("Whoops, couldn't keep up with the noise!\n"))
+		s.Stop()
+	}
 }
 
 func (s *session) Evict() {
