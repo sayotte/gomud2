@@ -11,6 +11,7 @@ import (
 	gouuid "github.com/satori/go.uuid"
 
 	"github.com/sayotte/gomud2/auth"
+	"github.com/sayotte/gomud2/brain"
 	"github.com/sayotte/gomud2/core"
 	"github.com/sayotte/gomud2/spawnreap"
 	"github.com/sayotte/gomud2/store"
@@ -86,6 +87,7 @@ func main() {
 	waitForeverWG := &sync.WaitGroup{}
 	waitForeverWG.Add(1)
 	waitForeverWG.Wait()
+	//time.Sleep(1 * time.Minute)
 }
 
 func initStartingWorld(worldConfigFile string) error {
@@ -93,6 +95,7 @@ func initStartingWorld(worldConfigFile string) error {
 		Filename:       "store/events.dat",
 		UseCompression: true,
 	}
+
 	z := core.NewZone(gouuid.Nil, "overworld", eStore)
 	z.StartCommandProcessing()
 
@@ -187,8 +190,8 @@ func initStartingWorld(worldConfigFile string) error {
 
 	shortDesc = "The Foxhunt Room"
 	longDesc = "A small room with wood paneled walls, standing here you "
-	longDesc += "feel as though you be sitting, sipping tea and making "
-	longDesc += "conversation with friends."
+	longDesc += "feel as though you should be sitting, sipping tea and "
+	longDesc += "making conversation with friends."
 	loc3Prim := core.NewLocation(gouuid.Nil, z2, shortDesc, longDesc)
 	loc3, err := z2.AddLocation(loc3Prim)
 	if err != nil {
@@ -232,7 +235,8 @@ func initStartingWorld(worldConfigFile string) error {
 
 	spawnSpec := spawnreap.SpawnSpecification{
 		ActorProto: spawnreap.ActorPrototype{
-			Name: "a rabbit",
+			Name:      "a rabbit",
+			BrainType: "crowd-averse-wanderer",
 		},
 		MaxCount:           30,
 		MaxSpawnAtOneTime:  10,
@@ -323,6 +327,23 @@ func runWorld(world *core.World, cfg mudConfig) error {
 		World:               world,
 	}
 	err = apiServer.Start()
+	if err != nil {
+		return err
+	}
+
+	brainService := &brain.Service{
+		AuthUsername:   "a",
+		AuthPassword:   "a",
+		WSAPIURLString: "ws://localhost:4001",
+	}
+
+	spawnReapService := &spawnreap.Service{
+		World:       world,
+		BrainSvc:    brainService,
+		ReapTicks:   cfg.SpawnReap.TicksUntilReap,
+		TickLengthS: cfg.SpawnReap.TickLengthInSeconds,
+	}
+	err = spawnReapService.Start()
 	if err != nil {
 		return err
 	}

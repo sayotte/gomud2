@@ -3,6 +3,7 @@ package spawnreap
 import (
 	"errors"
 	"fmt"
+	"github.com/sayotte/gomud2/brain"
 	"math/rand"
 	"sync"
 	"time"
@@ -19,7 +20,8 @@ const (
 )
 
 type Service struct {
-	World *core.World
+	World    *core.World
+	BrainSvc *brain.Service
 	// How often, in seconds, to check for objects that need reaping, and
 	// actors that need spawning
 	TickLengthS int
@@ -29,7 +31,8 @@ type Service struct {
 	ConfigFile string
 	cfgdb      *spawnConfigDatabase
 
-	zoneToLocToObjectAgeMap map[uuid.UUID]map[uuid.UUID]map[uuid.UUID]int
+	zoneToLocToObjectAgeMap      map[uuid.UUID]map[uuid.UUID]map[uuid.UUID]int
+	actorToAIBrainSpawnCountsMap map[uuid.UUID]int
 
 	rando *rand.Rand
 
@@ -55,6 +58,8 @@ func (s *Service) Start() error {
 	s.rando = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	s.zoneToLocToObjectAgeMap = make(map[uuid.UUID]map[uuid.UUID]map[uuid.UUID]int)
+	s.actorToAIBrainSpawnCountsMap = make(map[uuid.UUID]int)
+
 	if s.TickLengthS == 0 {
 		s.TickLengthS = DefaultTickLengthS
 	}
@@ -77,6 +82,7 @@ func (s *Service) Stop() {
 }
 
 func (s *Service) tickLoop() {
+	// FIXME replace this loop with a time.Ticker
 	for {
 		select {
 		case <-s.stopChan:
@@ -105,6 +111,7 @@ func (s *Service) handleTick() {
 	for _, zone := range s.World.Zones() {
 		s.reapZone(zone)
 		s.spawnZone(zone)
+		s.brainZone(zone)
 	}
 }
 
@@ -218,4 +225,21 @@ func (s *Service) spawnZone(zone *core.Zone) {
 			}
 		}
 	}
+}
+
+func (s *Service) brainZone(zone *core.Zone) {
+	zoneActors := zone.Actors()
+	for _, actor := range zoneActors {
+		if len(actor.Observers()) == 0 {
+			count := s.actorToAIBrainSpawnCountsMap[actor.ID()]
+			err := s.BrainSvc.LaunchBrain(actor.BrainType(), actor.ID())
+			if err != nil {
+				fmt.Printf("SpawnReap WARNING: failed to launch brain: %s\n", err)
+			}
+			count++
+			s.actorToAIBrainSpawnCountsMap[actor.ID()] = count
+			fmt.Printf("SPAWN DEBUG: spawned a brain for %q, this is brain #%d\n", actor.Name(), count)
+		}
+	}
+	fmt.Printf("SPAWN DEBUG: zone %s has %d active brains\n", zone.Tag(), len(zoneActors))
 }
