@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"path/filepath"
+	"runtime/pprof"
 	"sync"
 
 	gouuid "github.com/satori/go.uuid"
@@ -24,11 +25,13 @@ var version string
 type cliArgs struct {
 	initStartingZone bool
 	worldConfigFile  string
+	cpuProfile       string
 }
 
 func parseCliArgs() (cliArgs, error) {
 	initStartingZone := flag.Bool("initWorld", false, "Create a default world with some locations, exits, objects and actors; persist the related events, then exit.")
 	worldConfig := flag.String("config", "mudConfig.yaml", "Configuration file for MUD daemon")
+	cpuProfile := flag.String("cpuprofile", "", "Write CPU profile information to this file")
 
 	flag.Parse()
 
@@ -36,6 +39,7 @@ func parseCliArgs() (cliArgs, error) {
 
 	args.initStartingZone = *initStartingZone
 	args.worldConfigFile = *worldConfig
+	args.cpuProfile = *cpuProfile
 
 	return args, nil
 }
@@ -49,6 +53,18 @@ func main() {
 	args, err := parseCliArgs()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if args.cpuProfile != "" {
+		f, err := os.Create(args.cpuProfile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer pprof.StopCPUProfile()
 	}
 
 	if args.initStartingZone {
