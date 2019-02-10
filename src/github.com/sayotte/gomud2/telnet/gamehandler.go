@@ -103,9 +103,45 @@ func (gh *gameHandler) getLookHandler() gameHandlerCommandHandler {
 			return lookAtLocation(core.ActorList{gh.actor}, terminalWidth, gh.actor.Location()), nil
 		}
 
+		targetKW := strings.ToLower(params[0])
+
+		// If we're asked to look in a particular direction, look at the
+		// Location in that direction (if there's even an Exit).
+		var dirLook bool
+		for _, dir := range orderedDirections {
+			if targetKW == dir {
+				dirLook = true
+				break
+			}
+		}
+		if dirLook {
+			var exit *core.Exit
+			for _, maybeExit := range gh.actor.Location().OutExits() {
+				if maybeExit.Direction() == targetKW {
+					exit = maybeExit
+					break
+				}
+			}
+			if exit == nil {
+				return []byte("No exit in that direction!\n"), nil
+			}
+			var targetLoc *core.Location
+			if exit.Destination() != nil {
+				targetLoc = exit.Destination()
+			} else {
+				targetZone := gh.world.ZoneByID(exit.OtherZoneID())
+				if targetZone != nil {
+					targetLoc = targetZone.LocationByID(exit.OtherZoneLocID())
+				}
+			}
+			if targetLoc == nil {
+				return []byte("Weird, there's an exit that way, but it goes nowhere..."), nil
+			}
+			return lookAtLocation(core.ActorList{gh.actor}, terminalWidth, targetLoc), nil
+		}
+
 		// Otherwise, look at a particular object
 		// Start by looking for a kw match in the inventory
-		targetKW := strings.ToLower(params[0])
 		var targetObj *core.Object
 		targetObj = keywordMatch(targetKW, gh.actor.Objects())
 		if targetObj == nil {
