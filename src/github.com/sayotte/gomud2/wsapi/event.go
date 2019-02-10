@@ -13,6 +13,8 @@ const (
 	EventTypeActorMove           = "actor-move"
 	EventTypeActorAddToZone      = "actor-add-to-zone"
 	EventTypeActorRemoveFromZone = "actor-remove-from-zone"
+	EventTypeActorMigrateIn      = "actor-migrate-in"
+	EventTypeActorMigrateOut     = "actor-migrate-out"
 	//EventTypeLocationAddToZone
 	//EventTypeExitAddToZone
 	EventTypeObjectAddToZone      = "object-add-to-zone"
@@ -51,6 +53,12 @@ func eventFromDomainEvent(from core.Event) (Event, error) {
 	case core.EventTypeActorRemoveFromZone:
 		e.EventType = EventTypeActorRemoveFromZone
 		frommer = &ActorRemoveFromZoneEventBody{}
+	case core.EventTypeActorMigrateIn:
+		e.EventType = EventTypeActorMigrateIn
+		frommer = &ActorMigrateInEventBody{}
+	case core.EventTypeActorMigrateOut:
+		e.EventType = EventTypeActorMigrateOut
+		frommer = &ActorMigrateOutEventBody{}
 	case core.EventTypeObjectAddToZone:
 		e.EventType = EventTypeObjectAddToZone
 		frommer = &ObjectAddToZoneEventBody{}
@@ -105,6 +113,42 @@ type ActorRemoveFromZoneEventBody struct {
 func (arfzeb *ActorRemoveFromZoneEventBody) populateFromDomain(e core.Event) {
 	typedEvent := e.(*core.ActorRemoveFromZoneEvent)
 	arfzeb.ActorID = typedEvent.ActorID()
+}
+
+type ActorMigrateInEventBody struct {
+	ActorID    uuid.UUID `json:"actorID"`
+	Name       string    `json:"name"`
+	FromLocID  uuid.UUID `json:"fromLocID"`
+	FromZoneID uuid.UUID `json:"fromZoneID"`
+	ToLocID    uuid.UUID `json:"toLocID"`
+}
+
+func (amieb *ActorMigrateInEventBody) populateFromDomain(e core.Event) {
+	from := e.(*core.ActorMigrateInEvent)
+	*amieb = ActorMigrateInEventBody{
+		ActorID:    from.ActorID,
+		Name:       from.Name,
+		FromLocID:  from.FromLocID,
+		FromZoneID: from.FromZoneID,
+		ToLocID:    from.ToLocID,
+	}
+}
+
+type ActorMigrateOutEventBody struct {
+	ActorID   uuid.UUID `json:"actorID"`
+	FromLocID uuid.UUID `json:"fromLocID"`
+	ToZoneID  uuid.UUID `json:"toZoneID"`
+	ToLocID   uuid.UUID `json:"toLocID"`
+}
+
+func (amoeb *ActorMigrateOutEventBody) populateFromDomain(e core.Event) {
+	from := e.(*core.ActorMigrateOutEvent)
+	*amoeb = ActorMigrateOutEventBody{
+		ActorID:   from.ActorID,
+		FromLocID: from.FromLocID,
+		ToZoneID:  from.ToZoneID,
+		ToLocID:   from.ToLocID,
+	}
 }
 
 type ObjectAddToZoneEventBody struct {
