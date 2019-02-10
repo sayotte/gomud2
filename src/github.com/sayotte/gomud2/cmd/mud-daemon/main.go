@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	//_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
@@ -471,6 +472,11 @@ func doBasicBidirectionalExits(fromLoc, toLoc *core.Location, dir string, z *cor
 }
 
 func runWorld(world *core.World, cfg mudConfig) error {
+	// Launch a pprof webserver on port 8080
+	//go func() {
+	//	log.Println(http.ListenAndServe("localhost:8080", nil))
+	//}()
+
 	// Dump all metrics to stdout every 5 seconds
 	//go metrics.Write(metrics.DefaultRegistry, time.Second*5, os.Stdout)
 
