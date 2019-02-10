@@ -3,6 +3,7 @@ package wsapi
 import (
 	"encoding/json"
 	"github.com/satori/go.uuid"
+	"github.com/sayotte/gomud2/commands"
 )
 
 type Message struct {
@@ -12,13 +13,15 @@ type Message struct {
 }
 
 const (
-	MessageTypeProcessingError     = "processing-error"
-	MessageTypeListActorsCommand   = "list-actors"
-	MessageTypeListActorsComplete  = "actors-list"
-	MessageTypeAttachActorCommand  = "attach-actor"
-	MessageTypeAttachActorComplete = "actor-attached"
-	MessageTypeMoveActorCommand    = "move-actor"
-	MessageTypeEvent               = "event"
+	MessageTypeProcessingError               = "processing-error"
+	MessageTypeListActorsCommand             = "list-actors"
+	MessageTypeListActorsComplete            = "actors-list"
+	MessageTypeAttachActorCommand            = "attach-actor"
+	MessageTypeAttachActorComplete           = "actor-attached"
+	MessageTypeMoveActorCommand              = "move-actor"
+	MessageTypeEvent                         = "event"
+	MessageTypeGetCurrentLocationInfoCommand = "get-current-location-info"
+	MessageTypeCurrentLocationInfoComplete   = "current-location-info"
 )
 
 type CompleteListActors struct {
@@ -36,3 +39,5 @@ type CompleteAttachActor struct {
 type CommandMoveActor struct {
 	Direction string
 }
+
+type CurrentLocationInfo commands.LocationInfo

@@ -195,6 +195,8 @@ func (s *session) handleMessage(msg Message) {
 		s.handleCommandListActors(msg)
 	case MessageTypeMoveActorCommand:
 		s.handleCommandMoveActor(msg)
+	case MessageTypeGetCurrentLocationInfoCommand:
+		s.handleCommandGetCurrentLocInfo(msg)
 	default:
 		fmt.Printf("WSAPI ERROR: session received message of type %q\n", msg.Type)
 		s.sendCloseDetachAndStop(websocket.CloseProtocolError, fmt.Sprintf("unhandleable API message type %q", msg.Type))
@@ -329,4 +331,16 @@ func (s *session) handleCommandMoveActor(msg Message) {
 		return
 	}
 	s.actor = newActor
+}
+
+func (s *session) handleCommandGetCurrentLocInfo(msg Message) {
+	if s.actor == nil {
+		return
+	}
+	lInfo := commands.LookAtLocation(s.actor.Location())
+	s.sendMessage(
+		MessageTypeCurrentLocationInfoComplete,
+		CurrentLocationInfo(lInfo),
+		msg.MessageID,
+	)
 }
