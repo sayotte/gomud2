@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"path/filepath"
 	"runtime/pprof"
 	"sync"
@@ -470,6 +471,9 @@ func doBasicBidirectionalExits(fromLoc, toLoc *core.Location, dir string, z *cor
 }
 
 func runWorld(world *core.World, cfg mudConfig) error {
+	// Dump all metrics to stdout every 5 seconds
+	//go metrics.Write(metrics.DefaultRegistry, time.Second*5, os.Stdout)
+
 	authServer := &auth.Server{
 		AccountDatabaseFile: "auth.db",
 	}

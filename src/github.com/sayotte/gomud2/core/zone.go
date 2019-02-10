@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rcrowley/go-metrics"
 	"github.com/satori/go.uuid"
 
 	"github.com/sayotte/gomud2/rpc"
@@ -248,6 +249,7 @@ func (z *Zone) syncRequestToSelf(c Command) (interface{}, error) {
 }
 
 func (z *Zone) StartCommandProcessing() {
+	timer := metrics.GetOrRegisterTimer(z.Tag()+"-command-processing-latency", metrics.DefaultRegistry)
 	z.privateRequestChan = make(chan rpc.Request, zoneRequestChannelCapacity)
 	z.stopChan = make(chan struct{})
 	go func() {
@@ -262,12 +264,14 @@ func (z *Zone) StartCommandProcessing() {
 				// FIXME unsure how wide the window should be, perhaps 100ms?
 				// FIXME unsure how much to delay, probably a function of average latency?
 				e := req.Payload.(Command)
+				start := time.Now()
 				value, err := z.processCommand(e)
 				response := rpc.Response{
 					Err:   err,
 					Value: value,
 				}
 				req.ResponseChan <- response
+				timer.UpdateSince(start)
 				//fmt.Printf("CORE STATS: command processing duration: %dus\n", duration/time.Microsecond)
 			}
 			//fmt.Printf("CORE STATS: zone %q queue-len is %d/%d\n", z.Tag(), len(z.privateRequestChan), cap(z.privateRequestChan))

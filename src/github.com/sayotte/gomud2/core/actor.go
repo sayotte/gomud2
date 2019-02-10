@@ -22,12 +22,12 @@ func NewActor(id uuid.UUID, name, brainType string, location *Location, zone *Zo
 		newID = myuuid.NewId()
 	}
 	return &Actor{
-		id:       newID,
-		name:     name,
-		location: location,
-		zone:     zone,
+		id:        newID,
+		name:      name,
+		location:  location,
+		zone:      zone,
 		brainType: brainType,
-		rwlock:   &sync.RWMutex{},
+		rwlock:    &sync.RWMutex{},
 	}
 }
 

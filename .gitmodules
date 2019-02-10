@@ -19,3 +19,6 @@
 [submodule "src/vendor/github.com/gorilla/websocket"]
 	path = src/vendor/github.com/gorilla/websocket
 	url = https://github.com/gorilla/websocket.git
+[submodule "src/vendor/github.com/rcrowley/go-metrics"]
+	path = src/vendor/github.com/rcrowley/go-metrics
+	url = https://github.com/rcrowley/go-metrics.git
