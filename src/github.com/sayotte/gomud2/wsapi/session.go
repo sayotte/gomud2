@@ -331,6 +331,7 @@ func (s *session) handleCommandMoveActor(msg Message) {
 		return
 	}
 	s.actor = newActor
+	s.sendMessage(MessageTypeMoveActorComplete, nil, msg.MessageID)
 }
 
 func (s *session) handleCommandGetCurrentLocInfo(msg Message) {

@@ -19,6 +19,7 @@ const (
 	MessageTypeAttachActorCommand            = "attach-actor"
 	MessageTypeAttachActorComplete           = "actor-attached"
 	MessageTypeMoveActorCommand              = "move-actor"
+	MessageTypeMoveActorComplete             = "move-actor-complete"
 	MessageTypeEvent                         = "event"
 	MessageTypeGetCurrentLocationInfoCommand = "get-current-location-info"
 	MessageTypeCurrentLocationInfoComplete   = "current-location-info"
