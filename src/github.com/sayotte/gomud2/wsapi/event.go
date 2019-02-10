@@ -92,7 +92,7 @@ type ActorAddToZoneEventBody struct {
 }
 
 func (aatzeb *ActorAddToZoneEventBody) populateFromDomain(e core.Event) {
-	typedEvent := e.(core.ActorAddToZoneEvent)
+	typedEvent := e.(*core.ActorAddToZoneEvent)
 	aatzeb.ActorID = typedEvent.ActorID()
 	aatzeb.Name = typedEvent.Name()
 	aatzeb.StartingLocationID = typedEvent.StartingLocationID()
@@ -103,7 +103,7 @@ type ActorRemoveFromZoneEventBody struct {
 }
 
 func (arfzeb *ActorRemoveFromZoneEventBody) populateFromDomain(e core.Event) {
-	typedEvent := e.(core.ActorRemoveFromZoneEvent)
+	typedEvent := e.(*core.ActorRemoveFromZoneEvent)
 	arfzeb.ActorID = typedEvent.ActorID()
 }
 
@@ -116,7 +116,7 @@ type ObjectAddToZoneEventBody struct {
 }
 
 func (oatzeb *ObjectAddToZoneEventBody) populateFromDomain(e core.Event) {
-	typedEvent := e.(core.ObjectAddToZoneEvent)
+	typedEvent := e.(*core.ObjectAddToZoneEvent)
 	oatzeb.ObjectID = typedEvent.ObjectID
 	oatzeb.Name = typedEvent.Name
 	oatzeb.LocationContainerID = typedEvent.LocationContainerID
@@ -130,7 +130,7 @@ type ObjectRemoveFromZoneEventBody struct {
 }
 
 func (orfzeb *ObjectRemoveFromZoneEventBody) populateFromDomain(e core.Event) {
-	typedEvent := e.(core.ObjectRemoveFromZoneEvent)
+	typedEvent := e.(*core.ObjectRemoveFromZoneEvent)
 	orfzeb.ObjectID = typedEvent.ObjectID
 	orfzeb.Name = typedEvent.Name
 }
@@ -146,7 +146,7 @@ type ObjectMoveEventBody struct {
 }
 
 func (omeb *ObjectMoveEventBody) populateFromDomain(e core.Event) {
-	typedEvent := e.(core.ObjectMoveEvent)
+	typedEvent := e.(*core.ObjectMoveEvent)
 	omeb.ObjectID = typedEvent.ObjectID
 	omeb.FromLocationContainerID = typedEvent.FromLocationContainerID
 	omeb.FromActorContainerID = typedEvent.FromActorContainerID
