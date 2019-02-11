@@ -60,27 +60,10 @@ func (w *World) LoadAndStart(zoneTags []string, defaultZoneID, defaultLocID uuid
 	}
 
 	for _, zoneTag := range zoneTags {
-		tagParts := strings.Split(zoneTag, "/")
-		zoneID, err := uuid.FromString(tagParts[1])
-		if err != nil {
-			return fmt.Errorf("uuid.FromString(%q): %s", tagParts[1], err)
-		}
-		z := NewZone(zoneID, tagParts[0], nil)
-		err = w.AddZone(z)
+		err = w.LoadZone(zoneTag)
 		if err != nil {
 			return err
 		}
-
-		eChan, err := w.DataStore.RetrieveAllEventsForZone(zoneID)
-		if err != nil {
-			return err
-		}
-		err = z.ReplayEvents(eChan)
-		if err != nil {
-			return err
-		}
-
-		z.setPersister(w.DataStore)
 	}
 
 	defaultZone := w.ZoneByID(defaultZoneID)
@@ -94,11 +77,40 @@ func (w *World) LoadAndStart(zoneTags []string, defaultZoneID, defaultLocID uuid
 	w.frontDoorZone = defaultZone
 	w.frontDoorLocation = defaultLoc
 
-	for _, zone := range w.Zones() {
-		zone.StartCommandProcessing()
+	err = w.ReplayIntentLog()
+	if err != nil {
+		return err
 	}
 
-	err = w.ReplayIntentLog()
+	return nil
+}
+
+// LoadZone creates a Zone with the given tag, finds all events in the
+// datastore associated with that tag and replays them into the Zone, and then
+// adds the Zone to the World in a runtime-safe fashion (i.e. this can be
+// called while the World is live).
+func (w *World) LoadZone(zoneTag string) error {
+	tagParts := strings.Split(zoneTag, "/")
+	zoneID, err := uuid.FromString(tagParts[1])
+	if err != nil {
+		return fmt.Errorf("uuid.FromString(%q): %s", tagParts[1], err)
+	}
+	z := NewZone(zoneID, tagParts[0], nil)
+
+	eChan, err := w.DataStore.RetrieveAllEventsForZone(zoneID)
+	if err != nil {
+		return err
+	}
+	err = z.ReplayEvents(eChan)
+	if err != nil {
+		return err
+	}
+
+	z.setPersister(w.DataStore)
+
+	z.StartCommandProcessing()
+
+	err = w.AddZone(z)
 	if err != nil {
 		return err
 	}
