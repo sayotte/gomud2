@@ -22,3 +22,15 @@
 [submodule "src/vendor/github.com/rcrowley/go-metrics"]
 	path = src/vendor/github.com/rcrowley/go-metrics
 	url = https://github.com/rcrowley/go-metrics.git
+[submodule "src/vendor/github.com/abiosoft/ishell"]
+	path = src/vendor/github.com/abiosoft/ishell
+	url = https://github.com/abiosoft/ishell.git
+[submodule "src/vendor/github.com/abiosoft/readline"]
+	path = src/vendor/github.com/abiosoft/readline
+	url = https://github.com/abiosoft/readline.git
+[submodule "src/vendor/github.com/flynn-archive/go-shlex"]
+	path = src/vendor/github.com/flynn-archive/go-shlex
+	url = https://github.com/flynn-archive/go-shlex.git
+[submodule "src/vendor/github.com/fatih/color"]
+	path = src/vendor/github.com/fatih/color
+	url = https://github.com/fatih/color.git

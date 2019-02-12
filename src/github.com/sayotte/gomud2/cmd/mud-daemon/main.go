@@ -28,12 +28,14 @@ type cliArgs struct {
 	initStartingZone bool
 	worldConfigFile  string
 	cpuProfile       string
+	debug            bool
 }
 
 func parseCliArgs() (cliArgs, error) {
 	initStartingZone := flag.Bool("initWorld", false, "Create a default world with some locations, exits, objects and actors; persist the related events, then exit.")
 	worldConfig := flag.String("config", "mudConfig.yaml", "Configuration file for MUD daemon")
 	cpuProfile := flag.String("cpuprofile", "", "Write CPU profile information to this file")
+	debug := flag.Bool("debug", false, "Enter an interactive debugger (this does not attach to a running MUD instance)")
 
 	flag.Parse()
 
@@ -42,6 +44,7 @@ func parseCliArgs() (cliArgs, error) {
 	args.initStartingZone = *initStartingZone
 	args.worldConfigFile = *worldConfig
 	args.cpuProfile = *cpuProfile
+	args.debug = *debug
 
 	return args, nil
 }
@@ -81,6 +84,18 @@ func main() {
 	err = (&cfg).DeserializeFromFile(args.worldConfigFile)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if args.debug {
+		dataStore := &store.EventStore{
+			Filename:          cfg.Store.EventsFile,
+			UseCompression:    cfg.Store.UseCompression,
+			SnapshotDirectory: filepath.Clean(cfg.Store.SnapshotDirectory),
+		}
+		debugger := &debugger{}
+		debugger.init(&cfg, dataStore)
+		debugger.run()
+		return
 	}
 
 	world := core.NewWorld()

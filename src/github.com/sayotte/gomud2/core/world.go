@@ -66,16 +66,20 @@ func (w *World) LoadAndStart(zoneTags []string, defaultZoneID, defaultLocID uuid
 		}
 	}
 
-	defaultZone := w.ZoneByID(defaultZoneID)
-	if defaultZone == nil {
-		return fmt.Errorf("default Zone %q not found in World", defaultZoneID)
+	if !uuid.Equal(defaultZoneID, uuid.Nil) {
+		defaultZone := w.ZoneByID(defaultZoneID)
+		if defaultZone == nil {
+			return fmt.Errorf("default Zone %q not found in World", defaultZoneID)
+		}
+		defaultLoc := defaultZone.LocationByID(defaultLocID)
+		if defaultLoc == nil {
+			return fmt.Errorf("default Location %q not found in default Zone", defaultLocID)
+		}
+		w.frontDoorZone = defaultZone
+		w.frontDoorLocation = defaultLoc
+	} else {
+		fmt.Println("CORE WARNING: starting World with no default Zone/Location; this makes sense in a debugging context, but otherwise is surely an error")
 	}
-	defaultLoc := defaultZone.LocationByID(defaultLocID)
-	if defaultLoc == nil {
-		return fmt.Errorf("default Location %q not found in default Zone", defaultLocID)
-	}
-	w.frontDoorZone = defaultZone
-	w.frontDoorLocation = defaultLoc
 
 	err = w.ReplayIntentLog()
 	if err != nil {
