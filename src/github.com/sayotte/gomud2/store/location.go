@@ -15,9 +15,9 @@ func (latze *locationAddToZoneEvent) FromDomain(e core.Event) {
 	from := e.(*core.LocationAddToZoneEvent)
 	*latze = locationAddToZoneEvent{
 		header:     eventHeaderFromDomainEvent(from),
-		LocationID: from.LocationID(),
-		ShortDesc:  from.ShortDescription(),
-		Desc:       from.Description(),
+		LocationID: from.LocationID,
+		ShortDesc:  from.ShortDesc,
+		Desc:       from.Desc,
 	}
 }
 
@@ -77,9 +77,9 @@ func (lue *locationUpdateEvent) FromDomain(e core.Event) {
 	from := e.(*core.LocationUpdateEvent)
 	*lue = locationUpdateEvent{
 		header:     eventHeaderFromDomainEvent(from),
-		LocationID: from.LocationID(),
-		ShortDesc:  from.ShortDescription(),
-		Desc:       from.Description(),
+		LocationID: from.LocationID,
+		ShortDesc:  from.ShortDesc,
+		Desc:       from.Desc,
 	}
 }
 

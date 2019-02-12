@@ -138,16 +138,16 @@ func (w *World) handleIncompleteTransactions(redo, undo []Event) error {
 			return fmt.Errorf("unhandleable World undo-event type %T", e)
 		}
 		readdEvent := e.(ActorAddToZoneEvent)
-		oldZone, found := w.zonesByID[readdEvent.aggregateId]
+		oldZone, found := w.zonesByID[readdEvent.AggregateID]
 		if !found {
-			return fmt.Errorf("no such Zone with ID %q", readdEvent.aggregateId)
+			return fmt.Errorf("no such Zone with ID %q", readdEvent.AggregateID)
 		}
-		oldLoc := oldZone.LocationByID(readdEvent.startingLocationId)
+		oldLoc := oldZone.LocationByID(readdEvent.StartingLocationID)
 		if oldLoc == nil {
-			return fmt.Errorf("no such Location with ID %q", readdEvent.startingLocationId)
+			return fmt.Errorf("no such Location with ID %q", readdEvent.StartingLocationID)
 		}
 
-		actor := NewActor(readdEvent.actorId, readdEvent.Name(), readdEvent.BrainType, oldLoc, oldZone)
+		actor := NewActor(readdEvent.ActorID, readdEvent.Name, readdEvent.BrainType, oldLoc, oldZone)
 		_, err := oldZone.AddActor(actor)
 		if err != nil {
 			return err

@@ -78,9 +78,9 @@ func (aatze *actorAddToZoneEvent) FromDomain(e core.Event) {
 	from := e.(*core.ActorAddToZoneEvent)
 	*aatze = actorAddToZoneEvent{
 		header:             eventHeaderFromDomainEvent(from),
-		ActorID:            from.ActorID(),
-		StartingLocationID: from.StartingLocationID(),
-		Name:               from.Name(),
+		ActorID:            from.ActorID,
+		StartingLocationID: from.StartingLocationID,
+		Name:               from.Name,
 		BrainType:          from.BrainType,
 	}
 }
@@ -114,7 +114,7 @@ func (arfze *actorRemoveFromZoneEvent) FromDomain(e core.Event) {
 	from := e.(*core.ActorRemoveFromZoneEvent)
 	*arfze = actorRemoveFromZoneEvent{
 		header:  eventHeaderFromDomainEvent(from),
-		ActorID: from.ActorID(),
+		ActorID: from.ActorID,
 	}
 }
 

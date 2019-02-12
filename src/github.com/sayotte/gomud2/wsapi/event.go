@@ -101,9 +101,9 @@ type ActorAddToZoneEventBody struct {
 
 func (aatzeb *ActorAddToZoneEventBody) populateFromDomain(e core.Event) {
 	typedEvent := e.(*core.ActorAddToZoneEvent)
-	aatzeb.ActorID = typedEvent.ActorID()
-	aatzeb.Name = typedEvent.Name()
-	aatzeb.StartingLocationID = typedEvent.StartingLocationID()
+	aatzeb.ActorID = typedEvent.ActorID
+	aatzeb.Name = typedEvent.Name
+	aatzeb.StartingLocationID = typedEvent.StartingLocationID
 }
 
 type ActorRemoveFromZoneEventBody struct {
@@ -112,7 +112,7 @@ type ActorRemoveFromZoneEventBody struct {
 
 func (arfzeb *ActorRemoveFromZoneEventBody) populateFromDomain(e core.Event) {
 	typedEvent := e.(*core.ActorRemoveFromZoneEvent)
-	arfzeb.ActorID = typedEvent.ActorID()
+	arfzeb.ActorID = typedEvent.ActorID
 }
 
 type ActorMigrateInEventBody struct {

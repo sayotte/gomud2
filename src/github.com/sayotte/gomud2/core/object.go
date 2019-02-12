@@ -202,10 +202,10 @@ type objectAddToZoneCommand struct {
 func NewObjectAddToZoneEvent(name, desc string, keywords []string, capacity int, objectId, locationContainerID, actorContainerID, objectContainerID, zoneId uuid.UUID) *ObjectAddToZoneEvent {
 	return &ObjectAddToZoneEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeObjectAddToZone,
-			version:       1,
-			aggregateId:   zoneId,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeObjectAddToZone,
+			VersionNum:        1,
+			AggregateID:       zoneId,
+			ShouldPersistBool: true,
 		},
 		ObjectID:            objectId,
 		Name:                name,
@@ -242,10 +242,10 @@ type objectRemoveFromZoneCommand struct {
 func NewObjectRemoveFromZoneEvent(name string, objectID, zoneID uuid.UUID) *ObjectRemoveFromZoneEvent {
 	return &ObjectRemoveFromZoneEvent{
 		&eventGeneric{
-			eventType:     EventTypeObjectRemoveFromZone,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeObjectRemoveFromZone,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		objectID,
 		name,
@@ -279,10 +279,10 @@ type objectMoveCommand struct {
 func NewObjectMoveEvent(objID, actorID, zoneID uuid.UUID) *ObjectMoveEvent {
 	return &ObjectMoveEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeObjectMove,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeObjectMove,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		ObjectID: objID,
 		ActorID:  actorID,
@@ -312,10 +312,10 @@ type objectAdminRelocateCommand struct {
 func NewObjectAdminRelocateEvent(objectID, zoneID uuid.UUID) *ObjectAdminRelocateEvent {
 	return &ObjectAdminRelocateEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeObjectAdminRelocate,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeObjectAdminRelocate,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		ObjectID: objectID,
 	}
@@ -330,10 +330,10 @@ type ObjectAdminRelocateEvent struct {
 func NewObjectMigrateInEvent(name, desc string, keywords []string, capacity int, objID, fromZoneID, locContainerID, actorContainerID, objContainerID, zoneID uuid.UUID) *ObjectMigrateInEvent {
 	return &ObjectMigrateInEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeObjectMigrateIn,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeObjectMigrateIn,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		ObjectID:            objID,
 		Name:                name,
@@ -360,10 +360,10 @@ type ObjectMigrateInEvent struct {
 func NewObjectMigrateOutEvent(name string, objID, toZoneID, zoneID uuid.UUID) *ObjectMigrateOutEvent {
 	return &ObjectMigrateOutEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeObjectMigrateOut,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeObjectMigrateOut,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		ObjectID: objID,
 		Name:     name,

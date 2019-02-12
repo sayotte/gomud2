@@ -36,33 +36,33 @@ type Event interface {
 }
 
 type eventGeneric struct {
-	eventType      int
-	version        int
-	aggregateId    uuid.UUID
-	sequenceNumber uint64
-	shouldPersist  bool
+	SequenceNum       uint64
+	EventTypeNum      int
+	VersionNum        int
+	AggregateID       uuid.UUID
+	ShouldPersistBool bool
 }
 
 func (eg eventGeneric) Type() int {
-	return eg.eventType
+	return eg.EventTypeNum
 }
 
 func (eg eventGeneric) Version() int {
-	return eg.version
+	return eg.VersionNum
 }
 
 func (eg eventGeneric) AggregateId() uuid.UUID {
-	return eg.aggregateId
+	return eg.AggregateID
 }
 
 func (eg eventGeneric) SequenceNumber() uint64 {
-	return eg.sequenceNumber
+	return eg.SequenceNum
 }
 
 func (eg *eventGeneric) SetSequenceNumber(num uint64) {
-	eg.sequenceNumber = num
+	eg.SequenceNum = num
 }
 
 func (eg eventGeneric) ShouldPersist() bool {
-	return eg.shouldPersist
+	return eg.ShouldPersistBool
 }

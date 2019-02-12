@@ -224,10 +224,10 @@ type actorMoveCommand struct {
 func NewActorMoveEvent(fromLocationId, toLocationId, actorId, zoneId uuid.UUID) *ActorMoveEvent {
 	return &ActorMoveEvent{
 		&eventGeneric{
-			eventType:     EventTypeActorMove,
-			version:       1,
-			aggregateId:   zoneId,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeActorMove,
+			VersionNum:        1,
+			AggregateID:       zoneId,
+			ShouldPersistBool: true,
 		},
 		fromLocationId,
 		toLocationId,
@@ -237,13 +237,13 @@ func NewActorMoveEvent(fromLocationId, toLocationId, actorId, zoneId uuid.UUID) 
 
 type ActorMoveEvent struct {
 	*eventGeneric
-	fromLocationId uuid.UUID
-	toLocationId   uuid.UUID
-	actorId        uuid.UUID
+	FromLocationId uuid.UUID
+	ToLocationId   uuid.UUID
+	ActorId        uuid.UUID
 }
 
 func (ame ActorMoveEvent) FromToActorIDs() (uuid.UUID, uuid.UUID, uuid.UUID) {
-	return ame.fromLocationId, ame.toLocationId, ame.actorId
+	return ame.FromLocationId, ame.ToLocationId, ame.ActorId
 }
 
 func newActorAdminRelocateCommand(wrapped *ActorAdminRelocateEvent) actorAdminRelocateCommand {
@@ -261,10 +261,10 @@ type actorAdminRelocateCommand struct {
 func NewActorAdminRelocateEvent(actorID, locID, zoneID uuid.UUID) *ActorAdminRelocateEvent {
 	return &ActorAdminRelocateEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeActorAdminRelocate,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeActorAdminRelocate,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		ActorID:      actorID,
 		ToLocationID: locID,
@@ -292,10 +292,10 @@ type actorAddToZoneCommand struct {
 func NewActorAddToZoneEvent(name, brainType string, actorId, startingLocationId, zoneId uuid.UUID) *ActorAddToZoneEvent {
 	return &ActorAddToZoneEvent{
 		&eventGeneric{
-			eventType:     EventTypeActorAddToZone,
-			version:       1,
-			aggregateId:   zoneId,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeActorAddToZone,
+			VersionNum:        1,
+			AggregateID:       zoneId,
+			ShouldPersistBool: true,
 		},
 		actorId,
 		name,
@@ -306,21 +306,9 @@ func NewActorAddToZoneEvent(name, brainType string, actorId, startingLocationId,
 
 type ActorAddToZoneEvent struct {
 	*eventGeneric
-	actorId            uuid.UUID
-	name, BrainType    string
-	startingLocationId uuid.UUID
-}
-
-func (aatze ActorAddToZoneEvent) ActorID() uuid.UUID {
-	return aatze.actorId
-}
-
-func (aatze ActorAddToZoneEvent) Name() string {
-	return aatze.name
-}
-
-func (aatze ActorAddToZoneEvent) StartingLocationID() uuid.UUID {
-	return aatze.startingLocationId
+	ActorID            uuid.UUID
+	Name, BrainType    string
+	StartingLocationID uuid.UUID
 }
 
 func newActorRemoveFromZoneCommand(wrapped *ActorRemoveFromZoneEvent) *actorRemoveFromZoneCommand {
@@ -338,10 +326,10 @@ type actorRemoveFromZoneCommand struct {
 func NewActorRemoveFromZoneEvent(actorID, zoneID uuid.UUID) ActorRemoveFromZoneEvent {
 	return ActorRemoveFromZoneEvent{
 		&eventGeneric{
-			eventType:     EventTypeActorRemoveFromZone,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeActorRemoveFromZone,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		actorID,
 	}
@@ -349,11 +337,7 @@ func NewActorRemoveFromZoneEvent(actorID, zoneID uuid.UUID) ActorRemoveFromZoneE
 
 type ActorRemoveFromZoneEvent struct {
 	*eventGeneric
-	actorID uuid.UUID
-}
-
-func (arfze ActorRemoveFromZoneEvent) ActorID() uuid.UUID {
-	return arfze.actorID
+	ActorID uuid.UUID
 }
 
 func newActorMigrateInCommand(actor *Actor, from, to *Location, oList ObserverList) *actorMigrateInCommand {
@@ -376,10 +360,10 @@ type actorMigrateInCommand struct {
 func NewActorMigrateInEvent(name, brainType string, actorID, fromLocID, fromZoneID, toLocID, zoneID uuid.UUID) *ActorMigrateInEvent {
 	return &ActorMigrateInEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeActorMigrateIn,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeActorMigrateIn,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		Name:       name,
 		BrainType:  brainType,
@@ -416,10 +400,10 @@ type actorMigrateOutCommand struct {
 func NewActorMigrateOutEvent(actorID, fromLocID, toLocID, toZoneID, zoneID uuid.UUID) *ActorMigrateOutEvent {
 	return &ActorMigrateOutEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeActorMigrateOut,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeActorMigrateOut,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		ActorID:   actorID,
 		FromLocID: fromLocID,

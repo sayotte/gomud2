@@ -356,13 +356,13 @@ func (z *Zone) processActorAddToZoneCommand(c Command) (interface{}, []Event, er
 	cmd := c.(actorAddToZoneCommand)
 	e := cmd.wrappedEvent
 
-	_, ok := z.locationsById[e.startingLocationId]
+	_, ok := z.locationsById[e.StartingLocationID]
 	if !ok {
-		return nil, nil, fmt.Errorf("unknown startingLocation %q", e.startingLocationId)
+		return nil, nil, fmt.Errorf("unknown startingLocation %q", e.StartingLocationID)
 	}
-	_, duplicate := z.actorsById[e.actorId]
+	_, duplicate := z.actorsById[e.ActorID]
 	if duplicate {
-		return nil, nil, fmt.Errorf("Actor %q already present in zone", e.actorId)
+		return nil, nil, fmt.Errorf("Actor %q already present in zone", e.ActorID)
 	}
 
 	e.SetSequenceNumber(z.nextSequenceId)
@@ -375,13 +375,13 @@ func (z *Zone) processActorMoveCommand(c Command) ([]Event, error) {
 	cmd := c.(actorMoveCommand)
 	e := cmd.wrappedEvent
 
-	from, ok := z.locationsById[e.fromLocationId]
+	from, ok := z.locationsById[e.FromLocationId]
 	if !ok {
-		return nil, fmt.Errorf("unknown from-location %q", e.fromLocationId)
+		return nil, fmt.Errorf("unknown from-location %q", e.FromLocationId)
 	}
-	to, ok := z.locationsById[e.toLocationId]
+	to, ok := z.locationsById[e.ToLocationId]
 	if !ok {
-		return nil, fmt.Errorf("unknown to-location %q", e.toLocationId)
+		return nil, fmt.Errorf("unknown to-location %q", e.ToLocationId)
 	}
 	exitExists := false
 	for _, exit := range from.OutExits() {
@@ -393,9 +393,9 @@ func (z *Zone) processActorMoveCommand(c Command) ([]Event, error) {
 	if !exitExists {
 		return nil, fmt.Errorf("no exit to that destination from location %q", from.ID())
 	}
-	_, ok = z.actorsById[e.actorId]
+	_, ok = z.actorsById[e.ActorId]
 	if !ok {
-		return nil, fmt.Errorf("unknown Actor %q", e.actorId)
+		return nil, fmt.Errorf("unknown Actor %q", e.ActorId)
 	}
 
 	e.SetSequenceNumber(z.nextSequenceId)
@@ -426,9 +426,9 @@ func (z *Zone) processActorAdminRelocateCommand(c Command) ([]Event, error) {
 func (z *Zone) processActorRemoveCommand(c Command) ([]Event, error) {
 	cmd := c.(actorRemoveFromZoneCommand)
 	e := cmd.wrappedEvent
-	_, found := z.actorsById[e.actorID]
+	_, found := z.actorsById[e.ActorID]
 	if !found {
-		return nil, fmt.Errorf("Actor %q not found in Zone", e.actorID)
+		return nil, fmt.Errorf("Actor %q not found in Zone", e.ActorID)
 	}
 
 	e.SetSequenceNumber(z.nextSequenceId)
@@ -539,9 +539,9 @@ func (z *Zone) processActorMigrateOutCommand(c Command) ([]Event, error) {
 func (z *Zone) processLocationAddToZoneCommand(c Command) (interface{}, []Event, error) {
 	cmd := c.(locationAddToZoneCommand)
 	e := cmd.wrappedEvent
-	_, duplicate := z.locationsById[e.locationId]
+	_, duplicate := z.locationsById[e.LocationID]
 	if duplicate {
-		return nil, nil, fmt.Errorf("Location with ID %q already present in Zone", e.locationId)
+		return nil, nil, fmt.Errorf("Location with ID %q already present in Zone", e.LocationID)
 	}
 
 	e.SetSequenceNumber(z.nextSequenceId)
@@ -554,9 +554,9 @@ func (z *Zone) processLocationUpdateCommand(c Command) ([]Event, error) {
 	cmd := c.(locationUpdateCommand)
 	e := cmd.wrappedEvent
 
-	_, ok := z.locationsById[e.locationID]
+	_, ok := z.locationsById[e.LocationID]
 	if !ok {
-		return nil, fmt.Errorf("unknown Location %q", e.locationID)
+		return nil, fmt.Errorf("unknown Location %q", e.LocationID)
 	}
 
 	e.SetSequenceNumber(z.nextSequenceId)
@@ -1013,14 +1013,14 @@ func (z *Zone) applyEvent(e Event) (interface{}, error) {
 }
 
 func (z *Zone) applyActorAddToZoneEvent(e *ActorAddToZoneEvent) (*Actor, ObserverList, error) {
-	newLoc := z.locationsById[e.startingLocationId]
+	newLoc := z.locationsById[e.StartingLocationID]
 	if newLoc == nil {
 		if z.defaultLocation == nil {
-			return nil, nil, fmt.Errorf("cannot resolve StartingLocationID %q, and no default Location set for Zone", e.startingLocationId)
+			return nil, nil, fmt.Errorf("cannot resolve StartingLocationID %q, and no default Location set for Zone", e.StartingLocationID)
 		}
 		newLoc = z.defaultLocation
 	}
-	actor := NewActor(e.ActorID(), e.name, e.BrainType, newLoc, z)
+	actor := NewActor(e.ActorID, e.Name, e.BrainType, newLoc, z)
 
 	newLoc.addActor(actor)
 	actor.setLocation(newLoc)
@@ -1032,9 +1032,9 @@ func (z *Zone) applyActorAddToZoneEvent(e *ActorAddToZoneEvent) (*Actor, Observe
 }
 
 func (z *Zone) applyActorMoveEvent(e *ActorMoveEvent) (ObserverList, error) {
-	fromLoc := z.locationsById[e.fromLocationId]
-	toLoc := z.locationsById[e.toLocationId]
-	actor := z.actorsById[e.actorId]
+	fromLoc := z.locationsById[e.FromLocationId]
+	toLoc := z.locationsById[e.ToLocationId]
+	actor := z.actorsById[e.ActorId]
 
 	if fromLoc == nil || toLoc == nil || actor == nil {
 		return nil, errors.New("cannot resolve From/To/Actor IDs in event")
@@ -1087,7 +1087,7 @@ func (z *Zone) applyActorAdminRelocateEvent(e *ActorAdminRelocateEvent) (Observe
 }
 
 func (z *Zone) applyActorRemoveEvent(e *ActorRemoveFromZoneEvent) (ObserverList, error) {
-	actor := z.actorsById[e.actorID]
+	actor := z.actorsById[e.ActorID]
 	if actor == nil {
 		return nil, errors.New("cannot find Actor to remove")
 	}
@@ -1096,7 +1096,7 @@ func (z *Zone) applyActorRemoveEvent(e *ActorRemoveFromZoneEvent) (ObserverList,
 	oldLoc.removeActor(actor)
 	actor.setLocation(nil)
 	actor.setZone(nil)
-	delete(z.actorsById, e.actorID)
+	delete(z.actorsById, e.ActorID)
 
 	oList := oldLoc.Observers()
 
@@ -1137,23 +1137,23 @@ func (z *Zone) applyActorMigrateOutEvent(e *ActorMigrateOutEvent) (ObserverList,
 
 func (z *Zone) applyLocationAddToZoneEvent(e *LocationAddToZoneEvent) (*Location, error) {
 	loc := NewLocation(
-		e.locationId,
+		e.LocationID,
 		z,
-		e.shortDesc,
-		e.desc,
+		e.ShortDesc,
+		e.Desc,
 	)
-	z.locationsById[e.locationId] = loc
+	z.locationsById[e.LocationID] = loc
 	return loc, nil
 }
 
 func (z *Zone) applyLocationUpdateEvent(e *LocationUpdateEvent) error {
-	loc, ok := z.locationsById[e.locationID]
+	loc, ok := z.locationsById[e.LocationID]
 	if !ok {
-		return fmt.Errorf("unknown Location %q", e.locationID)
+		return fmt.Errorf("unknown Location %q", e.LocationID)
 	}
 
-	loc.setShortDescription(e.ShortDescription())
-	loc.setDescription(e.Description())
+	loc.setShortDescription(e.ShortDesc)
+	loc.setDescription(e.Desc)
 	return nil
 }
 
@@ -1509,10 +1509,10 @@ type zoneSetDefaultLocationCommand struct {
 func NewZoneSetDefaultLocationEvent(locID, zoneID uuid.UUID) *ZoneSetDefaultLocationEvent {
 	return &ZoneSetDefaultLocationEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeZoneSetDefaultLocation,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeZoneSetDefaultLocation,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		LocationID: locID,
 	}

@@ -203,10 +203,10 @@ type exitAddToZoneCommand struct {
 func NewExitAddToZoneEvent(desc, direction string, exitId, sourceId, destLocId, srcZoneId, destZoneID uuid.UUID) *ExitAddToZoneEvent {
 	return &ExitAddToZoneEvent{
 		&eventGeneric{
-			eventType:     EventTypeExitAddToZone,
-			version:       1,
-			aggregateId:   srcZoneId,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeExitAddToZone,
+			VersionNum:        1,
+			AggregateID:       srcZoneId,
+			ShouldPersistBool: true,
 		},
 		exitId,
 		desc,
@@ -242,10 +242,10 @@ type exitUpdateCommand struct {
 func NewExitUpdateEvent(desc, direction string, exitID, sourceID, destID, srcZoneID, extZoneID uuid.UUID) *ExitUpdateEvent {
 	xue := &ExitUpdateEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeExitUpdate,
-			version:       1,
-			aggregateId:   srcZoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeExitUpdate,
+			VersionNum:        1,
+			AggregateID:       srcZoneID,
+			ShouldPersistBool: true,
 		},
 		ExitID:           exitID,
 		Description:      desc,
@@ -282,10 +282,10 @@ type exitRemoveFromZoneCommand struct {
 func NewExitRemoveFromZoneEvent(exitID, zoneID uuid.UUID) *ExitRemoveFromZoneEvent {
 	return &ExitRemoveFromZoneEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeExitRemoveFromZone,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeExitRemoveFromZone,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		ExitID: exitID,
 	}

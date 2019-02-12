@@ -215,10 +215,10 @@ type locationAddToZoneCommand struct {
 func NewLocationAddToZoneEvent(shortDesc, desc string, locationId, zoneId uuid.UUID) *LocationAddToZoneEvent {
 	return &LocationAddToZoneEvent{
 		&eventGeneric{
-			eventType:     EventTypeLocationAddToZone,
-			version:       1,
-			aggregateId:   zoneId,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeLocationAddToZone,
+			VersionNum:        1,
+			AggregateID:       zoneId,
+			ShouldPersistBool: true,
 		},
 		locationId,
 		shortDesc,
@@ -228,21 +228,9 @@ func NewLocationAddToZoneEvent(shortDesc, desc string, locationId, zoneId uuid.U
 
 type LocationAddToZoneEvent struct {
 	*eventGeneric
-	locationId uuid.UUID
-	shortDesc  string
-	desc       string
-}
-
-func (latze LocationAddToZoneEvent) LocationID() uuid.UUID {
-	return latze.locationId
-}
-
-func (latze LocationAddToZoneEvent) ShortDescription() string {
-	return latze.shortDesc
-}
-
-func (latze LocationAddToZoneEvent) Description() string {
-	return latze.desc
+	LocationID uuid.UUID
+	ShortDesc  string
+	Desc       string
 }
 
 func newLocationUpdateCommand(wrapped *LocationUpdateEvent) locationUpdateCommand {
@@ -260,10 +248,10 @@ type locationUpdateCommand struct {
 func NewLocationUpdateEvent(shortDesc, desc string, locationID, zoneID uuid.UUID) *LocationUpdateEvent {
 	return &LocationUpdateEvent{
 		&eventGeneric{
-			eventType:     EventTypeLocationUpdate,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeLocationUpdate,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		locationID,
 		shortDesc,
@@ -273,21 +261,9 @@ func NewLocationUpdateEvent(shortDesc, desc string, locationID, zoneID uuid.UUID
 
 type LocationUpdateEvent struct {
 	*eventGeneric
-	locationID uuid.UUID
-	shortDesc  string
-	desc       string
-}
-
-func (lue LocationUpdateEvent) LocationID() uuid.UUID {
-	return lue.locationID
-}
-
-func (lue LocationUpdateEvent) ShortDescription() string {
-	return lue.shortDesc
-}
-
-func (lue LocationUpdateEvent) Description() string {
-	return lue.desc
+	LocationID uuid.UUID
+	ShortDesc  string
+	Desc       string
 }
 
 func newLocationRemoveFromZoneCommand(wrapped *LocationRemoveFromZoneEvent) locationRemoveFromZoneCommand {
@@ -305,10 +281,10 @@ type locationRemoveFromZoneCommand struct {
 func NewLocationRemoveFromZoneEvent(locID, zoneID uuid.UUID) *LocationRemoveFromZoneEvent {
 	return &LocationRemoveFromZoneEvent{
 		eventGeneric: &eventGeneric{
-			eventType:     EventTypeLocationRemoveFromZone,
-			version:       1,
-			aggregateId:   zoneID,
-			shouldPersist: true,
+			EventTypeNum:      EventTypeLocationRemoveFromZone,
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
 		},
 		LocationID: locID,
 	}
