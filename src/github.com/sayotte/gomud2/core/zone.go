@@ -1511,6 +1511,7 @@ func NewZoneSetDefaultLocationEvent(locID, zoneID uuid.UUID) *ZoneSetDefaultLoca
 	return &ZoneSetDefaultLocationEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeZoneSetDefaultLocation,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,

@@ -2,6 +2,7 @@ package core
 
 import (
 	"github.com/satori/go.uuid"
+	"time"
 )
 
 const (
@@ -28,6 +29,8 @@ const (
 
 type Event interface {
 	Type() int
+	Timestamp() time.Time
+	SetTimestamp(t time.Time)
 	Version() int
 	AggregateId() uuid.UUID
 	SequenceNumber() uint64
@@ -37,6 +40,7 @@ type Event interface {
 
 type eventGeneric struct {
 	SequenceNum       uint64
+	TimeStamp         time.Time
 	EventTypeNum      int
 	VersionNum        int
 	AggregateID       uuid.UUID
@@ -45,6 +49,14 @@ type eventGeneric struct {
 
 func (eg eventGeneric) Type() int {
 	return eg.EventTypeNum
+}
+
+func (eg eventGeneric) Timestamp() time.Time {
+	return eg.TimeStamp
+}
+
+func (eg *eventGeneric) SetTimestamp(t time.Time) {
+	eg.TimeStamp = t
 }
 
 func (eg eventGeneric) Version() int {

@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/satori/go.uuid"
 
@@ -204,6 +205,7 @@ func NewExitAddToZoneEvent(desc, direction string, exitId, sourceId, destLocId, 
 	return &ExitAddToZoneEvent{
 		&eventGeneric{
 			EventTypeNum:      EventTypeExitAddToZone,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       srcZoneId,
 			ShouldPersistBool: true,
@@ -243,6 +245,7 @@ func NewExitUpdateEvent(desc, direction string, exitID, sourceID, destID, srcZon
 	xue := &ExitUpdateEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeExitUpdate,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       srcZoneID,
 			ShouldPersistBool: true,
@@ -283,6 +286,7 @@ func NewExitRemoveFromZoneEvent(exitID, zoneID uuid.UUID) *ExitRemoveFromZoneEve
 	return &ExitRemoveFromZoneEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeExitRemoveFromZone,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,

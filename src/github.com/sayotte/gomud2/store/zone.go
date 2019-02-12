@@ -14,6 +14,7 @@ type zoneSetDefaultLocationEvent struct {
 func (zsdle zoneSetDefaultLocationEvent) ToDomain() core.Event {
 	e := core.NewZoneSetDefaultLocationEvent(zsdle.LocationID, zsdle.header.AggregateId)
 	e.SetSequenceNumber(zsdle.header.SequenceNumber)
+	e.SetTimestamp(zsdle.header.Timestamp)
 	return e
 }
 

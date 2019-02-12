@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/satori/go.uuid"
 
@@ -216,6 +217,7 @@ func NewLocationAddToZoneEvent(shortDesc, desc string, locationId, zoneId uuid.U
 	return &LocationAddToZoneEvent{
 		&eventGeneric{
 			EventTypeNum:      EventTypeLocationAddToZone,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneId,
 			ShouldPersistBool: true,
@@ -249,6 +251,7 @@ func NewLocationUpdateEvent(shortDesc, desc string, locationID, zoneID uuid.UUID
 	return &LocationUpdateEvent{
 		&eventGeneric{
 			EventTypeNum:      EventTypeLocationUpdate,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,
@@ -282,6 +285,7 @@ func NewLocationRemoveFromZoneEvent(locID, zoneID uuid.UUID) *LocationRemoveFrom
 	return &LocationRemoveFromZoneEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeLocationRemoveFromZone,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,

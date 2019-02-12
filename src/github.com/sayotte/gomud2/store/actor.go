@@ -29,6 +29,7 @@ func (ame actorMoveEvent) ToDomain() core.Event {
 		ame.header.AggregateId,
 	)
 	e.SetSequenceNumber(ame.header.SequenceNumber)
+	e.SetTimestamp(ame.header.Timestamp)
 	return e
 }
 
@@ -57,6 +58,7 @@ func (aare *actorAdminRelocateEvent) FromDomain(e core.Event) {
 func (aare actorAdminRelocateEvent) ToDomain() core.Event {
 	e := core.NewActorAdminRelocateEvent(aare.ActorID, aare.ToLocationID, aare.header.AggregateId)
 	e.SetSequenceNumber(aare.header.SequenceNumber)
+	e.SetTimestamp(aare.header.Timestamp)
 	return e
 }
 
@@ -94,6 +96,7 @@ func (aatze actorAddToZoneEvent) ToDomain() core.Event {
 		aatze.header.AggregateId,
 	)
 	e.SetSequenceNumber(aatze.header.SequenceNumber)
+	e.SetTimestamp(aatze.header.Timestamp)
 	return e
 }
 
@@ -121,6 +124,7 @@ func (arfze *actorRemoveFromZoneEvent) FromDomain(e core.Event) {
 func (arfze actorRemoveFromZoneEvent) ToDomain() core.Event {
 	e := core.NewActorRemoveFromZoneEvent(arfze.ActorID, arfze.header.AggregateId)
 	e.SetSequenceNumber(arfze.header.SequenceNumber)
+	e.SetTimestamp(arfze.header.Timestamp)
 	return e
 }
 
@@ -165,6 +169,7 @@ func (amie actorMigrateInEvent) ToDomain() core.Event {
 		amie.header.AggregateId,
 	)
 	e.SetSequenceNumber(amie.header.SequenceNumber)
+	e.SetTimestamp(amie.header.Timestamp)
 	return e
 }
 
@@ -203,6 +208,7 @@ func (amoe actorMigrateOutEvent) ToDomain() core.Event {
 		amoe.header.AggregateId,
 	)
 	e.SetSequenceNumber(amoe.header.SequenceNumber)
+	e.SetTimestamp(amoe.header.Timestamp)
 	return e
 }
 

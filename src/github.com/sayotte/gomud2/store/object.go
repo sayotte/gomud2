@@ -17,12 +17,7 @@ type objectAddToZoneEvent struct {
 func (oatze *objectAddToZoneEvent) FromDomain(e core.Event) {
 	from := e.(*core.ObjectAddToZoneEvent)
 	*oatze = objectAddToZoneEvent{
-		header: eventHeader{
-			EventType:      from.Type(),
-			Version:        from.Version(),
-			AggregateId:    from.AggregateId(),
-			SequenceNumber: from.SequenceNumber(),
-		},
+		header:              eventHeaderFromDomainEvent(e),
 		ObjectId:            from.ObjectID,
 		Name:                from.Name,
 		Description:         from.Description,
@@ -47,6 +42,7 @@ func (oatze objectAddToZoneEvent) ToDomain() core.Event {
 		oatze.header.AggregateId,
 	)
 	e.SetSequenceNumber(oatze.header.SequenceNumber)
+	e.SetTimestamp(oatze.header.Timestamp)
 	return e
 }
 
@@ -76,6 +72,7 @@ func (orfze *objectRemoveFromZoneEvent) FromDomain(e core.Event) {
 func (orfze objectRemoveFromZoneEvent) ToDomain() core.Event {
 	e := core.NewObjectRemoveFromZoneEvent(orfze.Name, orfze.ObjectID, orfze.header.AggregateId)
 	e.SetSequenceNumber(orfze.header.SequenceNumber)
+	e.SetTimestamp(orfze.header.Timestamp)
 	return e
 }
 
@@ -124,6 +121,7 @@ func (ome objectMoveEvent) ToDomain() core.Event {
 	e.ToObjectContainerID = ome.ToObjectContainerID
 
 	e.SetSequenceNumber(ome.header.SequenceNumber)
+	e.SetTimestamp(ome.header.Timestamp)
 	return e
 }
 
@@ -158,6 +156,7 @@ func (oare objectAdminRelocateEvent) ToDomain() core.Event {
 	e.ToActorContainerID = oare.ToActorContainerID
 	e.ToObjectContainerID = oare.ToObjectContainerID
 	e.SetSequenceNumber(oare.header.SequenceNumber)
+	e.SetTimestamp(oare.header.Timestamp)
 
 	return e
 }
@@ -210,6 +209,7 @@ func (omie objectMigrateInEvent) ToDomain() core.Event {
 		omie.header.AggregateId,
 	)
 	e.SetSequenceNumber(omie.header.SequenceNumber)
+	e.SetTimestamp(omie.header.Timestamp)
 	return e
 }
 
@@ -246,6 +246,7 @@ func (omoe objectMigrateOutEvent) ToDomain() core.Event {
 		omoe.header.AggregateId,
 	)
 	e.SetSequenceNumber(omoe.header.SequenceNumber)
+	e.SetTimestamp(omoe.header.Timestamp)
 	return e
 }
 

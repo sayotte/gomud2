@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/satori/go.uuid"
 
@@ -203,6 +204,7 @@ func NewObjectAddToZoneEvent(name, desc string, keywords []string, capacity int,
 	return &ObjectAddToZoneEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeObjectAddToZone,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneId,
 			ShouldPersistBool: true,
@@ -243,6 +245,7 @@ func NewObjectRemoveFromZoneEvent(name string, objectID, zoneID uuid.UUID) *Obje
 	return &ObjectRemoveFromZoneEvent{
 		&eventGeneric{
 			EventTypeNum:      EventTypeObjectRemoveFromZone,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,
@@ -280,6 +283,7 @@ func NewObjectMoveEvent(objID, actorID, zoneID uuid.UUID) *ObjectMoveEvent {
 	return &ObjectMoveEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeObjectMove,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,
@@ -313,6 +317,7 @@ func NewObjectAdminRelocateEvent(objectID, zoneID uuid.UUID) *ObjectAdminRelocat
 	return &ObjectAdminRelocateEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeObjectAdminRelocate,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,
@@ -361,6 +366,7 @@ func NewObjectMigrateOutEvent(name string, objID, toZoneID, zoneID uuid.UUID) *O
 	return &ObjectMigrateOutEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeObjectMigrateOut,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,

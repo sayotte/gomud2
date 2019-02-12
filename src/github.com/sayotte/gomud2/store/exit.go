@@ -22,6 +22,7 @@ func (eatze exitAddToZoneEvent) ToDomain() core.Event {
 		eatze.DestZoneID,
 	)
 	e.SetSequenceNumber(eatze.header.SequenceNumber)
+	e.SetTimestamp(eatze.header.Timestamp)
 	return e
 }
 
@@ -63,6 +64,7 @@ func (exue exitUpdateEvent) ToDomain() core.Event {
 		exue.DestZoneID,
 	)
 	e.SetSequenceNumber(exue.header.SequenceNumber)
+	e.SetTimestamp(exue.header.Timestamp)
 	return e
 }
 
@@ -95,6 +97,7 @@ type exitRemoveFromZoneEvent struct {
 func (erfz exitRemoveFromZoneEvent) ToDomain() core.Event {
 	e := core.NewExitRemoveFromZoneEvent(erfz.ExitID, erfz.header.AggregateId)
 	e.SetSequenceNumber(erfz.header.SequenceNumber)
+	e.SetTimestamp(erfz.header.Timestamp)
 	return e
 }
 

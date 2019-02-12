@@ -29,6 +29,7 @@ func (latze locationAddToZoneEvent) ToDomain() core.Event {
 		latze.header.AggregateId,
 	)
 	e.SetSequenceNumber(latze.header.SequenceNumber)
+	e.SetTimestamp(latze.header.Timestamp)
 	return e
 }
 
@@ -56,6 +57,7 @@ func (lrfze *locationRemoveFromZoneEvent) FromDomain(e core.Event) {
 func (lrfze locationRemoveFromZoneEvent) ToDomain() core.Event {
 	e := core.NewLocationRemoveFromZoneEvent(lrfze.LocationID, lrfze.header.AggregateId)
 	e.SetSequenceNumber(lrfze.header.SequenceNumber)
+	e.SetTimestamp(lrfze.header.Timestamp)
 	return e
 }
 
@@ -91,6 +93,7 @@ func (lue locationUpdateEvent) ToDomain() core.Event {
 		lue.header.AggregateId,
 	)
 	e.SetSequenceNumber(lue.header.SequenceNumber)
+	e.SetTimestamp(lue.header.Timestamp)
 	return e
 }
 

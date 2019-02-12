@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"github.com/satori/go.uuid"
 	"github.com/sayotte/gomud2/core"
+	"time"
 )
 
-const eventHeaderByteLen = 33
+const eventHeaderByteLen = 48
 
 func eventHeaderFromDomainEvent(from core.Event) eventHeader {
 	return eventHeader{
 		EventType:      from.Type(),
+		Timestamp:      from.Timestamp(),
 		Version:        from.Version(),
 		AggregateId:    from.AggregateId(),
 		SequenceNumber: from.SequenceNumber(),
@@ -20,6 +22,7 @@ func eventHeaderFromDomainEvent(from core.Event) eventHeader {
 
 type eventHeader struct {
 	EventType      int
+	Timestamp      time.Time
 	Version        int
 	AggregateId    uuid.UUID
 	SequenceNumber uint64
@@ -33,8 +36,9 @@ func (eh eventHeader) MarshalBinary() ([]byte, error) {
 	//len uint32     // 4
 	//typ uint16     // 2
 	//ver uint16     // 2
+	//time [15]byte  // 15
 	//compress       // 1
-	//// total of 33 bytes
+	//// total of 48 bytes
 
 	buf := make([]byte, eventHeaderByteLen)
 	copy(buf[0:16], eh.AggregateId.Bytes())
@@ -42,13 +46,18 @@ func (eh eventHeader) MarshalBinary() ([]byte, error) {
 	binary.LittleEndian.PutUint32(buf[24:28], uint32(eh.Length))
 	binary.LittleEndian.PutUint16(buf[28:30], uint16(eh.EventType))
 	binary.LittleEndian.PutUint16(buf[30:32], uint16(eh.Version))
+	timeBytes, err := eh.Timestamp.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("Time.MarshalBinary(): %s", err)
+	}
+	copy(buf[32:47], timeBytes)
 	var useCompression byte
 	if eh.UseCompression {
 		useCompression = 1
 	} else {
 		useCompression = 0
 	}
-	buf[32] = useCompression
+	buf[47] = useCompression
 	return buf, nil
 }
 
@@ -61,7 +70,11 @@ func (eh *eventHeader) UnmarshalBinary(buf []byte) error {
 	eh.Length = int(binary.LittleEndian.Uint32(buf[24:28]))
 	eh.EventType = int(binary.LittleEndian.Uint16(buf[28:30]))
 	eh.Version = int(binary.LittleEndian.Uint16(buf[30:32]))
-	useCompression := buf[32]
+	err := (&eh.Timestamp).UnmarshalBinary(buf[32:47])
+	if err != nil {
+		return fmt.Errorf("Time.UnmarshalBinary(): %s", err)
+	}
+	useCompression := buf[47]
 	if useCompression == 0 {
 		eh.UseCompression = false
 	} else {

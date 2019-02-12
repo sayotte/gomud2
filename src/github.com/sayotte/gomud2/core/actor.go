@@ -225,6 +225,7 @@ func NewActorMoveEvent(fromLocationId, toLocationId, actorId, zoneId uuid.UUID) 
 	return &ActorMoveEvent{
 		&eventGeneric{
 			EventTypeNum:      EventTypeActorMove,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneId,
 			ShouldPersistBool: true,
@@ -262,6 +263,7 @@ func NewActorAdminRelocateEvent(actorID, locID, zoneID uuid.UUID) *ActorAdminRel
 	return &ActorAdminRelocateEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeActorAdminRelocate,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,
@@ -293,6 +295,7 @@ func NewActorAddToZoneEvent(name, brainType string, actorId, startingLocationId,
 	return &ActorAddToZoneEvent{
 		&eventGeneric{
 			EventTypeNum:      EventTypeActorAddToZone,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneId,
 			ShouldPersistBool: true,
@@ -327,6 +330,7 @@ func NewActorRemoveFromZoneEvent(actorID, zoneID uuid.UUID) ActorRemoveFromZoneE
 	return ActorRemoveFromZoneEvent{
 		&eventGeneric{
 			EventTypeNum:      EventTypeActorRemoveFromZone,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,
@@ -361,6 +365,7 @@ func NewActorMigrateInEvent(name, brainType string, actorID, fromLocID, fromZone
 	return &ActorMigrateInEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeActorMigrateIn,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,
@@ -401,6 +406,7 @@ func NewActorMigrateOutEvent(actorID, fromLocID, toLocID, toZoneID, zoneID uuid.
 	return &ActorMigrateOutEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeActorMigrateOut,
+			TimeStamp:         time.Now(),
 			VersionNum:        1,
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,
