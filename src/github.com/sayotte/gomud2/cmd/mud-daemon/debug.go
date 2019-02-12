@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/abiosoft/ishell"
 	"github.com/satori/go.uuid"
@@ -16,6 +17,8 @@ import (
 	"github.com/sayotte/gomud2/store"
 	"github.com/sayotte/gomud2/telnet"
 )
+
+const timestampLayout = "02 Jan 2006 15:04:05.000"
 
 var eventTypeToStringName = map[int]string{
 	core.EventTypeActorMove:              "ActorMoveEvent",
@@ -231,7 +234,20 @@ func (d *debugger) getBreakHandler() func(c *ishell.Context) {
 
 func (d *debugger) getBreakTimeHandler() func(c *ishell.Context) {
 	return func(c *ishell.Context) {
-		c.Println("break time?")
+		if len(c.Args) != 1 {
+			c.Println("Invalid syntax, need: break time <timestamp>, where <timestamp> is of the form %q (don't forget to use quotes!).\n", timestampLayout)
+			return
+		}
+		t, err := time.Parse(timestampLayout, c.Args[0])
+		if err != nil {
+			c.Printf("Can't parse that timestamp: %s\n", err)
+			return
+		}
+
+		bp := timeBreakpoint{
+			timestamp: t,
+		}
+		d.breakpoints = append(d.breakpoints, bp)
 	}
 }
 
@@ -726,4 +742,16 @@ func (ob objBreakpoint) shouldBreak(e core.Event) bool {
 
 func (ob objBreakpoint) String() string {
 	return fmt.Sprintf("break object %s", ob.objectID)
+}
+
+type timeBreakpoint struct {
+	timestamp time.Time
+}
+
+func (tb timeBreakpoint) shouldBreak(e core.Event) bool {
+	return e.Timestamp().After(tb.timestamp)
+}
+
+func (tb timeBreakpoint) String() string {
+	return fmt.Sprintf("break time %q", tb.timestamp.Format(timestampLayout))
 }
