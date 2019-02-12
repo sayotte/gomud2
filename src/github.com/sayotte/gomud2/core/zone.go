@@ -1272,19 +1272,20 @@ func (z *Zone) applyExitRemoveFromZoneEvent(e *ExitRemoveFromZoneEvent) error {
 
 func (z *Zone) applyObjectAddToZoneEvent(e *ObjectAddToZoneEvent) (*Object, ObserverList, error) {
 	var container Container
+	var containerFound bool
 	var oList ObserverList
 
 	switch {
 	case !uuid.Equal(e.LocationContainerID, uuid.Nil):
-		container = z.locationsById[e.LocationContainerID]
+		container, containerFound = z.locationsById[e.LocationContainerID]
 	case !uuid.Equal(e.ActorContainerID, uuid.Nil):
-		container = z.actorsById[e.ActorContainerID]
+		container, containerFound = z.actorsById[e.ActorContainerID]
 	case !uuid.Equal(e.ObjectContainerID, uuid.Nil):
-		container = z.objectsById[e.ObjectContainerID]
+		container, containerFound = z.objectsById[e.ObjectContainerID]
 	}
 
 	obj := NewObject(e.ObjectID, e.Name, e.Description, e.Keywords, container, e.Capacity, z)
-	if container != nil {
+	if containerFound {
 		err := container.addObject(obj)
 		if err != nil {
 			return nil, nil, err
