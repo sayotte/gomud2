@@ -47,11 +47,19 @@ func (s *Server) Start() error {
 		Addr:    s.ListenAddrString,
 		Handler: s,
 	}
-	err := s.httpServer.ListenAndServe()
-	if err != nil {
-		return fmt.Errorf("s.httpServer.ListenAndServe(): %s", err)
-	}
+	go func() {
+		err := s.httpServer.ListenAndServe()
+		if err != nil {
+			fmt.Printf("WSAPI ERROR: http.Server.ListenAndServe(): %s\n", err)
+		}
+	}()
 	return nil
+}
+
+func (s *Server) Stop() {
+	_ = s.httpServer.Close()
+	// FIXME should so something to unwind the websocket connections, which
+	// FIXME the Close() call above doesn't touch at all
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
