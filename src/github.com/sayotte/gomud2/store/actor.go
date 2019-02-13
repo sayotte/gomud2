@@ -74,6 +74,8 @@ type actorAddToZoneEvent struct {
 	header                      eventHeader
 	ActorID, StartingLocationID uuid.UUID
 	Name, BrainType             string
+	Attributes                  core.AttributeSet
+	Skills                      core.Skillset
 }
 
 func (aatze *actorAddToZoneEvent) FromDomain(e core.Event) {
@@ -84,6 +86,8 @@ func (aatze *actorAddToZoneEvent) FromDomain(e core.Event) {
 		StartingLocationID: from.StartingLocationID,
 		Name:               from.Name,
 		BrainType:          from.BrainType,
+		Attributes:         from.Attributes,
+		Skills:             from.Skills,
 	}
 }
 
@@ -94,6 +98,8 @@ func (aatze actorAddToZoneEvent) ToDomain() core.Event {
 		aatze.ActorID,
 		aatze.StartingLocationID,
 		aatze.header.AggregateId,
+		aatze.Attributes,
+		aatze.Skills,
 	)
 	e.SetSequenceNumber(aatze.header.SequenceNumber)
 	e.SetTimestamp(aatze.header.Timestamp)
@@ -142,6 +148,8 @@ type actorMigrateInEvent struct {
 	Name, BrainType       string
 	FromLocID, FromZoneID uuid.UUID
 	ToLocID               uuid.UUID
+	Attributes            core.AttributeSet
+	Skills                core.Skillset
 }
 
 func (amie *actorMigrateInEvent) FromDomain(e core.Event) {
@@ -154,6 +162,8 @@ func (amie *actorMigrateInEvent) FromDomain(e core.Event) {
 		FromLocID:  from.FromLocID,
 		FromZoneID: from.FromZoneID,
 		ToLocID:    from.ToLocID,
+		Attributes: from.Attributes,
+		Skills:     from.Skills,
 	}
 	return
 }
@@ -167,6 +177,8 @@ func (amie actorMigrateInEvent) ToDomain() core.Event {
 		amie.FromZoneID,
 		amie.ToLocID,
 		amie.header.AggregateId,
+		amie.Attributes,
+		amie.Skills,
 	)
 	e.SetSequenceNumber(amie.header.SequenceNumber)
 	e.SetTimestamp(amie.header.Timestamp)

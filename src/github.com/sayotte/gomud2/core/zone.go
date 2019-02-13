@@ -450,6 +450,8 @@ func (z *Zone) processActorMigrateInCommand(c Command) (interface{}, []Event, er
 		cmd.from.Zone().ID(),
 		cmd.to.ID(),
 		z.id,
+		cmd.actor.Attributes(),
+		cmd.actor.Skills(),
 	)
 	actorEv.SetSequenceNumber(z.nextSequenceId)
 	z.nextSequenceId = actorEv.SequenceNumber() + 1
@@ -1020,7 +1022,15 @@ func (z *Zone) applyActorAddToZoneEvent(e *ActorAddToZoneEvent) (*Actor, Observe
 		}
 		newLoc = z.defaultLocation
 	}
-	actor := NewActor(e.ActorID, e.Name, e.BrainType, newLoc, z)
+	actor := NewActor(
+		e.ActorID,
+		e.Name,
+		e.BrainType,
+		newLoc,
+		z,
+		e.Attributes,
+		e.Skills,
+	)
 
 	newLoc.addActor(actor)
 	actor.setLocation(newLoc)
@@ -1105,7 +1115,15 @@ func (z *Zone) applyActorRemoveEvent(e *ActorRemoveFromZoneEvent) (ObserverList,
 
 func (z *Zone) applyActorMigrateInEvent(e *ActorMigrateInEvent) (*Actor, ObserverList, error) {
 	newLoc := z.locationsById[e.ToLocID]
-	actor := NewActor(e.ActorID, e.Name, e.BrainType, newLoc, z)
+	actor := NewActor(
+		e.ActorID,
+		e.Name,
+		e.BrainType,
+		newLoc,
+		z,
+		e.Attributes,
+		e.Skills,
+	)
 
 	var oList ObserverList
 	if newLoc != nil {
