@@ -51,6 +51,8 @@ type Actor struct {
 	skills     Skillset
 }
 
+//////// getters + non-command-setters
+
 func (a *Actor) ID() uuid.UUID {
 	return a.id
 }
@@ -125,6 +127,38 @@ func (a *Actor) removeObject(o *Object) {
 	a.inventoryObjects = a.inventoryObjects.Remove(o)
 }
 
+func (a *Actor) Zone() *Zone {
+	a.rwlock.RLock()
+	defer a.rwlock.RUnlock()
+	return a.zone
+}
+
+func (a *Actor) setZone(z *Zone) {
+	a.rwlock.Lock()
+	defer a.rwlock.Unlock()
+	a.zone = z
+}
+
+func (a Actor) snapshot(sequenceNum uint64) Event {
+	e := NewActorAddToZoneEvent(
+		a.name,
+		a.brainType,
+		a.id,
+		a.location.ID(),
+		a.zone.ID(),
+		a.attributes,
+		a.skills,
+	)
+	e.SetSequenceNumber(sequenceNum)
+	return e
+}
+
+func (a Actor) snapshotDependencies() []snapshottable {
+	return []snapshottable{a.location}
+}
+
+//////// command methods
+
 func (a *Actor) Move(from, to *Location) error {
 	if from.Zone() != to.Zone() {
 		return fmt.Errorf("cross-zone moves should use the World.MigrateZone() API call")
@@ -162,18 +196,6 @@ func (a *Actor) AdminRelocate(to *Location) error {
 	return err
 }
 
-func (a *Actor) Zone() *Zone {
-	a.rwlock.RLock()
-	defer a.rwlock.RUnlock()
-	return a.zone
-}
-
-func (a *Actor) setZone(z *Zone) {
-	a.rwlock.Lock()
-	defer a.rwlock.Unlock()
-	a.zone = z
-}
-
 func (a *Actor) syncRequestToZone(c Command) (interface{}, error) {
 	req := rpc.NewRequest(c)
 	a.zone.requestChan() <- req
@@ -181,23 +203,7 @@ func (a *Actor) syncRequestToZone(c Command) (interface{}, error) {
 	return response.Value, response.Err
 }
 
-func (a Actor) snapshot(sequenceNum uint64) Event {
-	e := NewActorAddToZoneEvent(
-		a.name,
-		a.brainType,
-		a.id,
-		a.location.ID(),
-		a.zone.ID(),
-		a.attributes,
-		a.skills,
-	)
-	e.SetSequenceNumber(sequenceNum)
-	return e
-}
-
-func (a Actor) snapshotDependencies() []snapshottable {
-	return []snapshottable{a.location}
-}
+///////////////////////////////// ActorList ///////////////////////////////////
 
 type ActorList []*Actor
 
@@ -223,6 +229,8 @@ func (al ActorList) Remove(actor *Actor) ActorList {
 	}
 	return append(al[:idx], al[idx+1:]...)
 }
+
+///////////////////////////// Commands and Events /////////////////////////////
 
 func newActorMoveCommand(wrapped *ActorMoveEvent) actorMoveCommand {
 	return actorMoveCommand{
