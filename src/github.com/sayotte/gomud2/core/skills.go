@@ -2,19 +2,20 @@ package core
 
 type Skillset struct {
 	// melee attack skills
-	Slashing, SlashingCap int
-	Stabbing, StabbingCap int
-	Bashing, BashingCap   int
+	Slashing, SlashingCap float64
+	Stabbing, StabbingCap float64
+	Bashing, BashingCap   float64
 	// NPC melee attack skills
-	Biting, BitingCap int
+	Biting, BitingCap float64
 
 	// melee defense skills
-	Dodging, DodgingCap       int
-	Deflecting, DeflectingCap int
-	Blocking, BlockingCap     int
+	Dodging, DodgingCap                     float64
+	DodgingTechniques, DodgingTechniquesCap int
+	Deflecting, DeflectingCap               float64
+	Blocking, BlockingCap                   float64
 
 	// magic skills
-	Sorcery, SorceryCap         int
-	Mysticism, MysticismCap     int
-	Inscription, InscriptionCap int
+	Sorcery, SorceryCap         float64
+	Mysticism, MysticismCap     float64
+	Inscription, InscriptionCap float64
 }
