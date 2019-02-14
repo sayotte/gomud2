@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -43,6 +44,9 @@ type Zone struct {
 	locationsById   map[uuid.UUID]*Location
 	exitsById       map[uuid.UUID]*Exit
 	objectsById     map[uuid.UUID]*Object
+
+	rando *rand.Rand
+
 	// This is the channel where the Zone picks up new events submitted by
 	// public methods.
 	privateRequestChan chan rpc.Request
@@ -133,6 +137,10 @@ func (z *Zone) setWorld(world *World) {
 
 func (z *Zone) requestChan() chan<- rpc.Request {
 	return z.privateRequestChan
+}
+
+func (z *Zone) Rand() *rand.Rand {
+	return z.rando
 }
 
 //////// public command methods
@@ -252,6 +260,7 @@ func (z *Zone) StartCommandProcessing() {
 	timer := metrics.GetOrRegisterTimer(z.Tag()+"-command-processing-latency", metrics.DefaultRegistry)
 	z.privateRequestChan = make(chan rpc.Request, zoneRequestChannelCapacity)
 	z.stopChan = make(chan struct{})
+	z.rando = rand.New(rand.NewSource(time.Now().UnixNano()))
 	go func() {
 		for {
 			select {
