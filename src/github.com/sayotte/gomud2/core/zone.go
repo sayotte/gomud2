@@ -497,6 +497,7 @@ func (z *Zone) processActorMigrateInCommand(c Command) (interface{}, []Event, er
 			actorContID,
 			objContID,
 			z.id,
+			cmd.actor.SubcontainerFor(objContTuple.obj),
 		)
 		objEv.SetSequenceNumber(z.nextSequenceId)
 		z.nextSequenceId = objEv.SequenceNumber() + 1
@@ -1406,7 +1407,7 @@ func (z *Zone) applyObjectAddToZoneEvent(e *ObjectAddToZoneEvent) (*Object, Obse
 
 	obj := NewObject(e.ObjectID, e.Name, e.Description, e.Keywords, container, e.Capacity, z)
 	if containerFound {
-		err := container.addObject(obj)
+		err := container.addObject(obj, e.Subcontainer)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1456,7 +1457,7 @@ func (z *Zone) applyObjectMoveEvent(e *ObjectMoveEvent) (ObserverList, error) {
 	}
 
 	if to != nil {
-		_ = to.addObject(obj)
+		_ = to.addObject(obj, e.ToSubcontainer)
 		oList = append(oList, to.Observers()...)
 	} else {
 		fmt.Printf("WARNING: applying ObjectMoveEvent with no resolvable 'to'\n")
@@ -1496,7 +1497,7 @@ func (z *Zone) applyObjectAdminRelocateEvent(e *ObjectAdminRelocateEvent) (Obser
 		from.removeObject(obj)
 		oList = from.Observers()
 	}
-	err := to.addObject(obj)
+	err := to.addObject(obj, e.ToSubcontainer)
 	if err != nil {
 		return nil, err
 	}
@@ -1536,7 +1537,7 @@ func (z *Zone) applyObjectMigrateInEvent(e *ObjectMigrateInEvent) error {
 
 	obj := NewObject(e.ObjectID, e.Name, e.Description, e.Keywords, container, e.Capacity, z)
 	if container != nil {
-		err := container.addObject(obj)
+		err := container.addObject(obj, e.Subcontainer)
 		if err != nil {
 			return err
 		}

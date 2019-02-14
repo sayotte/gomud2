@@ -11,6 +11,7 @@ type objectAddToZoneEvent struct {
 	Name, Description                                        string
 	Keywords                                                 []string
 	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
+	Subcontainer                                             string
 	Capacity                                                 int
 }
 
@@ -25,6 +26,7 @@ func (oatze *objectAddToZoneEvent) FromDomain(e core.Event) {
 		LocationContainerID: from.LocationContainerID,
 		ActorContainerID:    from.ActorContainerID,
 		ObjectContainerID:   from.ObjectContainerID,
+		Subcontainer:        from.Subcontainer,
 		Capacity:            from.Capacity,
 	}
 }
@@ -40,6 +42,7 @@ func (oatze objectAddToZoneEvent) ToDomain() core.Event {
 		oatze.ActorContainerID,
 		oatze.ObjectContainerID,
 		oatze.header.AggregateId,
+		oatze.Subcontainer,
 	)
 	e.SetSequenceNumber(oatze.header.SequenceNumber)
 	e.SetTimestamp(oatze.header.Timestamp)
@@ -137,6 +140,7 @@ type objectAdminRelocateEvent struct {
 	header                                                         eventHeader
 	ObjectID                                                       uuid.UUID
 	ToLocationContainerID, ToActorContainerID, ToObjectContainerID uuid.UUID
+	ToSubcontainer                                                 string
 }
 
 func (oare *objectAdminRelocateEvent) FromDomain(e core.Event) {
@@ -147,6 +151,7 @@ func (oare *objectAdminRelocateEvent) FromDomain(e core.Event) {
 		ToLocationContainerID: from.ToLocationContainerID,
 		ToActorContainerID:    from.ToActorContainerID,
 		ToObjectContainerID:   from.ToObjectContainerID,
+		ToSubcontainer:        from.ToSubcontainer,
 	}
 }
 
@@ -155,6 +160,7 @@ func (oare objectAdminRelocateEvent) ToDomain() core.Event {
 	e.ToLocationContainerID = oare.ToLocationContainerID
 	e.ToActorContainerID = oare.ToActorContainerID
 	e.ToObjectContainerID = oare.ToObjectContainerID
+	e.ToSubcontainer = oare.ToSubcontainer
 	e.SetSequenceNumber(oare.header.SequenceNumber)
 	e.SetTimestamp(oare.header.Timestamp)
 
@@ -176,6 +182,7 @@ type objectMigrateInEvent struct {
 	Keywords                                                 []string
 	FromZoneID                                               uuid.UUID
 	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
+	Subcontainer                                             string
 	Capacity                                                 int
 }
 
@@ -192,6 +199,7 @@ func (omie *objectMigrateInEvent) FromDomain(e core.Event) {
 		ActorContainerID:    from.ActorContainerID,
 		ObjectContainerID:   from.ObjectContainerID,
 		Capacity:            from.Capacity,
+		Subcontainer:        from.Subcontainer,
 	}
 }
 
@@ -207,6 +215,7 @@ func (omie objectMigrateInEvent) ToDomain() core.Event {
 		omie.ActorContainerID,
 		omie.ObjectContainerID,
 		omie.header.AggregateId,
+		omie.Subcontainer,
 	)
 	e.SetSequenceNumber(omie.header.SequenceNumber)
 	e.SetTimestamp(omie.header.Timestamp)

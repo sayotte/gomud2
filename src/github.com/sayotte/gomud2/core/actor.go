@@ -118,7 +118,11 @@ func (a *Actor) ContainsObject(o *Object) bool {
 	return err == nil
 }
 
-func (a *Actor) addObject(o *Object) error {
+func (a *Actor) SubcontainerFor(o *Object) string {
+	return ContainerDefaultSubcontainer
+}
+
+func (a *Actor) addObject(o *Object, subcontainer string) error {
 	_, err := a.inventoryObjects.IndexOf(o)
 	if err == nil {
 		return fmt.Errorf("Object %q already present in inventory for Actor %q", o.ID(), a.id)
@@ -129,6 +133,14 @@ func (a *Actor) addObject(o *Object) error {
 
 func (a *Actor) removeObject(o *Object) {
 	a.inventoryObjects = a.inventoryObjects.Remove(o)
+}
+
+func (a *Actor) checkMoveObjectToSubcontainer(o *Object, oldSub, newSub string) error {
+	return errors.New("Actor does not implement subcontainers")
+}
+
+func (a *Actor) moveObjectToSubcontainer(o *Object, oldSub, newSub string) error {
+	return errors.New("Actor does not implement subcontainers")
 }
 
 func (a *Actor) Zone() *Zone {

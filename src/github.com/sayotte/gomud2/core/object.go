@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -27,12 +28,13 @@ func NewObject(id uuid.UUID, name, desc string, keywords []string, container Con
 }
 
 type Object struct {
-	id          uuid.UUID
-	name        string
-	description string
-	keywords    []string
-	container   Container
-	zone        *Zone
+	id             uuid.UUID
+	name           string
+	description    string
+	inventorySlots int
+	keywords       []string
+	container      Container
+	zone           *Zone
 
 	containerCapacity int
 	containedObjects  ObjectList
@@ -50,6 +52,10 @@ func (o Object) Description() string {
 	return o.description
 }
 
+func (o Object) InventorySlots() int {
+	return o.inventorySlots
+}
+
 func (o Object) Keywords() []string {
 	out := make([]string, len(o.keywords))
 	copy(out, o.keywords)
@@ -62,6 +68,10 @@ func (o Object) Container() Container {
 
 func (o *Object) setContainer(c Container) {
 	o.container = c
+}
+
+func (o *Object) SubcontainerFor(obj *Object) string {
+	return ContainerDefaultSubcontainer
 }
 
 func (o *Object) Location() *Location {
@@ -80,7 +90,7 @@ func (o *Object) Objects() ObjectList {
 	return o.containedObjects.Copy()
 }
 
-func (o *Object) addObject(object *Object) error {
+func (o *Object) addObject(object *Object, subcontainer string) error {
 	_, err := o.containedObjects.IndexOf(object)
 	if err == nil {
 		return fmt.Errorf("Object %q already present in Object/Container %q", object.ID(), o.id)
@@ -91,6 +101,14 @@ func (o *Object) addObject(object *Object) error {
 
 func (o *Object) removeObject(object *Object) {
 	o.containedObjects = o.containedObjects.Remove(object)
+}
+
+func (o *Object) checkMoveObjectToSubcontainer(object *Object, oldSub, newSub string) error {
+	return errors.New("Object does not implement subcontainers")
+}
+
+func (o *Object) moveObjectToSubcontainer(object *Object, oldSub, newSub string) error {
+	return errors.New("Object does not implement subcontainers")
 }
 
 func (o *Object) Capacity() int {
@@ -106,13 +124,13 @@ func (o *Object) Observers() ObserverList {
 	return o.container.Observers()
 }
 
-func (o *Object) Move(from, to Container, who *Actor) error {
-	cmd := newObjectMoveCommand(o, who, from, to)
+func (o *Object) Move(from, to Container, who *Actor, toSubcontainer string) error {
+	cmd := newObjectMoveCommand(o, who, from, to, toSubcontainer)
 	_, err := o.syncRequestToZone(cmd)
 	return err
 }
 
-func (o *Object) AdminRelocate(to Container) error {
+func (o *Object) AdminRelocate(to Container, toSubcontainer string) error {
 	e := NewObjectAdminRelocateEvent(o.id, o.Zone().ID())
 	switch to.(type) {
 	case *Location:
@@ -122,6 +140,7 @@ func (o *Object) AdminRelocate(to Container) error {
 	case *Object:
 		e.ToObjectContainerID = o.container.ID()
 	}
+	e.ToSubcontainer = toSubcontainer
 
 	cmd := newObjectAdminRelocateCommand(e)
 	_, err := o.syncRequestToZone(cmd)
@@ -135,7 +154,7 @@ func (o *Object) syncRequestToZone(c Command) (interface{}, error) {
 	return response.Value, response.Err
 }
 
-func (o Object) snapshot(sequenceNum uint64) Event {
+func (o *Object) snapshot(sequenceNum uint64) Event {
 	e := NewObjectAddToZoneEvent(
 		o.name,
 		o.description,
@@ -146,6 +165,7 @@ func (o Object) snapshot(sequenceNum uint64) Event {
 		uuid.Nil,
 		uuid.Nil,
 		o.zone.ID(),
+		o.container.SubcontainerFor(o),
 	)
 	switch o.container.(type) {
 	case *Location:
@@ -200,7 +220,7 @@ type objectAddToZoneCommand struct {
 	wrappedEvent *ObjectAddToZoneEvent
 }
 
-func NewObjectAddToZoneEvent(name, desc string, keywords []string, capacity int, objectId, locationContainerID, actorContainerID, objectContainerID, zoneId uuid.UUID) *ObjectAddToZoneEvent {
+func NewObjectAddToZoneEvent(name, desc string, keywords []string, capacity int, objectId, locationContainerID, actorContainerID, objectContainerID, zoneId uuid.UUID, subcontainer string) *ObjectAddToZoneEvent {
 	return &ObjectAddToZoneEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeObjectAddToZone,
@@ -216,6 +236,7 @@ func NewObjectAddToZoneEvent(name, desc string, keywords []string, capacity int,
 		LocationContainerID: locationContainerID,
 		ActorContainerID:    actorContainerID,
 		ObjectContainerID:   objectContainerID,
+		Subcontainer:        subcontainer,
 		Capacity:            capacity,
 	}
 }
@@ -226,6 +247,7 @@ type ObjectAddToZoneEvent struct {
 	Name, Description                                        string
 	Keywords                                                 []string
 	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
+	Subcontainer                                             string
 	Capacity                                                 int
 }
 
@@ -261,22 +283,24 @@ type ObjectRemoveFromZoneEvent struct {
 	Name     string
 }
 
-func newObjectMoveCommand(obj *Object, actor *Actor, fromContainer, toContainer Container) objectMoveCommand {
+func newObjectMoveCommand(obj *Object, actor *Actor, fromContainer, toContainer Container, toSubcontainer string) objectMoveCommand {
 	return objectMoveCommand{
 		commandGeneric: commandGeneric{commandType: CommandTypeObjectMove},
 		obj:            obj,
 		actor:          actor,
 		fromContainer:  fromContainer,
 		toContainer:    toContainer,
+		toSubcontainer: toSubcontainer,
 	}
 }
 
 type objectMoveCommand struct {
 	commandGeneric
-	obj           *Object
-	actor         *Actor
-	fromContainer Container
-	toContainer   Container
+	obj            *Object
+	actor          *Actor
+	fromContainer  Container
+	toContainer    Container
+	toSubcontainer string
 }
 
 func NewObjectMoveEvent(objID, actorID, zoneID uuid.UUID) *ObjectMoveEvent {
@@ -299,6 +323,7 @@ type ObjectMoveEvent struct {
 	ActorID                                                              uuid.UUID
 	FromLocationContainerID, FromActorContainerID, FromObjectContainerID uuid.UUID
 	ToLocationContainerID, ToActorContainerID, ToObjectContainerID       uuid.UUID
+	ToSubcontainer                                                       string
 }
 
 func newObjectAdminRelocateCommand(wrapped *ObjectAdminRelocateEvent) objectAdminRelocateCommand {
@@ -330,9 +355,10 @@ type ObjectAdminRelocateEvent struct {
 	*eventGeneric
 	ObjectID                                                       uuid.UUID
 	ToLocationContainerID, ToActorContainerID, ToObjectContainerID uuid.UUID
+	ToSubcontainer                                                 string
 }
 
-func NewObjectMigrateInEvent(name, desc string, keywords []string, capacity int, objID, fromZoneID, locContainerID, actorContainerID, objContainerID, zoneID uuid.UUID) *ObjectMigrateInEvent {
+func NewObjectMigrateInEvent(name, desc string, keywords []string, capacity int, objID, fromZoneID, locContainerID, actorContainerID, objContainerID, zoneID uuid.UUID, subcontainer string) *ObjectMigrateInEvent {
 	return &ObjectMigrateInEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeObjectMigrateIn,
@@ -349,6 +375,7 @@ func NewObjectMigrateInEvent(name, desc string, keywords []string, capacity int,
 		ActorContainerID:    actorContainerID,
 		ObjectContainerID:   objContainerID,
 		Capacity:            capacity,
+		Subcontainer:        subcontainer,
 	}
 }
 
@@ -359,6 +386,7 @@ type ObjectMigrateInEvent struct {
 	Keywords                                                 []string
 	FromZoneID                                               uuid.UUID
 	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
+	Subcontainer                                             string
 	Capacity                                                 int
 }
 

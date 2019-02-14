@@ -431,7 +431,7 @@ func (gh *gameHandler) getTakeHandler() gameHandlerCommandHandler {
 			return []byte("You have no room for that in your inventory!\n"), nil
 		}
 
-		err := targetObj.Move(container, gh.actor, gh.actor)
+		err := targetObj.Move(container, gh.actor, gh.actor, core.ContainerDefaultSubcontainer)
 		if err != nil {
 			return []byte("Whoops...\n"), fmt.Errorf("Object.Move(Container, Actor): %s", err)
 		}
@@ -453,7 +453,7 @@ func (gh *gameHandler) getDropHandler() gameHandlerCommandHandler {
 			return []byte(fmt.Sprintf("Drop what again? I can't find a %q.\n", targetKeyword)), nil
 		}
 
-		err := targetObj.Move(gh.actor, gh.actor.Location(), gh.actor)
+		err := targetObj.Move(gh.actor, gh.actor.Location(), gh.actor, core.ContainerDefaultSubcontainer)
 		if err != nil {
 			return []byte("Whoops...\n"), fmt.Errorf("Object.Move(Actor, Location): %s", err)
 		}
@@ -499,7 +499,7 @@ func (gh *gameHandler) getPutHandler() gameHandlerCommandHandler {
 			return []byte("That container can't hold any more.\n"), nil
 		}
 
-		err := targetObj.Move(targetObj.Container(), container, gh.actor)
+		err := targetObj.Move(targetObj.Container(), container, gh.actor, core.ContainerDefaultSubcontainer)
 		if err != nil {
 			return []byte("Whoops...\n"), fmt.Errorf("Object.Move(Actor, Container): %s", err)
 		}

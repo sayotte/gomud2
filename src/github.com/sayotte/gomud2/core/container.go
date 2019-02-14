@@ -2,15 +2,20 @@ package core
 
 import "github.com/satori/go.uuid"
 
+const ContainerDefaultSubcontainer = "any"
+
 type Container interface {
 	ID() uuid.UUID
 	Capacity() int
 	ContainsObject(o *Object) bool
+	SubcontainerFor(o *Object) string
 	Objects() ObjectList
 	Observers() ObserverList
 	Location() *Location
-	addObject(o *Object) error
+	addObject(o *Object, subcontainer string) error
 	removeObject(o *Object)
+	checkMoveObjectToSubcontainer(o *Object, oldSub, newSub string) error
+	moveObjectToSubcontainer(o *Object, oldSub, newSub string) error
 }
 
 type objectContainerTuple struct {

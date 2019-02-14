@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -106,13 +107,21 @@ func (l *Location) removeObject(object *Object) {
 	l.objects = l.objects.Remove(object)
 }
 
-func (l *Location) addObject(object *Object) error {
+func (l *Location) addObject(object *Object, subcontainer string) error {
 	_, err := l.objects.IndexOf(object)
 	if err == nil {
 		return fmt.Errorf("Object %q already present at location %q", object.ID(), l.id)
 	}
 	l.objects = append(l.objects, object)
 	return nil
+}
+
+func (l *Location) checkMoveObjectToSubcontainer(o *Object, oldSub, newSub string) error {
+	return errors.New("Location does not implement subcontainers")
+}
+
+func (l *Location) moveObjectToSubcontainer(o *Object, oldSub, newSub string) error {
+	return errors.New("Location does not implement subcontainers")
 }
 
 func (l *Location) Capacity() int {
@@ -122,6 +131,10 @@ func (l *Location) Capacity() int {
 func (l *Location) ContainsObject(o *Object) bool {
 	_, err := l.objects.IndexOf(o)
 	return err == nil
+}
+
+func (l *Location) SubcontainerFor(o *Object) string {
+	return ContainerDefaultSubcontainer
 }
 
 // Location() implements the Container interface, by returning the receiver
