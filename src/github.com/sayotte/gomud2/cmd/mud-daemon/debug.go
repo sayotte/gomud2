@@ -40,6 +40,7 @@ var eventTypeToStringName = map[int]string{
 	core.EventTypeObjectMigrateIn:        "ObjectMigrateInEvent",
 	core.EventTypeObjectMigrateOut:       "ObjectMigrateOutEvent",
 	core.EventTypeZoneSetDefaultLocation: "ZoneSetDefaultLocationEvent",
+	core.EventTypeCombatMeleeDamage:      "CombatMeleeDamageEvent",
 }
 
 type debugger struct {

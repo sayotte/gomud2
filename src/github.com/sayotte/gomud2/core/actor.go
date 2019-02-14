@@ -200,6 +200,15 @@ func (a *Actor) AdminRelocate(to *Location) error {
 	return err
 }
 
+func (a *Actor) Slash(target *Actor) error {
+	//if target.Location() != a.location {
+	//	return fmt.Errorf("target not in same Location")
+	//}
+	dmgCmd := newCombatMeleeCommand(a, target, CombatMeleeDamageTypeSlash)
+	_, err := a.syncRequestToZone(dmgCmd)
+	return err
+}
+
 func (a *Actor) syncRequestToZone(c Command) (interface{}, error) {
 	req := rpc.NewRequest(c)
 	a.zone.requestChan() <- req

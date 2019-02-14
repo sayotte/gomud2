@@ -345,6 +345,8 @@ func (z *Zone) processCommand(c Command) (interface{}, error) {
 		outEvents, err = z.processObjectRemoveFromZoneCommand(c)
 	case CommandTypeZoneSetDefaultLocation:
 		outEvents, err = z.processZoneSetDefaultLocationCommand(c)
+	case CommandTypeCombatMelee:
+		outEvents, err = z.processCombatMeleeCommand(c)
 	default:
 		err = fmt.Errorf("unrecognized Command type %d", c.CommandType())
 	}
@@ -921,6 +923,24 @@ func (z *Zone) processZoneSetDefaultLocationCommand(c Command) ([]Event, error) 
 	return []Event{e}, err
 }
 
+func (z *Zone) processCombatMeleeCommand(c Command) ([]Event, error) {
+	typed := c.(*combatMeleeCommand)
+	outEvents, err := typed.Do()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, e := range outEvents {
+		e.SetSequenceNumber(z.nextSequenceId)
+		z.nextSequenceId = e.SequenceNumber() + 1
+		_, err := z.applyEvent(e)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return outEvents, err
+}
+
 //////// Event processing
 
 func (z *Zone) sendEventToObservers(e Event, oList ObserverList) {
@@ -1009,6 +1029,13 @@ func (z *Zone) applyEvent(e Event) (interface{}, error) {
 	case EventTypeZoneSetDefaultLocation:
 		typedEvent := e.(*ZoneSetDefaultLocationEvent)
 		err = z.applyZoneSetDefaultLocationEvent(typedEvent)
+	case EventTypeCombatDodge:
+		typedEvent := e.(*CombatDodgeEvent)
+		oList = z.applyCombatDodgeEvent(typedEvent)
+	case EventTypeCombatMeleeDamage:
+		typedEvent := e.(*CombatMeleeDamageEvent)
+		oList, err = z.applyCombatMeleeDamageEvent(typedEvent)
+
 	default:
 		err = fmt.Errorf("unknown Event type %T", e)
 	}
@@ -1160,6 +1187,72 @@ func (z *Zone) applyActorMigrateOutEvent(e *ActorMigrateOutEvent) (ObserverList,
 	delete(z.actorsById, actor.ID())
 
 	return oldLoc.Observers(), nil
+}
+
+func (z *Zone) applyCombatDodgeEvent(e *CombatDodgeEvent) ObserverList {
+	dedupeObserverMap := make(map[Observer]struct{})
+
+	attacker, found := z.actorsById[e.AttackerID]
+	if found {
+		for _, o := range attacker.Observers() {
+			dedupeObserverMap[o] = struct{}{}
+		}
+		for _, o := range attacker.Location().Observers() {
+			dedupeObserverMap[o] = struct{}{}
+		}
+	}
+	target, found := z.actorsById[e.TargetID]
+	if found {
+		for _, o := range target.Observers() {
+			dedupeObserverMap[o] = struct{}{}
+		}
+		for _, o := range target.Location().Observers() {
+			dedupeObserverMap[o] = struct{}{}
+		}
+	}
+
+	oList := make(ObserverList, 0, len(dedupeObserverMap))
+	for o := range dedupeObserverMap {
+		oList = append(oList, o)
+	}
+
+	return oList
+}
+
+func (z *Zone) applyCombatMeleeDamageEvent(e *CombatMeleeDamageEvent) (ObserverList, error) {
+	target, found := z.actorsById[e.TargetID]
+	if !found {
+		return nil, fmt.Errorf("unknown Actor %q", e.TargetID)
+	}
+	targetAttrs := target.Attributes()
+	targetAttrs.Physical -= e.PhysicalDmg
+	targetAttrs.Stamina -= e.StaminaDmg
+	targetAttrs.Focus -= e.FocusDmg
+	target.setAttributes(targetAttrs)
+
+	dedupeObserverMap := make(map[Observer]struct{})
+	attacker, found := z.actorsById[e.AttackerID]
+	if found {
+		for _, o := range attacker.Observers() {
+			dedupeObserverMap[o] = struct{}{}
+		}
+		for _, o := range attacker.Location().Observers() {
+			dedupeObserverMap[o] = struct{}{}
+		}
+	}
+	for _, o := range target.Observers() {
+		dedupeObserverMap[o] = struct{}{}
+	}
+	for _, o := range target.Location().Observers() {
+		dedupeObserverMap[o] = struct{}{}
+	}
+
+	oList := make(ObserverList, 0, len(dedupeObserverMap))
+	for o := range dedupeObserverMap {
+		oList = append(oList, o)
+	}
+
+	return oList, nil
 }
 
 func (z *Zone) applyLocationAddToZoneEvent(e *LocationAddToZoneEvent) (*Location, error) {

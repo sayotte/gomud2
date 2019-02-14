@@ -25,6 +25,8 @@ const (
 	EventTypeObjectMigrateIn
 	EventTypeObjectMigrateOut
 	EventTypeZoneSetDefaultLocation
+	EventTypeCombatMeleeDamage
+	EventTypeCombatDodge
 )
 
 type Event interface {

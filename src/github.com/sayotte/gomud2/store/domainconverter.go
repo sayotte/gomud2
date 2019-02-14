@@ -61,6 +61,8 @@ func writeEvent(e core.Event, outStream io.Writer, useCompression bool) error {
 		frommer = &objectMigrateOutEvent{}
 	case core.EventTypeZoneSetDefaultLocation:
 		frommer = &zoneSetDefaultLocationEvent{}
+	case core.EventTypeCombatMeleeDamage:
+		frommer = &combatMeleeDamageEvent{}
 	default:
 		return fmt.Errorf("unhandled event type %T", e)
 	}
@@ -170,6 +172,8 @@ func readEvent(inStream io.Reader) (core.Event, error) {
 		toEr = &objectMigrateOutEvent{}
 	case core.EventTypeZoneSetDefaultLocation:
 		toEr = &zoneSetDefaultLocationEvent{}
+	case core.EventTypeCombatMeleeDamage:
+		toEr = &combatMeleeDamageEvent{}
 	}
 	err = json.Unmarshal(buf, toEr)
 	if err != nil {

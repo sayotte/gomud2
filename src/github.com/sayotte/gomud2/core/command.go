@@ -22,6 +22,7 @@ const (
 	CommandTypeObjectAdminRelocate
 	CommandTypeObjectRemoveFromZone
 	CommandTypeZoneSetDefaultLocation
+	CommandTypeCombatMelee
 )
 
 type commandGeneric struct {
