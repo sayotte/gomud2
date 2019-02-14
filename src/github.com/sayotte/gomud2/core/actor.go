@@ -97,6 +97,10 @@ func (a *Actor) Attributes() AttributeSet {
 	return a.attributes
 }
 
+func (a *Actor) setAttributes(attrs AttributeSet) {
+	a.attributes = attrs
+}
+
 func (a *Actor) Skills() Skillset {
 	return a.skills
 }
