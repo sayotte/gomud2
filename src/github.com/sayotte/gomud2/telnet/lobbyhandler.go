@@ -144,7 +144,19 @@ func (lh *lobbyHandler) handleGetCharacterNameState(line []byte) ([]byte, handle
 			Focus:        10,
 			Zeal:         10,
 		},
-		core.Skillset{},
+		core.Skillset{
+			Slashing:             5.0,
+			SlashingCap:          100.0,
+			StabbingCap:          100.0,
+			BashingCap:           100.0,
+			DodgingCap:           100.0,
+			DodgingTechniquesCap: 5,
+			DeflectingCap:        100.0,
+			BlockingCap:          100.0,
+			SorceryCap:           100.0,
+			MysticismCap:         100.0,
+			InscriptionCap:       100.0,
+		},
 	)
 	actor, err := lh.world.AddActor(actorPre)
 	if err != nil {
