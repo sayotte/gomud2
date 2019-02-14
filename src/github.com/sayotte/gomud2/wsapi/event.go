@@ -20,6 +20,8 @@ const (
 	EventTypeObjectAddToZone      = "object-add-to-zone"
 	EventTypeObjectRemoveFromZone = "object-remove-from-zone"
 	EventTypeObjectMove           = "object-move"
+	EventTypeCombatMeleeDamage    = "combat-melee-damage"
+	EventTypeCombatDodge          = "combat-dodge"
 )
 
 type Event struct {
@@ -68,6 +70,12 @@ func eventFromDomainEvent(from core.Event) (Event, error) {
 	case core.EventTypeObjectMove:
 		e.EventType = EventTypeObjectMove
 		frommer = &ObjectMoveEventBody{}
+	case core.EventTypeCombatMeleeDamage:
+		e.EventType = EventTypeCombatMeleeDamage
+		frommer = &CombatMeleeDamageEventBody{}
+	case core.EventTypeCombatDodge:
+		e.EventType = EventTypeCombatDodge
+		frommer = &CombatDodgeEventBody{}
 	default:
 		return e, fmt.Errorf("unhandled Event type %T", from)
 	}
@@ -198,4 +206,40 @@ func (omeb *ObjectMoveEventBody) populateFromDomain(e core.Event) {
 	omeb.ToLocationContainerID = typedEvent.ToLocationContainerID
 	omeb.ToActorContainerID = typedEvent.ToActorContainerID
 	omeb.ToObjectContainerID = typedEvent.ToObjectContainerID
+}
+
+type CombatMeleeDamageEventBody struct {
+	DamageType  string    `json:"damageType"`
+	AttackerID  uuid.UUID `json:"attackerID"`
+	TargetID    uuid.UUID `json:"targetID"`
+	PhysicalDmg int       `json:"physicalDmg"`
+	StaminaDmg  int       `json:"staminaDmg"`
+	FocusDmg    int       `json:"focusDmg"`
+}
+
+func (cmdeb *CombatMeleeDamageEventBody) populateFromDomain(e core.Event) {
+	from := e.(*core.CombatMeleeDamageEvent)
+	*cmdeb = CombatMeleeDamageEventBody{
+		DamageType:  from.DamageType,
+		AttackerID:  from.AttackerID,
+		TargetID:    from.TargetID,
+		PhysicalDmg: from.PhysicalDmg,
+		StaminaDmg:  from.StaminaDmg,
+		FocusDmg:    from.FocusDmg,
+	}
+}
+
+type CombatDodgeEventBody struct {
+	DamageType string
+	AttackerID uuid.UUID
+	TargetID   uuid.UUID
+}
+
+func (cdeb *CombatDodgeEventBody) populateFromDomain(e core.Event) {
+	from := e.(*core.CombatDodgeEvent)
+	*cdeb = CombatDodgeEventBody{
+		DamageType: from.DamageType,
+		AttackerID: from.AttackerID,
+		TargetID:   from.TargetID,
+	}
 }
