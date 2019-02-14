@@ -62,7 +62,7 @@ func (gh *gameHandler) handleEvent(e core.Event, terminalWidth, terminalHeight i
 		out, err := gh.handleEventObjectMove(terminalWidth, typedE)
 		return out, gh, err
 	case core.EventTypeObjectRemoveFromZone:
-		typedE := e.(core.ObjectRemoveFromZoneEvent)
+		typedE := e.(*core.ObjectRemoveFromZoneEvent)
 		out, err := gh.handleEventObjectRemoved(terminalWidth, typedE)
 		return out, gh, err
 	default:
@@ -143,10 +143,10 @@ func (gh *gameHandler) getLookHandler() gameHandlerCommandHandler {
 		// Otherwise, look at a particular object
 		// Start by looking for a kw match in the inventory
 		var targetObj *core.Object
-		targetObj = keywordMatch(targetKW, gh.actor.Objects())
+		targetObj = keywordObjectMatch(targetKW, gh.actor.Objects())
 		if targetObj == nil {
 			// Failing that, look for a kw match on the ground
-			targetObj = keywordMatch(targetKW, gh.actor.Location().Objects())
+			targetObj = keywordObjectMatch(targetKW, gh.actor.Location().Objects())
 			if targetObj == nil {
 				return []byte(fmt.Sprintf("Look at what, exactly? I can't find a %q.\n", targetKW)), nil
 			}
@@ -301,7 +301,7 @@ func (gh *gameHandler) handleEventObjectMove(terminalWidth int, e *core.ObjectMo
 	return []byte(out), nil
 }
 
-func (gh *gameHandler) handleEventObjectRemoved(terminalWidth int, e core.ObjectRemoveFromZoneEvent) ([]byte, error) {
+func (gh *gameHandler) handleEventObjectRemoved(terminalWidth int, e *core.ObjectRemoveFromZoneEvent) ([]byte, error) {
 	return []byte(fmt.Sprintf("%s finally crumbles into dust.\n", e.Name)), nil
 }
 
@@ -320,14 +320,14 @@ func (gh *gameHandler) getTakeHandler() gameHandlerCommandHandler {
 			contKeyword := strings.ToLower(params[1])
 
 			// first check inventory
-			contObj := keywordMatch(contKeyword, gh.actor.Objects())
+			contObj := keywordObjectMatch(contKeyword, gh.actor.Objects())
 			if contObj != nil {
 				container = contObj
 				goto foundContainer
 			}
 
 			// if that fails, check containers on the ground
-			contObj = keywordMatch(contKeyword, gh.actor.Location().Objects())
+			contObj = keywordObjectMatch(contKeyword, gh.actor.Location().Objects())
 			if contObj != nil {
 				container = contObj
 				goto foundContainer
@@ -340,7 +340,7 @@ func (gh *gameHandler) getTakeHandler() gameHandlerCommandHandler {
 		// Decide which object we're taking
 		targetKeyword := strings.ToLower(params[0])
 		var targetObj *core.Object
-		targetObj = keywordMatch(targetKeyword, container.Objects())
+		targetObj = keywordObjectMatch(targetKeyword, container.Objects())
 		if targetObj == nil {
 			return []byte(fmt.Sprintf("Take what again? I can't find a %q.\n", targetKeyword)), nil
 		}
@@ -366,7 +366,7 @@ func (gh *gameHandler) getDropHandler() gameHandlerCommandHandler {
 		}
 
 		targetKeyword := strings.ToLower(params[0])
-		targetObj := keywordMatch(targetKeyword, gh.actor.Objects())
+		targetObj := keywordObjectMatch(targetKeyword, gh.actor.Objects())
 		if targetObj == nil {
 			return []byte(fmt.Sprintf("Drop what again? I can't find a %q.\n", targetKeyword)), nil
 		}
@@ -389,7 +389,7 @@ func (gh *gameHandler) getPutHandler() gameHandlerCommandHandler {
 
 		// Decide which object we're putting
 		targetKeyword := strings.ToLower(params[0])
-		targetObj := keywordMatch(targetKeyword, gh.actor.Objects())
+		targetObj := keywordObjectMatch(targetKeyword, gh.actor.Objects())
 		if targetObj == nil {
 			return []byte(fmt.Sprintf("Put what, exactly? There's no %q in your inventory.\n", targetKeyword)), nil
 		}
@@ -399,13 +399,13 @@ func (gh *gameHandler) getPutHandler() gameHandlerCommandHandler {
 		contKeyword := strings.ToLower(params[1])
 		// first check inventory
 		// note I'm working around a weirdness with nil-checking interface variables, see: https://gist.github.com/sayotte/450e5105f5004487646f84b3dc48e910
-		contObj := keywordMatch(contKeyword, gh.actor.Objects())
+		contObj := keywordObjectMatch(contKeyword, gh.actor.Objects())
 		if contObj != nil {
 			container = contObj
 			goto foundContainer
 		}
 		// if that fails, check containers on the ground
-		contObj = keywordMatch(contKeyword, gh.actor.Location().Objects())
+		contObj = keywordObjectMatch(contKeyword, gh.actor.Location().Objects())
 		if contObj != nil {
 			container = contObj
 			goto foundContainer
@@ -569,7 +569,7 @@ func summarizeCommands(cmdTrie *trie.Trie, terminalWidth int) []byte {
 	return []byte(output)
 }
 
-func keywordMatch(keyword string, candidateObjs []*core.Object) *core.Object {
+func keywordObjectMatch(keyword string, candidateObjs []*core.Object) *core.Object {
 	for _, obj := range candidateObjs {
 		for _, kw := range obj.Keywords() {
 			if strings.HasPrefix(kw, keyword) {
