@@ -22,6 +22,8 @@ type gameHandler struct {
 	world *core.World
 
 	cmdTrie *trie.Trie
+
+	targetID uuid.UUID
 }
 
 func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
@@ -34,6 +36,8 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 	gh.cmdTrie.Add("look", gh.getLookHandler())
 	gh.cmdTrie.Add("put", gh.getPutHandler())
 	gh.cmdTrie.Add("take", gh.getTakeHandler())
+	gh.cmdTrie.Add("target", gh.getTargetHandler())
+	gh.cmdTrie.Add("slash", gh.getSlashHandler())
 
 	gh.cmdTrie.Add(core.ExitDirectionNorth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionNorth)
@@ -76,6 +80,14 @@ func (gh *gameHandler) handleEvent(e core.Event, terminalWidth, terminalHeight i
 	case core.EventTypeObjectRemoveFromZone:
 		typedE := e.(*core.ObjectRemoveFromZoneEvent)
 		out, err := gh.handleEventObjectRemoved(terminalWidth, typedE)
+		return out, gh, err
+	case core.EventTypeCombatMeleeDamage:
+		typedE := e.(*core.CombatMeleeDamageEvent)
+		out, err := gh.handleEventCombatMeleeDamage(terminalWidth, typedE)
+		return out, gh, err
+	case core.EventTypeCombatDodge:
+		typedE := e.(*core.CombatDodgeEvent)
+		out, err := gh.handleEventCombatDodge(terminalWidth, typedE)
 		return out, gh, err
 	default:
 		return []byte(fmt.Sprintf("session: observed event of type %T\n", e)), gh, nil
@@ -317,6 +329,64 @@ func (gh *gameHandler) handleEventObjectRemoved(terminalWidth int, e *core.Objec
 	return []byte(fmt.Sprintf("%s finally crumbles into dust.\n", e.Name)), nil
 }
 
+func (gh *gameHandler) handleEventCombatMeleeDamage(terminalWidth int, e *core.CombatMeleeDamageEvent) ([]byte, error) {
+	attackerName := "Someone's"
+	if uuid.Equal(e.AttackerID, gh.actor.ID()) {
+		attackerName = "Your"
+	} else {
+		for _, actor := range gh.actor.Location().Actors() {
+			if uuid.Equal(e.AttackerID, actor.ID()) {
+				attackerName = fmt.Sprintf("%s's", actor.Name())
+				break
+			}
+		}
+	}
+
+	targetName := "someone"
+	if uuid.Equal(e.TargetID, gh.actor.ID()) {
+		targetName = "you"
+	} else {
+		for _, actor := range gh.actor.Location().Actors() {
+			if uuid.Equal(e.TargetID, actor.ID()) {
+				targetName = actor.Name()
+				break
+			}
+		}
+	}
+
+	out := fmt.Sprintf("%s %s wounds %s.\n", attackerName, e.DamageType, targetName)
+	return []byte(wordwrap.WrapString(out, uint(terminalWidth))), nil
+}
+
+func (gh *gameHandler) handleEventCombatDodge(terminalWidth int, e *core.CombatDodgeEvent) ([]byte, error) {
+	targetName := "Someone"
+	if uuid.Equal(e.TargetID, gh.actor.ID()) {
+		targetName = "You"
+	} else {
+		for _, actor := range gh.actor.Location().Actors() {
+			if uuid.Equal(e.TargetID, actor.ID()) {
+				targetName = actor.Name()
+				break
+			}
+		}
+	}
+
+	attackerName := "someone's"
+	if uuid.Equal(e.AttackerID, gh.actor.ID()) {
+		attackerName = "your"
+	} else {
+		for _, actor := range gh.actor.Location().Actors() {
+			if uuid.Equal(e.AttackerID, actor.ID()) {
+				attackerName = fmt.Sprintf("%s's", actor.Name())
+				break
+			}
+		}
+	}
+
+	out := fmt.Sprintf("%s dodges %s %s.\n", targetName, attackerName, e.DamageType)
+	return []byte(wordwrap.WrapString(out, uint(terminalWidth))), nil
+}
+
 func (gh *gameHandler) getTakeHandler() gameHandlerCommandHandler {
 	return func(line string, terminalWidth int) ([]byte, error) {
 		params := strings.Split(line, " ")
@@ -446,6 +516,47 @@ func (gh *gameHandler) getInventoryHandler() gameHandlerCommandHandler {
 		}
 
 		return []byte(fmt.Sprintf("Inventory contents:\n%s\n\n", strings.Join(objNames, "\n"))), nil
+	}
+}
+
+func (gh *gameHandler) getTargetHandler() gameHandlerCommandHandler {
+	return func(line string, terminalWidth int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) < 1 {
+			return []byte("Usage: target <target keyword>\n"), nil
+		}
+
+		// Decide which actor we're targeting
+		targetName := strings.ToLower(params[0])
+		targetActor := nameActorMatch(targetName, gh.actor.Location().Actors())
+		if targetActor == nil {
+			return []byte(fmt.Sprintf("Target who, exactly? There's no %q here.\n", targetName)), nil
+		}
+
+		gh.targetID = targetActor.ID()
+		return nil, nil
+	}
+}
+
+func (gh *gameHandler) getSlashHandler() gameHandlerCommandHandler {
+	return func(line string, terminalWidth int) ([]byte, error) {
+		var targetActor *core.Actor
+		for _, a := range gh.actor.Location().Actors() {
+			if uuid.Equal(a.ID(), gh.targetID) {
+				targetActor = a
+				break
+			}
+		}
+		if targetActor == nil {
+			return []byte("Target doesn't seem to be in this location...\n"), nil
+		}
+
+		err := gh.actor.Slash(targetActor)
+		if err != nil {
+			return []byte("Whoops..."), fmt.Errorf("Actor.Slash(): %s", err)
+		}
+
+		return nil, nil
 	}
 }
 
@@ -587,6 +698,16 @@ func keywordObjectMatch(keyword string, candidateObjs []*core.Object) *core.Obje
 			if strings.HasPrefix(kw, keyword) {
 				return obj
 			}
+		}
+	}
+	return nil
+}
+
+func nameActorMatch(name string, candidateActors core.ActorList) *core.Actor {
+	lowerName := strings.ToLower(name)
+	for _, a := range candidateActors {
+		if strings.HasPrefix(strings.ToLower(a.Name()), lowerName) {
+			return a
 		}
 	}
 	return nil
