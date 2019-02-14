@@ -342,7 +342,7 @@ func (z *Zone) processCommand(c Command) (interface{}, error) {
 	case CommandTypeObjectAdminRelocate:
 		outEvents, err = z.processObjectAdminRelocateCommand(c)
 	case CommandTypeObjectRemoveFromZone:
-		outEvents, err = z.processExitRemoveFromZoneCommand(c)
+		outEvents, err = z.processObjectRemoveFromZoneCommand(c)
 	case CommandTypeZoneSetDefaultLocation:
 		outEvents, err = z.processZoneSetDefaultLocationCommand(c)
 	default:
@@ -353,7 +353,7 @@ func (z *Zone) processCommand(c Command) (interface{}, error) {
 	}
 
 	for _, e := range outEvents {
-		if z.persister != nil {
+		if z.persister != nil && e.ShouldPersist() {
 			err = z.persister.PersistEvent(e)
 		}
 	}
