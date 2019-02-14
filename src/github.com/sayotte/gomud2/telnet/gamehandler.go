@@ -38,13 +38,25 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 	gh.cmdTrie.Add(core.ExitDirectionNorth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionNorth)
 	}))
+	gh.cmdTrie.Add("n", gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
+		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionNorth)
+	}))
 	gh.cmdTrie.Add(core.ExitDirectionSouth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
+		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionSouth)
+	}))
+	gh.cmdTrie.Add("s", gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionSouth)
 	}))
 	gh.cmdTrie.Add(core.ExitDirectionEast, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionEast)
 	}))
+	gh.cmdTrie.Add("e", gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
+		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionEast)
+	}))
 	gh.cmdTrie.Add(core.ExitDirectionWest, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
+		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionWest)
+	}))
+	gh.cmdTrie.Add("w", gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionWest)
 	}))
 
