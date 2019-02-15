@@ -339,6 +339,8 @@ func (z *Zone) processCommand(c Command) (interface{}, error) {
 		out, outEvents, err = z.processObjectAddToZoneCommand(c)
 	case CommandTypeObjectMove:
 		outEvents, err = z.processObjectMoveCommand(c)
+	case CommandTypeObjectMoveSubcontainer:
+		outEvents, err = z.processObjectMoveSubcontainerCommand(c)
 	case CommandTypeObjectAdminRelocate:
 		outEvents, err = z.processObjectAdminRelocateCommand(c)
 	case CommandTypeObjectRemoveFromZone:
@@ -866,6 +868,32 @@ func (z *Zone) processObjectMoveCommand(c Command) ([]Event, error) {
 	return []Event{e}, err
 }
 
+func (z *Zone) processObjectMoveSubcontainerCommand(c Command) ([]Event, error) {
+	cmd := c.(objectMoveSubcontainerCommand)
+	if cmd.obj.Zone() != z {
+		return nil, errors.New("Zone cannot move Objects in other Zones")
+	}
+	if cmd.actor.Location() != cmd.obj.Location() {
+		return nil, errors.New("Actor and Object must be in the same Location")
+	}
+	err := cmd.obj.Container().checkMoveObjectToSubcontainer(cmd.obj, cmd.fromSubcontainer, cmd.toSubcontainer)
+	if err != nil {
+		return nil, err
+	}
+
+	e := NewObjectMoveSubcontainerEvent(
+		cmd.obj.ID(),
+		cmd.actor.ID(),
+		z.ID(),
+		cmd.fromSubcontainer,
+		cmd.toSubcontainer,
+	)
+	e.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = e.SequenceNumber() + 1
+	_, err = z.applyEvent(e)
+	return []Event{e}, err
+}
+
 func (z *Zone) processObjectAdminRelocateCommand(c Command) ([]Event, error) {
 	cmd := c.(objectAdminRelocateCommand)
 	e := cmd.wrappedEvent
@@ -1015,6 +1043,9 @@ func (z *Zone) applyEvent(e Event) (interface{}, error) {
 	case EventTypeObjectMove:
 		typedEvent := e.(*ObjectMoveEvent)
 		oList, err = z.applyObjectMoveEvent(typedEvent)
+	case EventTypeObjectMoveSubcontainer:
+		typedEvent := e.(*ObjectMoveSubcontainerEvent)
+		oList, err = z.applyObjectMoveSubcontainerEvent(typedEvent)
 	case EventTypeObjectAdminRelocate:
 		typedEvent := e.(*ObjectAdminRelocateEvent)
 		oList, err = z.applyObjectAdminRelocateEvent(typedEvent)
@@ -1467,6 +1498,31 @@ func (z *Zone) applyObjectMoveEvent(e *ObjectMoveEvent) (ObserverList, error) {
 
 	oList = oList.Dedupe()
 
+	return oList, nil
+}
+
+func (z *Zone) applyObjectMoveSubcontainerEvent(e *ObjectMoveSubcontainerEvent) (ObserverList, error) {
+	obj, found := z.objectsById[e.ObjectID]
+	if !found {
+		return nil, fmt.Errorf("cannot find/move Object %q", e.ObjectID)
+	}
+
+	err := obj.Container().moveObjectToSubcontainer(obj, e.FromSubcontainer, e.ToSubcontainer)
+	if err != nil {
+		return nil, err
+	}
+
+	dedupeObserverMap := make(map[Observer]struct{})
+	for _, o := range obj.Observers() {
+		dedupeObserverMap[o] = struct{}{}
+	}
+	for _, o := range obj.Location().Observers() {
+		dedupeObserverMap[o] = struct{}{}
+	}
+	oList := make(ObserverList, 0, len(dedupeObserverMap))
+	for o := range dedupeObserverMap {
+		oList = append(oList, o)
+	}
 	return oList, nil
 }
 

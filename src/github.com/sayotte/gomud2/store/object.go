@@ -93,6 +93,7 @@ type objectMoveEvent struct {
 	ActorID                                                              uuid.UUID
 	FromLocationContainerID, FromActorContainerID, FromObjectContainerID uuid.UUID
 	ToLocationContainerID, ToActorContainerID, ToObjectContainerID       uuid.UUID
+	ToSubcontainer                                                       string
 }
 
 func (ome *objectMoveEvent) FromDomain(e core.Event) {
@@ -107,6 +108,7 @@ func (ome *objectMoveEvent) FromDomain(e core.Event) {
 		ToLocationContainerID:   from.ToLocationContainerID,
 		ToActorContainerID:      from.ToActorContainerID,
 		ToObjectContainerID:     from.ToObjectContainerID,
+		ToSubcontainer:          from.ToSubcontainer,
 	}
 }
 
@@ -122,6 +124,7 @@ func (ome objectMoveEvent) ToDomain() core.Event {
 	e.ToLocationContainerID = ome.ToLocationContainerID
 	e.ToActorContainerID = ome.ToActorContainerID
 	e.ToObjectContainerID = ome.ToObjectContainerID
+	e.ToSubcontainer = ome.ToSubcontainer
 
 	e.SetSequenceNumber(ome.header.SequenceNumber)
 	e.SetTimestamp(ome.header.Timestamp)
@@ -134,6 +137,45 @@ func (ome objectMoveEvent) Header() eventHeader {
 
 func (ome *objectMoveEvent) SetHeader(h eventHeader) {
 	ome.header = h
+}
+
+type objectMoveSubcontainerEvent struct {
+	header                           eventHeader
+	ObjectID                         uuid.UUID
+	FromSubcontainer, ToSubcontainer string
+	ActorID                          uuid.UUID
+}
+
+func (omse *objectMoveSubcontainerEvent) FromDomain(e core.Event) {
+	from := e.(*core.ObjectMoveSubcontainerEvent)
+	*omse = objectMoveSubcontainerEvent{
+		header:           eventHeaderFromDomainEvent(from),
+		ObjectID:         from.ObjectID,
+		FromSubcontainer: from.FromSubcontainer,
+		ToSubcontainer:   from.ToSubcontainer,
+		ActorID:          from.ActorID,
+	}
+}
+
+func (omse objectMoveSubcontainerEvent) ToDomain() core.Event {
+	e := core.NewObjectMoveSubcontainerEvent(
+		omse.ObjectID,
+		omse.ActorID,
+		omse.header.AggregateId,
+		omse.FromSubcontainer,
+		omse.ToSubcontainer,
+	)
+	e.SetSequenceNumber(omse.header.SequenceNumber)
+	e.SetTimestamp(omse.header.Timestamp)
+	return e
+}
+
+func (omse objectMoveSubcontainerEvent) Header() eventHeader {
+	return omse.header
+}
+
+func (omse *objectMoveSubcontainerEvent) SetHeader(h eventHeader) {
+	omse.header = h
 }
 
 type objectAdminRelocateEvent struct {

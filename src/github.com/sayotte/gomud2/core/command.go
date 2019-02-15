@@ -19,6 +19,7 @@ const (
 	CommandTypeExitRemoveFromZone
 	CommandTypeObjectAddToZone
 	CommandTypeObjectMove
+	CommandTypeObjectMoveSubcontainer
 	CommandTypeObjectAdminRelocate
 	CommandTypeObjectRemoveFromZone
 	CommandTypeZoneSetDefaultLocation

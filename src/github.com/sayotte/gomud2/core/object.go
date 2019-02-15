@@ -326,6 +326,47 @@ type ObjectMoveEvent struct {
 	ToSubcontainer                                                       string
 }
 
+func newObjectMoveSubcontainerCommand(obj *Object, fromSub, toSub string, actor *Actor) objectMoveSubcontainerCommand {
+	return objectMoveSubcontainerCommand{
+		commandGeneric:   commandGeneric{commandType: CommandTypeObjectMoveSubcontainer},
+		obj:              obj,
+		fromSubcontainer: fromSub,
+		toSubcontainer:   toSub,
+		actor:            actor,
+	}
+}
+
+type objectMoveSubcontainerCommand struct {
+	commandGeneric
+	obj              *Object
+	fromSubcontainer string
+	toSubcontainer   string
+	actor            *Actor
+}
+
+func NewObjectMoveSubcontainerEvent(objId, actorID, zoneID uuid.UUID, fromSub, toSub string) *ObjectMoveSubcontainerEvent {
+	return &ObjectMoveSubcontainerEvent{
+		eventGeneric: &eventGeneric{
+			EventTypeNum:      EventTypeObjectMoveSubcontainer,
+			TimeStamp:         time.Now(),
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
+		},
+		ObjectID:         objId,
+		FromSubcontainer: fromSub,
+		ToSubcontainer:   toSub,
+		ActorID:          actorID,
+	}
+}
+
+type ObjectMoveSubcontainerEvent struct {
+	*eventGeneric
+	ObjectID                         uuid.UUID
+	FromSubcontainer, ToSubcontainer string
+	ActorID                          uuid.UUID
+}
+
 func newObjectAdminRelocateCommand(wrapped *ObjectAdminRelocateEvent) objectAdminRelocateCommand {
 	return objectAdminRelocateCommand{
 		commandGeneric{commandType: CommandTypeObjectAdminRelocate},

@@ -21,6 +21,7 @@ const (
 	EventTypeObjectAddToZone
 	EventTypeObjectRemoveFromZone
 	EventTypeObjectMove
+	EventTypeObjectMoveSubcontainer
 	EventTypeObjectAdminRelocate
 	EventTypeObjectMigrateIn
 	EventTypeObjectMigrateOut
