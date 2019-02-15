@@ -130,6 +130,17 @@ func (o *Object) Move(from, to Container, who *Actor, toSubcontainer string) err
 	return err
 }
 
+func (o *Object) MoveToSubcontainer(subcontainer string, actor *Actor) error {
+	if !actor.ContainsObject(o) {
+		return errors.New("Actor doesn't possess that Object")
+	}
+
+	fromSub := actor.SubcontainerFor(o)
+	cmd := newObjectMoveSubcontainerCommand(o, fromSub, subcontainer, actor)
+	_, err := o.syncRequestToZone(cmd)
+	return err
+}
+
 func (o *Object) AdminRelocate(to Container, toSubcontainer string) error {
 	e := NewObjectAdminRelocateEvent(o.id, o.Zone().ID())
 	switch to.(type) {
