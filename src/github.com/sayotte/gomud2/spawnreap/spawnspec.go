@@ -13,10 +13,11 @@ type SpawnSpecification struct {
 }
 
 type ActorPrototype struct {
-	Name       string
-	BrainType  string
-	Attributes core.AttributeSet
-	Skills     core.Skillset
+	Name                 string
+	BrainType            string
+	Attributes           core.AttributeSet
+	Skills               core.Skillset
+	InventoryConstraints core.ActorInventoryConstraints
 }
 
 func (ap ActorPrototype) ToActor(loc *core.Location) *core.Actor {
@@ -28,5 +29,6 @@ func (ap ActorPrototype) ToActor(loc *core.Location) *core.Actor {
 		loc.Zone(),
 		ap.Attributes,
 		ap.Skills,
+		ap.InventoryConstraints,
 	)
 }

@@ -465,6 +465,7 @@ func (z *Zone) processActorMigrateInCommand(c Command) (interface{}, []Event, er
 		z.id,
 		cmd.actor.Attributes(),
 		cmd.actor.Skills(),
+		cmd.actor.Inventory().Constraints(),
 	)
 	actorEv.SetSequenceNumber(z.nextSequenceId)
 	z.nextSequenceId = actorEv.SequenceNumber() + 1
@@ -1098,6 +1099,7 @@ func (z *Zone) applyActorAddToZoneEvent(e *ActorAddToZoneEvent) (*Actor, Observe
 		z,
 		e.Attributes,
 		e.Skills,
+		e.InventoryConstraints,
 	)
 
 	newLoc.addActor(actor)
@@ -1191,6 +1193,7 @@ func (z *Zone) applyActorMigrateInEvent(e *ActorMigrateInEvent) (*Actor, Observe
 		z,
 		e.Attributes,
 		e.Skills,
+		e.InventoryConstraints,
 	)
 
 	var oList ObserverList
@@ -1488,7 +1491,10 @@ func (z *Zone) applyObjectMoveEvent(e *ObjectMoveEvent) (ObserverList, error) {
 	}
 
 	if to != nil {
-		_ = to.addObject(obj, e.ToSubcontainer)
+		err := to.addObject(obj, e.ToSubcontainer)
+		if err != nil {
+			return nil, err
+		}
 		oList = append(oList, to.Observers()...)
 	} else {
 		fmt.Printf("WARNING: applying ObjectMoveEvent with no resolvable 'to'\n")

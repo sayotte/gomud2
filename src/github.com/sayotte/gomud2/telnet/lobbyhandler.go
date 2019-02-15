@@ -157,6 +157,7 @@ func (lh *lobbyHandler) handleGetCharacterNameState(line []byte) ([]byte, handle
 			MysticismCap:         100.0,
 			InscriptionCap:       100.0,
 		},
+		core.DefaultHumanInventoryConstraints,
 	)
 	actor, err := lh.world.AddActor(actorPre)
 	if err != nil {

@@ -12,11 +12,9 @@ import (
 	myuuid "github.com/sayotte/gomud2/uuid"
 )
 
-const actorInventoryCapacity = 15
-
 var actorMoveDelay = time.Millisecond * 500
 
-func NewActor(id uuid.UUID, name, brainType string, location *Location, zone *Zone, attrs AttributeSet, skills Skillset) *Actor {
+func NewActor(id uuid.UUID, name, brainType string, location *Location, zone *Zone, attrs AttributeSet, skills Skillset, inventoryConstraints ActorInventoryConstraints) *Actor {
 	newID := id
 	if uuid.Equal(id, uuid.Nil) {
 		newID = myuuid.NewId()
@@ -27,6 +25,7 @@ func NewActor(id uuid.UUID, name, brainType string, location *Location, zone *Zo
 		location:   location,
 		zone:       zone,
 		brainType:  brainType,
+		inventory:  &ActorInventory{constraints: inventoryConstraints},
 		rwlock:     &sync.RWMutex{},
 		attributes: attrs,
 		skills:     skills,
@@ -43,7 +42,7 @@ type Actor struct {
 
 	brainType string
 
-	inventoryObjects ObjectList
+	inventory *ActorInventory
 
 	rwlock *sync.RWMutex
 
@@ -105,42 +104,40 @@ func (a *Actor) Skills() Skillset {
 	return a.skills
 }
 
+func (a *Actor) Inventory() *ActorInventory {
+	return a.inventory
+}
+
 func (a *Actor) Capacity() int {
-	return actorInventoryCapacity
+	return a.inventory.Capacity()
 }
 
 func (a *Actor) Objects() ObjectList {
-	return a.inventoryObjects.Copy()
+	return a.inventory.Objects()
 }
 
 func (a *Actor) ContainsObject(o *Object) bool {
-	_, err := a.inventoryObjects.IndexOf(o)
-	return err == nil
+	return a.inventory.ContainsObject(o)
 }
 
 func (a *Actor) SubcontainerFor(o *Object) string {
-	return ContainerDefaultSubcontainer
+	return a.inventory.SubcontainerFor(o)
 }
 
 func (a *Actor) addObject(o *Object, subcontainer string) error {
-	_, err := a.inventoryObjects.IndexOf(o)
-	if err == nil {
-		return fmt.Errorf("Object %q already present in inventory for Actor %q", o.ID(), a.id)
-	}
-	a.inventoryObjects = append(a.inventoryObjects, o)
-	return nil
+	return a.inventory.addObject(o, subcontainer)
 }
 
 func (a *Actor) removeObject(o *Object) {
-	a.inventoryObjects = a.inventoryObjects.Remove(o)
+	a.inventory.removeObject(o)
 }
 
 func (a *Actor) checkMoveObjectToSubcontainer(o *Object, oldSub, newSub string) error {
-	return errors.New("Actor does not implement subcontainers")
+	return a.inventory.checkMoveObjectToSubcontainer(o, oldSub, newSub)
 }
 
 func (a *Actor) moveObjectToSubcontainer(o *Object, oldSub, newSub string) error {
-	return errors.New("Actor does not implement subcontainers")
+	return a.inventory.moveObjectToSubcontainer(o, oldSub, newSub)
 }
 
 func (a *Actor) Zone() *Zone {
@@ -164,6 +161,7 @@ func (a Actor) snapshot(sequenceNum uint64) Event {
 		a.zone.ID(),
 		a.attributes,
 		a.skills,
+		a.inventory.Constraints(),
 	)
 	e.SetSequenceNumber(sequenceNum)
 	return e
@@ -339,7 +337,7 @@ type actorAddToZoneCommand struct {
 	wrappedEvent *ActorAddToZoneEvent
 }
 
-func NewActorAddToZoneEvent(name, brainType string, actorId, startingLocationId, zoneId uuid.UUID, attrs AttributeSet, skills Skillset) *ActorAddToZoneEvent {
+func NewActorAddToZoneEvent(name, brainType string, actorId, startingLocationId, zoneId uuid.UUID, attrs AttributeSet, skills Skillset, invConstraints ActorInventoryConstraints) *ActorAddToZoneEvent {
 	return &ActorAddToZoneEvent{
 		&eventGeneric{
 			EventTypeNum:      EventTypeActorAddToZone,
@@ -354,16 +352,18 @@ func NewActorAddToZoneEvent(name, brainType string, actorId, startingLocationId,
 		startingLocationId,
 		attrs,
 		skills,
+		invConstraints,
 	}
 }
 
 type ActorAddToZoneEvent struct {
 	*eventGeneric
-	ActorID            uuid.UUID
-	Name, BrainType    string
-	StartingLocationID uuid.UUID
-	Attributes         AttributeSet
-	Skills             Skillset
+	ActorID              uuid.UUID
+	Name, BrainType      string
+	StartingLocationID   uuid.UUID
+	Attributes           AttributeSet
+	Skills               Skillset
+	InventoryConstraints ActorInventoryConstraints
 }
 
 func newActorRemoveFromZoneCommand(wrapped *ActorRemoveFromZoneEvent) *actorRemoveFromZoneCommand {
@@ -413,7 +413,7 @@ type actorMigrateInCommand struct {
 	observers ObserverList
 }
 
-func NewActorMigrateInEvent(name, brainType string, actorID, fromLocID, fromZoneID, toLocID, zoneID uuid.UUID, attrs AttributeSet, skills Skillset) *ActorMigrateInEvent {
+func NewActorMigrateInEvent(name, brainType string, actorID, fromLocID, fromZoneID, toLocID, zoneID uuid.UUID, attrs AttributeSet, skills Skillset, invConstraints ActorInventoryConstraints) *ActorMigrateInEvent {
 	return &ActorMigrateInEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeActorMigrateIn,
@@ -422,14 +422,15 @@ func NewActorMigrateInEvent(name, brainType string, actorID, fromLocID, fromZone
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,
 		},
-		Name:       name,
-		BrainType:  brainType,
-		ActorID:    actorID,
-		FromLocID:  fromLocID,
-		FromZoneID: fromZoneID,
-		ToLocID:    toLocID,
-		Attributes: attrs,
-		Skills:     skills,
+		Name:                 name,
+		BrainType:            brainType,
+		ActorID:              actorID,
+		FromLocID:            fromLocID,
+		FromZoneID:           fromZoneID,
+		ToLocID:              toLocID,
+		Attributes:           attrs,
+		Skills:               skills,
+		InventoryConstraints: invConstraints,
 	}
 }
 
@@ -441,6 +442,7 @@ type ActorMigrateInEvent struct {
 	ToLocID               uuid.UUID
 	Attributes            AttributeSet
 	Skills                Skillset
+	InventoryConstraints  ActorInventoryConstraints
 }
 
 func newActorMigrateOutCommand(actor *Actor, from, to *Location) *actorMigrateOutCommand {

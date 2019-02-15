@@ -76,18 +76,20 @@ type actorAddToZoneEvent struct {
 	Name, BrainType             string
 	Attributes                  core.AttributeSet
 	Skills                      core.Skillset
+	InventoryConstraints        core.ActorInventoryConstraints
 }
 
 func (aatze *actorAddToZoneEvent) FromDomain(e core.Event) {
 	from := e.(*core.ActorAddToZoneEvent)
 	*aatze = actorAddToZoneEvent{
-		header:             eventHeaderFromDomainEvent(from),
-		ActorID:            from.ActorID,
-		StartingLocationID: from.StartingLocationID,
-		Name:               from.Name,
-		BrainType:          from.BrainType,
-		Attributes:         from.Attributes,
-		Skills:             from.Skills,
+		header:               eventHeaderFromDomainEvent(from),
+		ActorID:              from.ActorID,
+		StartingLocationID:   from.StartingLocationID,
+		Name:                 from.Name,
+		BrainType:            from.BrainType,
+		Attributes:           from.Attributes,
+		Skills:               from.Skills,
+		InventoryConstraints: from.InventoryConstraints,
 	}
 }
 
@@ -100,6 +102,7 @@ func (aatze actorAddToZoneEvent) ToDomain() core.Event {
 		aatze.header.AggregateId,
 		aatze.Attributes,
 		aatze.Skills,
+		aatze.InventoryConstraints,
 	)
 	e.SetSequenceNumber(aatze.header.SequenceNumber)
 	e.SetTimestamp(aatze.header.Timestamp)
@@ -150,20 +153,22 @@ type actorMigrateInEvent struct {
 	ToLocID               uuid.UUID
 	Attributes            core.AttributeSet
 	Skills                core.Skillset
+	InventoryConstraints  core.ActorInventoryConstraints
 }
 
 func (amie *actorMigrateInEvent) FromDomain(e core.Event) {
 	from := e.(*core.ActorMigrateInEvent)
 	*amie = actorMigrateInEvent{
-		header:     eventHeaderFromDomainEvent(from),
-		ActorID:    from.ActorID,
-		Name:       from.Name,
-		BrainType:  from.BrainType,
-		FromLocID:  from.FromLocID,
-		FromZoneID: from.FromZoneID,
-		ToLocID:    from.ToLocID,
-		Attributes: from.Attributes,
-		Skills:     from.Skills,
+		header:               eventHeaderFromDomainEvent(from),
+		ActorID:              from.ActorID,
+		Name:                 from.Name,
+		BrainType:            from.BrainType,
+		FromLocID:            from.FromLocID,
+		FromZoneID:           from.FromZoneID,
+		ToLocID:              from.ToLocID,
+		Attributes:           from.Attributes,
+		Skills:               from.Skills,
+		InventoryConstraints: from.InventoryConstraints,
 	}
 	return
 }
@@ -179,6 +184,7 @@ func (amie actorMigrateInEvent) ToDomain() core.Event {
 		amie.header.AggregateId,
 		amie.Attributes,
 		amie.Skills,
+		amie.InventoryConstraints,
 	)
 	e.SetSequenceNumber(amie.header.SequenceNumber)
 	e.SetTimestamp(amie.header.Timestamp)

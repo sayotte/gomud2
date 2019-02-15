@@ -159,6 +159,7 @@ func (w *World) handleIncompleteTransactions(redo, undo []Event) error {
 			oldZone,
 			readdEvent.Attributes,
 			readdEvent.Skills,
+			readdEvent.InventoryConstraints,
 		)
 		_, err := oldZone.AddActor(actor)
 		if err != nil {
