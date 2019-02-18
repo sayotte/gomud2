@@ -1,0 +1,19 @@
+@startuml
+== Command Submission ==
+Telnet -> Actor: "Move" API call
+Actor -> Actor: generate "ActorMoveCommand"
+Actor -> Zone: submit command for serial processing
+== Command Processing ==
+Zone -> Zone: check invariants
+Zone -> Zone: generate "ActorMovedEvent"
+Zone -> Zone: submit event
+== Event Processing ==
+Zone -> Zone: apply "ActorMovedEvent"
+Zone -> Zone: compile list of Observers to be notified (includes Telnet)
+Zone -> Telnet: async-notify Observers
+== Command Retirement ==
+Zone -> Store: persist "ActorMovedEvent"
+Zone -> Actor: return success
+Actor -> Telnet: return success
+
+@enduml
