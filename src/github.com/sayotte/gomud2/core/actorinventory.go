@@ -59,6 +59,20 @@ func (ai *ActorInventory) Capacity() int {
 	return ai.constraints.BackSlots + ai.constraints.BeltSlots + ai.constraints.BodySlots + ai.constraints.HandSlots
 }
 
+func (ai *ActorInventory) CapacityBySubcontainer(subname string) (int, int) {
+	switch subname {
+	case InventoryContainerBack:
+		return ai.constraints.BackSlots, ai.constraints.BackMaxItems
+	case InventoryContainerBelt:
+		return ai.constraints.BeltSlots, ai.constraints.BeltMaxItems
+	case InventoryContainerBody:
+		return ai.constraints.BodySlots, ai.constraints.BodyMaxItems
+	case InventoryContainerHands:
+		return ai.constraints.HandSlots, ai.constraints.HandMaxItems
+	}
+	return 0, 0
+}
+
 func (ai *ActorInventory) ContainsObject(o *Object) bool {
 	_, err := ai.back.IndexOf(o)
 	if err == nil {

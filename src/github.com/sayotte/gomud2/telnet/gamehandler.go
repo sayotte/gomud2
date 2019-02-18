@@ -38,6 +38,8 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 	gh.cmdTrie.Add("take", gh.getTakeHandler())
 	gh.cmdTrie.Add("target", gh.getTargetHandler())
 	gh.cmdTrie.Add("slash", gh.getSlashHandler())
+	gh.cmdTrie.Add("wear", gh.getWearHandler())
+	gh.cmdTrie.Add("remove", gh.getRemoveHandler())
 
 	gh.cmdTrie.Add(core.ExitDirectionNorth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionNorth)
@@ -76,6 +78,10 @@ func (gh *gameHandler) handleEvent(e core.Event, terminalWidth, terminalHeight i
 	case core.EventTypeObjectMove:
 		typedE := e.(*core.ObjectMoveEvent)
 		out, err := gh.handleEventObjectMove(terminalWidth, typedE)
+		return out, gh, err
+	case core.EventTypeObjectMoveSubcontainer:
+		typedE := e.(*core.ObjectMoveSubcontainerEvent)
+		out, err := gh.handleEventObjectMoveSubcontainer(terminalWidth, typedE)
 		return out, gh, err
 	case core.EventTypeObjectRemoveFromZone:
 		typedE := e.(*core.ObjectRemoveFromZoneEvent)
@@ -243,25 +249,8 @@ func (gh *gameHandler) handleEventObjectMove(terminalWidth int, e *core.ObjectMo
 
 	zone := gh.actor.Zone()
 
-	resolveActor := func(id uuid.UUID, defaultVal string) string {
-		ret := defaultVal
-		actor := zone.ActorByID(id)
-		if actor != nil {
-			ret = actor.Name()
-		}
-		return ret
-	}
-	resolveObj := func(id uuid.UUID) string {
-		ret := "something"
-		obj := zone.ObjectByID(id)
-		if obj != nil {
-			ret = obj.Name()
-		}
-		return ret
-	}
-
-	who := resolveActor(e.ActorID, "Someone")
-	what := resolveObj(e.ObjectID)
+	who := resolveActorNameByID(e.ActorID, "Someone", zone)
+	what := resolveObjNameByID(e.ObjectID, zone)
 
 	// These are the valid cases, which should be guaranteed by the command handler.
 	// We simply ignore other cases-- they might be interesting, but this is a pretty annoying function
@@ -283,15 +272,15 @@ func (gh *gameHandler) handleEventObjectMove(terminalWidth int, e *core.ObjectMo
 		switch {
 		case !uuid.Equal(e.FromActorContainerID, uuid.Nil) && !uuid.Equal(e.ToActorContainerID, uuid.Nil):
 			// me -> actor
-			toWhom := resolveActor(e.ToActorContainerID, "someone")
+			toWhom := resolveActorNameByID(e.ToActorContainerID, "someone", zone)
 			out = fmt.Sprintf("You give %s to %s.\n", what, toWhom)
 		case !uuid.Equal(e.ToObjectContainerID, uuid.Nil):
 			// me -> container
-			intoWhat := resolveObj(e.ToObjectContainerID)
+			intoWhat := resolveObjNameByID(e.ToObjectContainerID, zone)
 			out = fmt.Sprintf("You put %s into %s.\n", what, intoWhat)
 		case !uuid.Equal(e.FromObjectContainerID, uuid.Nil):
 			// container -> me
-			fromWhat := resolveObj(e.FromObjectContainerID)
+			fromWhat := resolveObjNameByID(e.FromObjectContainerID, zone)
 			out = fmt.Sprintf("You take %s from %s.\n", what, fromWhat)
 		case !uuid.Equal(e.ToLocationContainerID, uuid.Nil):
 			// me -> ground
@@ -307,11 +296,11 @@ func (gh *gameHandler) handleEventObjectMove(terminalWidth int, e *core.ObjectMo
 			out = fmt.Sprintf("%s gives you %s.\n", who, what)
 		case !uuid.Equal(e.ToObjectContainerID, uuid.Nil):
 			// actor -> container
-			intoWhat := resolveObj(e.ToObjectContainerID)
+			intoWhat := resolveObjNameByID(e.ToObjectContainerID, zone)
 			out = fmt.Sprintf("%s puts %s into %s.\n", who, what, intoWhat)
 		case !uuid.Equal(e.FromActorContainerID, uuid.Nil):
 			// container -> actor
-			fromWhat := resolveObj(e.FromObjectContainerID)
+			fromWhat := resolveObjNameByID(e.FromObjectContainerID, zone)
 			out = fmt.Sprintf("%s takes %s from %s.\n", who, what, fromWhat)
 		case !uuid.Equal(e.ToLocationContainerID, uuid.Nil):
 			// actor -> ground
@@ -327,6 +316,43 @@ func (gh *gameHandler) handleEventObjectMove(terminalWidth int, e *core.ObjectMo
 
 func (gh *gameHandler) handleEventObjectRemoved(terminalWidth int, e *core.ObjectRemoveFromZoneEvent) ([]byte, error) {
 	return []byte(fmt.Sprintf("%s finally crumbles into dust.\n", e.Name)), nil
+}
+
+func (gh *gameHandler) handleEventObjectMoveSubcontainer(terminalWidth int, e *core.ObjectMoveSubcontainerEvent) ([]byte, error) {
+	var out string
+
+	zone := gh.actor.Zone()
+	what := resolveObjNameByID(e.ObjectID, zone)
+
+	// cases:
+	// (self)  hands->other: you wear what on your where
+	// (self)  other->hands: you remove what
+	// (other) hands->other: who wears what on their where
+	// (other) other->hands: who removes what
+	if uuid.Equal(e.ActorID, gh.actor.ID()) {
+		switch {
+		case e.FromSubcontainer == core.InventoryContainerHands && e.ToSubcontainer != core.InventoryContainerHands:
+			out = fmt.Sprintf("You wear %s on your %s.\n", what, e.ToSubcontainer)
+		case e.FromSubcontainer != core.InventoryContainerHands && e.ToSubcontainer == core.InventoryContainerHands:
+			out = fmt.Sprintf("You remove %s from your %s.\n", what, e.FromSubcontainer)
+		default:
+			out = fmt.Sprintf("You move %s from %s to %s.\n", what, e.FromSubcontainer, e.ToSubcontainer)
+		}
+
+	} else {
+		who := resolveActorNameByID(e.ActorID, "Someone", zone)
+		switch {
+		case e.FromSubcontainer == core.InventoryContainerHands && e.ToSubcontainer != core.InventoryContainerHands:
+			out = fmt.Sprintf("%s wears %s on their %s.", who, what, e.ToSubcontainer)
+		case e.FromSubcontainer != core.InventoryContainerHands && e.ToSubcontainer == core.InventoryContainerHands:
+			out = fmt.Sprintf("%s removes %s from their %s.\n", who, what, e.FromSubcontainer)
+		default:
+			out = fmt.Sprintf("%s moves %s from %s to %s.\n", who, what, e.FromSubcontainer, e.ToSubcontainer)
+		}
+	}
+
+	return []byte(wordwrap.WrapString(out, uint(terminalWidth))), nil
+
 }
 
 func (gh *gameHandler) handleEventCombatMeleeDamage(terminalWidth int, e *core.CombatMeleeDamageEvent) ([]byte, error) {
@@ -560,6 +586,88 @@ func (gh *gameHandler) getSlashHandler() gameHandlerCommandHandler {
 	}
 }
 
+func (gh *gameHandler) getWearHandler() gameHandlerCommandHandler {
+	return func(line string, terminalWidth int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) <= 1 {
+			return []byte("Usage: wear <object keyword> <inventory slot keyword>\n"), nil
+		}
+
+		// Decide which object we're wearing
+		targetKeyword := strings.ToLower(params[0])
+		targetObj := keywordObjectMatch(targetKeyword, gh.actor.Inventory().ObjectsBySubcontainer(core.InventoryContainerHands))
+		if targetObj == nil {
+			return []byte(fmt.Sprintf("Wear what, exactly? You're not holding a %q in your hands.\n", targetKeyword)), nil
+		}
+
+		// Make sure we're not attempting something that'll throw an error for
+		// obvious reasons, or is otherwise silly.
+		if params[0] == core.InventoryContainerHands {
+			return []byte("Hands are for holding things, not wearing them.\n"), nil
+		}
+		maxSlots, maxItems := gh.actor.Inventory().CapacityBySubcontainer(params[1])
+		currentObjects := gh.actor.Inventory().ObjectsBySubcontainer(params[1])
+		if len(currentObjects) >= maxItems {
+			return []byte("You can't wear another item there.\n"), nil
+		}
+		currentSlotsTaken := 0
+		for _, obj := range currentObjects {
+			currentSlotsTaken += obj.InventorySlots()
+		}
+		if currentSlotsTaken+targetObj.InventorySlots() > maxSlots {
+			return []byte("That item won't fit there.\n"), nil
+		}
+
+		err := targetObj.MoveToSubcontainer(params[1], gh.actor)
+		if err != nil {
+			return []byte("Whoops..."), err
+		}
+
+		return nil, nil
+	}
+}
+
+func (gh *gameHandler) getRemoveHandler() gameHandlerCommandHandler {
+	return func(line string, terminalWidth int) ([]byte, error) {
+		params := strings.Split(line, " ")
+		if len(params) < 1 {
+			return []byte("Usage: remove <object keyword>\n"), nil
+		}
+
+		// Decide which object we're removing
+		targetKeyword := strings.ToLower(params[0])
+		targetObj := keywordObjectMatch(targetKeyword, gh.actor.Inventory().Objects())
+		if targetObj == nil {
+			return []byte(fmt.Sprintf("Remove what, exactly? You don't have a %q.\n", targetKeyword)), nil
+		}
+
+		// Make sure we're not attempting something that'll throw an error for
+		// obvious reasons, or is otherwise silly.
+		if targetObj.Container().SubcontainerFor(targetObj) == core.InventoryContainerHands {
+			return []byte("You're already holding that in your hands, you can't remove it.\n"), nil
+		}
+		currentHandItems := gh.actor.Inventory().ObjectsBySubcontainer(core.InventoryContainerHands)
+		maxSlots, maxItems := gh.actor.Inventory().CapacityBySubcontainer(core.InventoryContainerHands)
+		if len(currentHandItems) >= maxItems {
+			return []byte("You have no room in your hands to hold another item, put something down first?\n"), nil
+		}
+		currentSlotsTaken := 0
+		for _, obj := range currentHandItems {
+			currentSlotsTaken += obj.InventorySlots()
+		}
+		if currentSlotsTaken+targetObj.InventorySlots() > maxSlots {
+			return []byte("That's too big to hold in your hands right now, put something down first?\n"), nil
+		}
+
+		err := targetObj.MoveToSubcontainer(core.InventoryContainerHands, gh.actor)
+		if err != nil {
+			return []byte("Whoops..."), err
+		}
+
+		return nil, nil
+	}
+}
+
 var locationExitDisplayOrder = []string{
 	core.ExitDirectionNorth,
 	core.ExitDirectionSouth,
@@ -711,4 +819,22 @@ func nameActorMatch(name string, candidateActors core.ActorList) *core.Actor {
 		}
 	}
 	return nil
+}
+
+func resolveActorNameByID(id uuid.UUID, defaultVal string, zone *core.Zone) string {
+	ret := defaultVal
+	actor := zone.ActorByID(id)
+	if actor != nil {
+		ret = actor.Name()
+	}
+	return ret
+}
+
+func resolveObjNameByID(id uuid.UUID, zone *core.Zone) string {
+	ret := "something"
+	obj := zone.ObjectByID(id)
+	if obj != nil {
+		ret = obj.Name()
+	}
+	return ret
 }
