@@ -170,6 +170,18 @@ func (gh *gameHandler) getLookHandler() gameHandlerCommandHandler {
 			return lookAtLocation(core.ActorList{gh.actor}, terminalWidth, targetLoc), nil
 		}
 
+		// If we're asked to look at the special word "self", look at our own
+		// Actor.
+		if targetKW == "self" {
+			return lookAtActor(terminalWidth, gh.actor), nil
+		}
+
+		// See if we've been asked to look at another Actor, by name/prefix.
+		targetActor := nameActorMatch(targetKW, gh.actor.Location().Actors())
+		if targetActor != nil {
+			return lookAtActor(terminalWidth, targetActor), nil
+		}
+
 		// Otherwise, look at a particular object
 		// Start by looking for a kw match in the inventory
 		var targetObj *core.Object
@@ -768,6 +780,42 @@ func lookAtObject(terminalWidth int, obj *core.Object) []byte {
 	)
 
 	return []byte(lookOutput)
+}
+
+func lookAtActor(terminalWidth int, actor *core.Actor) []byte {
+	// You see <name>.
+	// They are wearing:
+	//   on their body: %s
+	//   ...
+	//   on their back: %s
+	//   ...
+	//   on their belt: %s
+	//   ...
+	//   in their hands: %s
+	//   ...
+	lookFmt := "You see %s.\n%s\n"
+
+	var wornObjectsClause string
+	onSubcontainerNames := []string{
+		core.InventoryContainerBody,
+		core.InventoryContainerBack,
+		core.InventoryContainerBelt,
+	}
+	onSubFmt := "  on their %s: %s\n"
+	for _, subName := range onSubcontainerNames {
+		for _, obj := range actor.Inventory().ObjectsBySubcontainer(subName) {
+			wornObjectsClause += fmt.Sprintf(onSubFmt, subName, obj.Name())
+		}
+	}
+	for _, obj := range actor.Inventory().ObjectsBySubcontainer(core.InventoryContainerHands) {
+		wornObjectsClause += fmt.Sprintf("  in their hands: %s\n", obj.Name())
+	}
+	if len(wornObjectsClause) > 0 {
+		wornObjectsClause = "They are wearing:\n" + wornObjectsClause
+	}
+
+	out := fmt.Sprintf(lookFmt, actor.Name(), wornObjectsClause)
+	return []byte(wordwrap.WrapString(out, uint(terminalWidth)))
 }
 
 func summarizeCommands(cmdTrie *trie.Trie, terminalWidth int) []byte {
