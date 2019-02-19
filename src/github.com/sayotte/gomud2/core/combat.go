@@ -64,9 +64,17 @@ func (cmc combatMeleeCommand) doSlash() ([]Event, error) {
 		return []Event{dodgeEvent}, nil
 	}
 
-	// FIXME calculate damage, generate damage event, add code to process event
-	weaponMinBaseDmg := 2.0
-	weaponMaxBaseDmg := 4.0
+	// find weapon in attacker's hands with highest slashing damage cap; use
+	// that for damage range
+	var weaponMinBaseDmg, weaponMaxBaseDmg float64
+	for _, obj := range cmc.attacker.Inventory().ObjectsBySubcontainer(InventoryContainerHands) {
+		attrs := obj.Attributes()
+		if attrs.SlashingDamageMax > weaponMaxBaseDmg {
+			weaponMinBaseDmg = attrs.SlashingDamageMin
+			weaponMaxBaseDmg = attrs.SlashingDamageMax
+		}
+	}
+	// calculate damage after bonuses etc.
 	baseDmgRange := weaponMaxBaseDmg - weaponMinBaseDmg
 	scaledBaseDmg := (rollFloat64(cmc.attacker.Zone().Rand()) * baseDmgRange) + weaponMinBaseDmg
 	physBonus := (float64(cmc.attacker.Attributes().Physical) / 100) * scaledBaseDmg // max 0.50
@@ -74,9 +82,9 @@ func (cmc combatMeleeCommand) doSlash() ([]Event, error) {
 	totalDmg := scaledBaseDmg + physBonus + focBonus
 
 	// distribute damage 3:1:1 over phys:stam:focus
-	physDmg := int(totalDmg * 0.60)
-	stamDmg := int(totalDmg * 0.20)
-	focDmg := int(totalDmg * 0.20)
+	physDmg := int(math.Round(totalDmg * 0.60))
+	stamDmg := int(math.Round(totalDmg * 0.20))
+	focDmg := int(math.Round(totalDmg * 0.20))
 
 	damageEvent := NewCombatMeleeDamageEvent(
 		CombatMeleeDamageTypeSlash,

@@ -198,6 +198,9 @@ func initStartingWorld(worldConfigFile string) error {
 		loc1,
 		0,
 		z,
+		core.ObjectAttributes{
+			BashingDamageMax: 1.0,
+		},
 	)
 	_, err = z.AddObject(objPrim, loc1)
 	if err != nil {
@@ -212,6 +215,9 @@ func initStartingWorld(worldConfigFile string) error {
 		loc1,
 		20,
 		z,
+		core.ObjectAttributes{
+			SlashingDamageMax: 1.0,
+		},
 	)
 	_, err = z.AddObject(bagPrim, loc1)
 	if err != nil {
