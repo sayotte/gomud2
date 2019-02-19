@@ -8,15 +8,16 @@ import (
 	"time"
 )
 
+// returns a random float64 between 0.0 and 1.0
 func rollFloat64(r *rand.Rand) float64 {
 	val := float64(r.Float32())
-	// scale val to 0.0 - 100.0
+	// scale val to 0.0 - 1.0
 	// we could use this func:
 	//    scaleFloat64 := func(x, minX, maxX, targetMin, targetMax float64) float64 {
 	//	    return (targetMax - targetMin) * ((x - minX) / (maxX - minX)) + targetMin
 	//    }
 	// but since we know our input/target ranges are always the same, we can simplify
-	return 100.0 * ((val + float64(math.MaxFloat32)) / (2 * float64(math.MaxFloat32)))
+	return (val + float64(math.MaxFloat32)) / (2 * float64(math.MaxFloat32))
 }
 
 const (
@@ -67,7 +68,7 @@ func (cmc combatMeleeCommand) doSlash() ([]Event, error) {
 	weaponMinBaseDmg := 2.0
 	weaponMaxBaseDmg := 4.0
 	baseDmgRange := weaponMaxBaseDmg - weaponMinBaseDmg
-	scaledBaseDmg := (rollFloat64(cmc.attacker.Zone().Rand()) / 100 * baseDmgRange) + weaponMinBaseDmg
+	scaledBaseDmg := (rollFloat64(cmc.attacker.Zone().Rand()) * baseDmgRange) + weaponMinBaseDmg
 	physBonus := (float64(cmc.attacker.Attributes().Physical) / 100) * scaledBaseDmg // max 0.50
 	focBonus := (float64(cmc.attacker.Attributes().Focus) / 100) * scaledBaseDmg     // max 0.15
 	totalDmg := scaledBaseDmg + physBonus + focBonus
@@ -114,8 +115,8 @@ func (cmc combatMeleeCommand) checkDodge(attackSkill float64, defender *Actor) b
 		if float64(i)*combatDodgeTechniquesUsableAtSkillInterval > dSkills.Dodging {
 			break
 		}
-		roll := rollFloat64(defender.Zone().Rand())
-		if roll > chance {
+		roll := rollFloat64(defender.Zone().Rand()) * 100
+		if roll <= chance {
 			return true
 		}
 	}
