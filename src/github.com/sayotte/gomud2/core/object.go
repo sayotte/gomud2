@@ -11,7 +11,7 @@ import (
 	myuuid "github.com/sayotte/gomud2/uuid"
 )
 
-func NewObject(id uuid.UUID, name, desc string, keywords []string, container Container, capacity int, zone *Zone) *Object {
+func NewObject(id uuid.UUID, name, desc string, keywords []string, container Container, capacity int, zone *Zone, attrs ObjectAttributes) *Object {
 	newID := id
 	if uuid.Equal(id, uuid.Nil) {
 		newID = myuuid.NewId()
@@ -24,6 +24,7 @@ func NewObject(id uuid.UUID, name, desc string, keywords []string, container Con
 		container:         container,
 		containerCapacity: capacity,
 		zone:              zone,
+		attributes:        attrs,
 	}
 }
 
@@ -38,6 +39,8 @@ type Object struct {
 
 	containerCapacity int
 	containedObjects  ObjectList
+
+	attributes ObjectAttributes
 }
 
 func (o Object) ID() uuid.UUID {
@@ -120,6 +123,10 @@ func (o *Object) ContainsObject(object *Object) bool {
 	return err == nil
 }
 
+func (o *Object) Attributes() ObjectAttributes {
+	return o.attributes
+}
+
 func (o *Object) Observers() ObserverList {
 	return o.container.Observers()
 }
@@ -177,6 +184,7 @@ func (o *Object) snapshot(sequenceNum uint64) Event {
 		uuid.Nil,
 		o.zone.ID(),
 		o.container.SubcontainerFor(o),
+		o.attributes,
 	)
 	switch o.container.(type) {
 	case *Location:
@@ -231,7 +239,7 @@ type objectAddToZoneCommand struct {
 	wrappedEvent *ObjectAddToZoneEvent
 }
 
-func NewObjectAddToZoneEvent(name, desc string, keywords []string, capacity int, objectId, locationContainerID, actorContainerID, objectContainerID, zoneId uuid.UUID, subcontainer string) *ObjectAddToZoneEvent {
+func NewObjectAddToZoneEvent(name, desc string, keywords []string, capacity int, objectId, locationContainerID, actorContainerID, objectContainerID, zoneId uuid.UUID, subcontainer string, attrs ObjectAttributes) *ObjectAddToZoneEvent {
 	return &ObjectAddToZoneEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeObjectAddToZone,
@@ -249,6 +257,7 @@ func NewObjectAddToZoneEvent(name, desc string, keywords []string, capacity int,
 		ObjectContainerID:   objectContainerID,
 		Subcontainer:        subcontainer,
 		Capacity:            capacity,
+		Attributes:          attrs,
 	}
 }
 
@@ -260,6 +269,7 @@ type ObjectAddToZoneEvent struct {
 	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
 	Subcontainer                                             string
 	Capacity                                                 int
+	Attributes                                               ObjectAttributes
 }
 
 func newObjectRemoveFromZoneCommand(wrapped *ObjectRemoveFromZoneEvent) objectRemoveFromZoneCommand {
@@ -410,7 +420,7 @@ type ObjectAdminRelocateEvent struct {
 	ToSubcontainer                                                 string
 }
 
-func NewObjectMigrateInEvent(name, desc string, keywords []string, capacity int, objID, fromZoneID, locContainerID, actorContainerID, objContainerID, zoneID uuid.UUID, subcontainer string) *ObjectMigrateInEvent {
+func NewObjectMigrateInEvent(name, desc string, keywords []string, capacity int, objID, fromZoneID, locContainerID, actorContainerID, objContainerID, zoneID uuid.UUID, subcontainer string, attrs ObjectAttributes) *ObjectMigrateInEvent {
 	return &ObjectMigrateInEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeObjectMigrateIn,
@@ -428,6 +438,7 @@ func NewObjectMigrateInEvent(name, desc string, keywords []string, capacity int,
 		ObjectContainerID:   objContainerID,
 		Capacity:            capacity,
 		Subcontainer:        subcontainer,
+		Attributes:          attrs,
 	}
 }
 
@@ -440,6 +451,7 @@ type ObjectMigrateInEvent struct {
 	LocationContainerID, ActorContainerID, ObjectContainerID uuid.UUID
 	Subcontainer                                             string
 	Capacity                                                 int
+	Attributes                                               ObjectAttributes
 }
 
 func NewObjectMigrateOutEvent(name string, objID, toZoneID, zoneID uuid.UUID) *ObjectMigrateOutEvent {

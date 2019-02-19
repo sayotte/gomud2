@@ -501,6 +501,7 @@ func (z *Zone) processActorMigrateInCommand(c Command) (interface{}, []Event, er
 			objContID,
 			z.id,
 			cmd.actor.SubcontainerFor(objContTuple.obj),
+			objContTuple.obj.Attributes(),
 		)
 		objEv.SetSequenceNumber(z.nextSequenceId)
 		z.nextSequenceId = objEv.SequenceNumber() + 1
@@ -1439,7 +1440,16 @@ func (z *Zone) applyObjectAddToZoneEvent(e *ObjectAddToZoneEvent) (*Object, Obse
 		container, containerFound = z.objectsById[e.ObjectContainerID]
 	}
 
-	obj := NewObject(e.ObjectID, e.Name, e.Description, e.Keywords, container, e.Capacity, z)
+	obj := NewObject(
+		e.ObjectID,
+		e.Name,
+		e.Description,
+		e.Keywords,
+		container,
+		e.Capacity,
+		z,
+		e.Attributes,
+	)
 	if containerFound {
 		err := container.addObject(obj, e.Subcontainer)
 		if err != nil {
@@ -1597,7 +1607,16 @@ func (z *Zone) applyObjectMigrateInEvent(e *ObjectMigrateInEvent) error {
 		container = z.objectsById[e.ObjectContainerID]
 	}
 
-	obj := NewObject(e.ObjectID, e.Name, e.Description, e.Keywords, container, e.Capacity, z)
+	obj := NewObject(
+		e.ObjectID,
+		e.Name,
+		e.Description,
+		e.Keywords,
+		container,
+		e.Capacity,
+		z,
+		e.Attributes,
+	)
 	if container != nil {
 		err := container.addObject(obj, e.Subcontainer)
 		if err != nil {
