@@ -145,6 +145,36 @@ func (arfze *actorRemoveFromZoneEvent) SetHeader(h eventHeader) {
 	arfze.header = h
 }
 
+type actorDeathEvent struct {
+	header    eventHeader
+	ActorName string
+	ActorID   uuid.UUID
+}
+
+func (ade *actorDeathEvent) FromDomain(e core.Event) {
+	from := e.(*core.ActorDeathEvent)
+	*ade = actorDeathEvent{
+		header:    eventHeaderFromDomainEvent(from),
+		ActorName: from.ActorName,
+		ActorID:   from.ActorID,
+	}
+}
+
+func (ade *actorDeathEvent) ToDomain() core.Event {
+	e := core.NewActorDeathEvent(ade.ActorName, ade.ActorID, ade.header.AggregateId)
+	e.SetSequenceNumber(ade.header.SequenceNumber)
+	e.SetTimestamp(ade.header.Timestamp)
+	return e
+}
+
+func (ade *actorDeathEvent) Header() eventHeader {
+	return ade.header
+}
+
+func (ade *actorDeathEvent) SetHeader(h eventHeader) {
+	ade.header = h
+}
+
 type actorMigrateInEvent struct {
 	header                eventHeader
 	ActorID               uuid.UUID

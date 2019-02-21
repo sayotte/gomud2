@@ -10,6 +10,7 @@ const (
 	EventTypeActorAdminRelocate
 	EventTypeActorAddToZone
 	EventTypeActorRemoveFromZone
+	EventTypeActorDeath
 	EventTypeActorMigrateIn
 	EventTypeActorMigrateOut
 	EventTypeLocationAddToZone
