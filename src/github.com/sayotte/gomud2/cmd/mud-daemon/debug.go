@@ -36,6 +36,7 @@ var eventTypeToStringName = map[int]string{
 	core.EventTypeObjectAddToZone:        "ObjectAddToZoneEvent",
 	core.EventTypeObjectRemoveFromZone:   "ObjectRemoveFromZoneEvent",
 	core.EventTypeObjectMove:             "ObjectMoveEvent",
+	core.EventTypeObjectMoveSubcontainer: "ObjectMoveSubcontainerEvent",
 	core.EventTypeObjectAdminRelocate:    "ObjectAdminRelocateEvent",
 	core.EventTypeObjectMigrateIn:        "ObjectMigrateInEvent",
 	core.EventTypeObjectMigrateOut:       "ObjectMigrateOutEvent",
