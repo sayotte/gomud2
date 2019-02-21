@@ -216,7 +216,7 @@ func initStartingWorld(worldConfigFile string) error {
 		20,
 		z,
 		core.ObjectAttributes{
-			SlashingDamageMax: 1.0,
+			SlashingDamageMax: 3.0,
 		},
 	)
 	_, err = z.AddObject(bagPrim, loc1)
@@ -330,18 +330,18 @@ func initStartingWorld(worldConfigFile string) error {
 				DodgingCap: 25,
 			},
 		},
-		MaxCount:           30,
-		MaxSpawnAtOneTime:  10,
-		SpawnChancePerTick: 0.5,
+		MaxCount:           1,
+		MaxSpawnAtOneTime:  1,
+		SpawnChancePerTick: 1.0,
 	}
 	chessSpawnSpec := spawnreap.SpawnSpecification{
 		ActorProto: spawnreap.ActorPrototype{
 			Name:      "a chess piece",
 			BrainType: "crowd-averse-wanderer",
 		},
-		MaxCount:           16,
-		MaxSpawnAtOneTime:  16,
-		SpawnChancePerTick: 0.5,
+		MaxCount:           1,
+		MaxSpawnAtOneTime:  1,
+		SpawnChancePerTick: 1.0,
 	}
 	spawnReapSvc := spawnreap.Service{
 		World:       &core.World{},
