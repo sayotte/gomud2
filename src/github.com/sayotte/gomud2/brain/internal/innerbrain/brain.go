@@ -252,6 +252,13 @@ func (b *Brain) handleEventMessage(msg wsapi.Message) {
 			return
 		}
 		b.handleActorMoveEvent(e, eventEnvelope.ZoneID)
+	case wsapi.EventTypeActorDeath:
+		var e wsapi.ActorDeathEventBody
+		err = json.Unmarshal(eventEnvelope.Body, &e)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(ActorDeathEventBody): %s\n", err)
+			return
+		}
 	case wsapi.EventTypeActorMigrateIn:
 		var e wsapi.ActorMigrateInEventBody
 		err = json.Unmarshal(eventEnvelope.Body, &e)
@@ -290,6 +297,18 @@ func (b *Brain) handleActorMoveEvent(e wsapi.ActorMoveEventBody, zoneID uuid.UUI
 			b.memory.AddActorToLocation(zoneID, e.ToLocationID, e.ActorID)
 		}
 	}
+}
+
+func (b *Brain) handleActorDeathEvent(e wsapi.ActorDeathEventBody, zoneID uuid.UUID) {
+	// check: did we die?
+	if uuid.Equal(e.ActorID, b.ActorID) {
+		fmt.Println("BRAIN INFO: our Actor died, shutting down")
+		b.Shutdown()
+		return
+	}
+	// else someone else died
+	_, currentLocID := b.memory.GetCurrentZoneAndLocationID()
+	b.memory.RemoveActorFromLocation(zoneID, currentLocID, e.ActorID)
 }
 
 func (b *Brain) handleActorMigrateInEvent(e wsapi.ActorMigrateInEventBody, zoneID uuid.UUID) {
