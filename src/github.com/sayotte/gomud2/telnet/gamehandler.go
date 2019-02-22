@@ -38,6 +38,7 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 	gh.cmdTrie.Add("take", gh.getTakeHandler())
 	gh.cmdTrie.Add("target", gh.getTargetHandler())
 	gh.cmdTrie.Add("slash", gh.getSlashHandler())
+	gh.cmdTrie.Add("kill", gh.getKillHandler())
 	gh.cmdTrie.Add("wear", gh.getWearHandler())
 	gh.cmdTrie.Add("remove", gh.getRemoveHandler())
 
@@ -606,6 +607,28 @@ func (gh *gameHandler) getSlashHandler() gameHandlerCommandHandler {
 		err := gh.actor.Slash(targetActor)
 		if err != nil {
 			return []byte("Whoops..."), fmt.Errorf("Actor.Slash(): %s", err)
+		}
+
+		return nil, nil
+	}
+}
+
+func (gh *gameHandler) getKillHandler() gameHandlerCommandHandler {
+	return func(line string, terminalWidth int) ([]byte, error) {
+		var targetActor *core.Actor
+		for _, a := range gh.actor.Location().Actors() {
+			if uuid.Equal(a.ID(), gh.targetID) {
+				targetActor = a
+				break
+			}
+		}
+		if targetActor == nil {
+			return []byte("Target doesn't seem to be in this location...\n"), nil
+		}
+
+		err := targetActor.Die()
+		if err != nil {
+			return []byte("Whoops..."), fmt.Errorf("Actor.Die(): %s", err)
 		}
 
 		return nil, nil
