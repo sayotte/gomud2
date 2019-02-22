@@ -41,6 +41,12 @@ type session struct {
 	stopChan     chan struct{}
 	stopWG       *sync.WaitGroup
 	stopOnce     *sync.Once
+	// These three vars have only one writer (a sync.Once function) and only one
+	// reader (lowLevelSendLoop()), and access to the variables is sequenced
+	// around closing stopChan.
+	sendCloseMessage bool
+	closeCode        int
+	closeText        string
 
 	world *core.World
 	actor *core.Actor
@@ -71,7 +77,8 @@ func (s *session) SendEvent(e core.Event) {
 
 // Evict implements the domain.Observer interface
 func (s *session) Evict() {
-	s.sendCloseDetachAndStop(websocket.CloseGoingAway, "evicted from attached actor")
+	fmt.Println("WSAPI DEBUG: session.Evict(): ...")
+	s.sendCloseDetachAndStop(true, websocket.CloseGoingAway, "evicted from attached actor")
 }
 
 func (s *session) lowLevelSendLoop() {
@@ -89,20 +96,34 @@ func (s *session) lowLevelSendLoop() {
 					break drainComplete
 				}
 			}
+			if s.sendCloseMessage {
+				// Send a close message to our peer, so it shuts down the connection
+				payload := websocket.FormatCloseMessage(s.closeCode, s.closeText)
+				err := s.conn.SetWriteDeadline(time.Time{})
+				if err != nil {
+					panic(err)
+				}
+				err = s.conn.WriteMessage(websocket.CloseMessage, payload)
+				if err != nil {
+					panic(err)
+				}
+			}
+			// Update the waitgroup, so that the goroutine waiting on that can
+			// close the underlying TCP connection.
 			s.stopWG.Done()
 			return
 		case msgBytes := <-s.lowLevelSendChan:
 			err := s.conn.SetWriteDeadline(time.Now().Add(socketWriteTimeoutLen))
 			if err != nil {
 				fmt.Printf("WSAPI ERROR: s.conn.SetWriteDeadline(now + %s): %s\n", socketWriteTimeoutLen, err)
-				s.sendCloseDetachAndStop(websocket.CloseAbnormalClosure, "write timeout")
+				s.sendCloseDetachAndStop(true, websocket.CloseAbnormalClosure, "write timeout")
 			}
 			//start := time.Now()
 			err = s.conn.WriteMessage(websocket.TextMessage, msgBytes)
 			if err != nil {
 				if !isAnyWebsocketCloseErrorHelper(err) {
 					fmt.Printf("WSAPI ERROR: s.conn.WriteMessage(): %s\n", err)
-					s.sendCloseDetachAndStop(websocket.CloseInternalServerErr, "")
+					s.sendCloseDetachAndStop(true, websocket.CloseInternalServerErr, "")
 				} else {
 					// it was a close error, because we wrote to an already-closed
 					// conn, which should never happen
@@ -133,7 +154,7 @@ func (s *session) forwardEventsFromCoreLoop() {
 			event, err := eventFromDomainEvent(e)
 			if err != nil {
 				fmt.Printf("WSAPI ERROR: %s\n", err)
-				s.sendCloseDetachAndStop(websocket.CloseInternalServerErr, "")
+				s.sendCloseDetachAndStop(true, websocket.CloseInternalServerErr, "")
 				continue
 			}
 			s.sendMessage(MessageTypeEvent, event, uuid.Nil)
@@ -152,13 +173,29 @@ func (s *session) receiveFromClientLoop() {
 
 		msgType, msgBytes, err := s.conn.ReadMessage()
 		if err != nil {
-			// we may be getting an error because we're reading from a closed
-			// Conn (there's a race condition in calling "go s.stop(); continue")
-			// but if not, it's a real error and we should emit it
+			// We may be getting an error because we're reading from a closed
+			// Conn (there's a race condition in calling "go s.stop(); continue").
+			// We wouldn't have had a chance to catch this, as the underlying
+			// websocket.Conn catches the message in-band and starts returning
+			// read-errors.
 			if !isAnyWebsocketCloseErrorHelper(err) {
+				// If not a read-on-closed-conn error, it's a real error and we
+				// should complain
 				fmt.Printf("WSAPI ERROR: s.conn.ReadMessage(): %s\n", err)
+			} else {
+				// The underlying connection has closed, but if that was
+				// initiated by our peer then we're the first ones to see it,
+				// so we need to invoke sendCloseDetachAndStop() so the rest of
+				// the goroutines shut down correctly. We specify "false" for
+				// "sendCloseMsg" because we've already *received* a Close message
+				// (or a dead TCP conn), so sending that is at best superflous.
+				s.sendCloseDetachAndStop(false, 0, "")
+				// And now we need to keep looping, so that our waitgroup-update
+				// code in the select{...} up above is called correctly.
+				// Note that stopChan will be closed on our very next iteration
+				// through the loop, so we won't hit this again.
+				continue
 			}
-			panic("reading from an already closed websocket, maybe?")
 		}
 		switch msgType {
 		// Ping has a default handler, none needed here
@@ -166,22 +203,27 @@ func (s *session) receiveFromClientLoop() {
 		//   the default case if we get one)
 		// We don't expect/want binary messages, so blow up in the default case
 		//   if we get one
-		// Respect close messages by shutting down gracefully
-		case websocket.CloseMessage:
-			s.sendCloseDetachAndStop(websocket.CloseNormalClosure, "")
 		// Specify a case for Text messages so they don't fall to the default
 		case websocket.TextMessage:
 			var msg Message
 			err = json.Unmarshal(msgBytes, &msg)
 			if err != nil {
 				fmt.Printf("WSAPI ERROR: json.Unmarshal(): %s\n", err)
-				s.sendCloseDetachAndStop(websocket.ClosePolicyViolation, "message JSON data cannot be decoded")
+				s.sendCloseDetachAndStop(
+					true,
+					websocket.ClosePolicyViolation,
+					"message JSON data cannot be decoded",
+				)
 				continue
 			}
 			s.handleMessage(msg)
 		// Blow up if we get anything else as it's not RFC 6455 compliant
 		default:
-			s.sendCloseDetachAndStop(websocket.CloseUnsupportedData, fmt.Sprintf("unhandleable message type %d", msgType))
+			s.sendCloseDetachAndStop(
+				true,
+				websocket.CloseUnsupportedData,
+				fmt.Sprintf("unhandleable message type %d", msgType),
+			)
 			continue
 		}
 	}
@@ -199,11 +241,12 @@ func (s *session) handleMessage(msg Message) {
 		s.handleCommandGetCurrentLocInfo(msg)
 	default:
 		fmt.Printf("WSAPI ERROR: session received message of type %q\n", msg.Type)
-		s.sendCloseDetachAndStop(websocket.CloseProtocolError, fmt.Sprintf("unhandleable API message type %q", msg.Type))
+		s.sendCloseDetachAndStop(true, websocket.CloseProtocolError, fmt.Sprintf("unhandleable API message type %q", msg.Type))
 	}
 }
 
-func (s *session) sendCloseDetachAndStop(closeCode int, closeText string) {
+//
+func (s *session) sendCloseDetachAndStop(sendCloseMsg bool, closeCode int, closeText string) {
 	// Have to wrap this in a sync.Once, because the stopping may cause our
 	// intake channels to fill up as we shutdown (we don't care, we're ignoring
 	// new work), which will result in this function being called again to
@@ -212,6 +255,20 @@ func (s *session) sendCloseDetachAndStop(closeCode int, closeText string) {
 		// detach from our actor so it stops sending us events
 		s.actor.RemoveObserver(s)
 		s.actor = nil
+
+		// update s.closeCode / s.closeText, so that lowlevelSendLoop() can
+		// format and send a Close message to our peer once, which should cause
+		// it to close the connection from its side, which will then allow our
+		// receiveFromClientLoop() to un-block, freeing the waitgroup below,
+		// and finally allowing the doClose() goroutine below to close the
+		// underlying TCP connection.
+		//
+		// Note that we need to do this *before* we close s.stopChan, because
+		// as soon as we close that lowLevelSendLoop() is going to read the
+		// value of these two variables.
+		s.sendCloseMessage = sendCloseMsg
+		s.closeCode = closeCode
+		s.closeText = closeText
 
 		// setup a WaitGroup so we can tell when all goroutines have stopped
 		s.stopWG = &sync.WaitGroup{}
@@ -226,8 +283,6 @@ func (s *session) sendCloseDetachAndStop(closeCode int, closeText string) {
 		// stopped, we're safe to close the conn.
 		doClose := func() {
 			s.stopWG.Wait()
-			payload := websocket.FormatCloseMessage(closeCode, closeText)
-			_ = s.conn.WriteMessage(websocket.CloseMessage, payload)
 			_ = s.conn.Close()
 		}
 		go doClose()
@@ -239,7 +294,7 @@ func (s *session) sendMessage(typ string, payload interface{}, id uuid.UUID) {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		fmt.Printf("WSAPI ERROR: json.Marshal(1): %s\n", err)
-		s.sendCloseDetachAndStop(websocket.CloseInternalServerErr, "")
+		s.sendCloseDetachAndStop(true, websocket.CloseInternalServerErr, "")
 		return
 	}
 	msg := Message{
@@ -250,7 +305,7 @@ func (s *session) sendMessage(typ string, payload interface{}, id uuid.UUID) {
 	msgBytes, err := json.Marshal(msg)
 	if err != nil {
 		fmt.Printf("WSAPI ERROR: json.Marshal(2): %s\n", err)
-		s.sendCloseDetachAndStop(websocket.CloseInternalServerErr, "")
+		s.sendCloseDetachAndStop(true, websocket.CloseInternalServerErr, "")
 		return
 	}
 
@@ -285,7 +340,7 @@ func (s *session) handleCommandAttachActor(msg Message) {
 	err := json.Unmarshal(msg.Payload, &cmd)
 	if err != nil {
 		fmt.Printf("WSAPI: ERROR: json.Unmarshal(): %s\n", err)
-		s.sendCloseDetachAndStop(websocket.ClosePolicyViolation, "message JSON data cannot be decoded")
+		s.sendCloseDetachAndStop(true, websocket.ClosePolicyViolation, "message JSON data cannot be decoded")
 		return
 	}
 
@@ -316,7 +371,7 @@ func (s *session) handleCommandMoveActor(msg Message) {
 	err := json.Unmarshal(msg.Payload, &moveCmd)
 	if err != nil {
 		fmt.Printf("WSAPI: ERROR: json.Unmarshal(): %s\n", err)
-		s.sendCloseDetachAndStop(websocket.ClosePolicyViolation, "message JSON data cannot be decoded")
+		s.sendCloseDetachAndStop(true, websocket.ClosePolicyViolation, "message JSON data cannot be decoded")
 		return
 	}
 
@@ -327,7 +382,7 @@ func (s *session) handleCommandMoveActor(msg Message) {
 			return
 		}
 		fmt.Printf("WSAPI ERROR: commands.MoveActor(...): %s\n", err)
-		s.sendCloseDetachAndStop(websocket.CloseInternalServerErr, "")
+		s.sendCloseDetachAndStop(true, websocket.CloseInternalServerErr, "")
 		return
 	}
 	s.actor = newActor
