@@ -238,8 +238,8 @@ func (s *Service) brainZone(zone *core.Zone) {
 			}
 			count++
 			s.actorToAIBrainSpawnCountsMap[actor.ID()] = count
-			fmt.Printf("SPAWN DEBUG: spawned a brain for %q, this is brain #%d\n", actor.Name(), count)
+			//fmt.Printf("SPAWN DEBUG: spawned a brain for %q, this is brain #%d\n", actor.Name(), count)
 		}
 	}
-	fmt.Printf("SPAWN DEBUG: zone %s has %d active brains\n", zone.Tag(), len(zoneActors))
+	//fmt.Printf("SPAWN DEBUG: zone %s has %d active brains\n", zone.Tag(), len(zoneActors))
 }
