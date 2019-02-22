@@ -75,6 +75,13 @@ func (gh *gameHandler) handleEvent(e core.Event, terminalWidth, terminalHeight i
 		typedE := e.(*core.ActorMoveEvent)
 		out, err := gh.handleEventActorMove(terminalWidth, typedE)
 		return out, gh, err
+	case core.EventTypeActorRemoveFromZone:
+		// print nothing, this is not useful information for the Telnet client
+		return nil, gh, nil
+	case core.EventTypeActorDeath:
+		typedE := e.(*core.ActorDeathEvent)
+		out, err := gh.handleEventActorDeath(terminalWidth, typedE)
+		return out, gh, err
 	case core.EventTypeObjectMove:
 		typedE := e.(*core.ObjectMoveEvent)
 		out, err := gh.handleEventObjectMove(terminalWidth, typedE)
@@ -254,6 +261,13 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMove
 		// someone else's actions
 		return []byte(fmt.Sprintf("%s moves to %s.\n", actorName, to.ShortDescription())), nil
 	}
+}
+
+func (gh *gameHandler) handleEventActorDeath(terminalWidth int, e *core.ActorDeathEvent) ([]byte, error) {
+	if uuid.Equal(e.ActorID, gh.actor.ID()) {
+		return []byte("You died!\n"), nil
+	}
+	return []byte(fmt.Sprintf("%s died!\n", e.ActorName)), nil
 }
 
 func (gh *gameHandler) handleEventObjectMove(terminalWidth int, e *core.ObjectMoveEvent) ([]byte, error) {
