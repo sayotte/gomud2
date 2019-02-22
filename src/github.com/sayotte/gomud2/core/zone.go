@@ -155,7 +155,7 @@ func (z *Zone) AddActor(a *Actor) (*Actor, error) {
 
 func (z *Zone) RemoveActor(a *Actor) error {
 	e := NewActorRemoveFromZoneEvent(a.ID(), z.id)
-	cmd := newActorRemoveFromZoneCommand(&e)
+	cmd := newActorRemoveFromZoneCommand(e)
 	_, err := z.syncRequestToSelf(cmd)
 	return err
 }
@@ -483,13 +483,17 @@ func (z *Zone) processActorMigrateInCommand(c Command) (interface{}, []Event, er
 
 	for _, objContTuple := range getObjectContainerTuplesRecursive(cmd.actor) {
 		var locContID, actorContID, objContID uuid.UUID
+		var subContainer string
 		switch objContTuple.cont.(type) {
 		case *Location:
 			locContID = objContTuple.cont.ID()
+			subContainer = ContainerDefaultSubcontainer
 		case *Actor:
 			actorContID = objContTuple.cont.ID()
+			subContainer = cmd.actor.SubcontainerFor(objContTuple.obj)
 		case *Object:
 			objContID = objContTuple.cont.ID()
+			subContainer = ContainerDefaultSubcontainer
 		}
 		objEv := NewObjectMigrateInEvent(
 			objContTuple.obj.Name(),
@@ -502,7 +506,7 @@ func (z *Zone) processActorMigrateInCommand(c Command) (interface{}, []Event, er
 			actorContID,
 			objContID,
 			z.id,
-			cmd.actor.SubcontainerFor(objContTuple.obj),
+			subContainer,
 			objContTuple.obj.Attributes(),
 		)
 		objEv.SetSequenceNumber(z.nextSequenceId)
@@ -826,6 +830,7 @@ func (z *Zone) processObjectMoveCommand(c Command) ([]Event, error) {
 		actorID = cmd.actor.ID()
 	}
 	e := NewObjectMoveEvent(cmd.obj.ID(), actorID, z.id)
+	e.ToSubcontainer = ContainerDefaultSubcontainer
 
 	fromID := cmd.fromContainer.ID()
 	switch cmd.fromContainer.(type) {

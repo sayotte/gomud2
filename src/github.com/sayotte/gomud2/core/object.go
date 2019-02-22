@@ -111,6 +111,9 @@ func (o *Object) checkMoveObjectToSubcontainer(object *Object, oldSub, newSub st
 }
 
 func (o *Object) moveObjectToSubcontainer(object *Object, oldSub, newSub string) error {
+	if newSub == ContainerDefaultSubcontainer {
+		return nil
+	}
 	return errors.New("Object does not implement subcontainers")
 }
 

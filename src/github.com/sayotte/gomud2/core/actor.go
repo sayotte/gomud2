@@ -384,8 +384,8 @@ type actorRemoveFromZoneCommand struct {
 	wrappedEvent *ActorRemoveFromZoneEvent
 }
 
-func NewActorRemoveFromZoneEvent(actorID, zoneID uuid.UUID) ActorRemoveFromZoneEvent {
-	return ActorRemoveFromZoneEvent{
+func NewActorRemoveFromZoneEvent(actorID, zoneID uuid.UUID) *ActorRemoveFromZoneEvent {
+	return &ActorRemoveFromZoneEvent{
 		&eventGeneric{
 			EventTypeNum:      EventTypeActorRemoveFromZone,
 			TimeStamp:         time.Now(),

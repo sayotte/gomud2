@@ -121,6 +121,9 @@ func (l *Location) checkMoveObjectToSubcontainer(o *Object, oldSub, newSub strin
 }
 
 func (l *Location) moveObjectToSubcontainer(o *Object, oldSub, newSub string) error {
+	if newSub == ContainerDefaultSubcontainer {
+		return nil
+	}
 	return errors.New("Location does not implement subcontainers")
 }
 
