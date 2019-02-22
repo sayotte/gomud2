@@ -25,6 +25,7 @@ var eventTypeToStringName = map[int]string{
 	core.EventTypeActorAdminRelocate:     "ActorAdminRelocateEvent",
 	core.EventTypeActorAddToZone:         "ActorAddToZoneEvent",
 	core.EventTypeActorRemoveFromZone:    "ActorRemoveFromZoneEvent",
+	core.EventTypeActorDeath:             "ActorDeathEvent",
 	core.EventTypeActorMigrateIn:         "ActorMigrateInEvent",
 	core.EventTypeActorMigrateOut:        "ActorMigrateOutEvent",
 	core.EventTypeLocationAddToZone:      "LocationAddToZoneEvent",
