@@ -1203,6 +1203,9 @@ func (z *Zone) applyActorRemoveEvent(e *ActorRemoveFromZoneEvent) (ObserverList,
 	actor.setLocation(nil)
 	actor.setZone(nil)
 	delete(z.actorsById, e.ActorID)
+	for _, o := range actor.Observers() {
+		o.Evict()
+	}
 
 	oList := oldLoc.Observers()
 
