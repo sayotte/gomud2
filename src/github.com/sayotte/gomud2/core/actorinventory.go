@@ -147,22 +147,58 @@ func (ai *ActorInventory) ObjectsBySubcontainer(subname string) ObjectList {
 }
 
 func (ai *ActorInventory) addObject(o *Object, subContainer string) error {
-	// objects always go into the hands first; they can be moved to other
-	// inventory locations afterward
+	// Objects always go into the hands first by default (although this method
+	// is also used for other scenarios, e.g. ActorMigrateIn). Once picked up
+	// in the hands, they can then be moved to other subContainers.
+	if subContainer == ContainerDefaultSubcontainer {
+		subContainer = InventoryContainerHands
+	}
 
-	if len(ai.hands) >= ai.constraints.HandMaxItems {
-		return fmt.Errorf("hands are full")
+	var subObjs ObjectList
+	var subMaxObjs, subSlots int
+	switch subContainer {
+	case InventoryContainerBack:
+		subObjs = ai.back
+		subMaxObjs = ai.constraints.BackMaxItems
+		subSlots = ai.constraints.BackSlots
+	case InventoryContainerBelt:
+		subObjs = ai.belt
+		subMaxObjs = ai.constraints.BeltMaxItems
+		subSlots = ai.constraints.BeltSlots
+	case InventoryContainerBody:
+		subObjs = ai.body
+		subMaxObjs = ai.constraints.BodyMaxItems
+		subSlots = ai.constraints.BodySlots
+	case InventoryContainerHands:
+		subObjs = ai.hands
+		subMaxObjs = ai.constraints.HandMaxItems
+		subSlots = ai.constraints.HandSlots
+	default:
+		return fmt.Errorf("unknown subcontainer %q", subContainer)
+	}
+
+	if len(subObjs) >= subMaxObjs {
+		return fmt.Errorf("can't fit another item in/on %s", subContainer)
 	}
 
 	var slotsTaken int
-	for _, o := range ai.hands {
+	for _, o := range subObjs {
 		slotsTaken += o.InventorySlots()
 	}
-	if slotsTaken+o.InventorySlots() > ai.constraints.HandSlots {
-		return fmt.Errorf("object too large to hold")
+	if slotsTaken+o.InventorySlots() > subSlots {
+		return fmt.Errorf("item too large to fit in/on %s")
 	}
 
-	ai.hands = append(ai.hands, o)
+	switch subContainer {
+	case InventoryContainerBack:
+		ai.back = append(ai.back, o)
+	case InventoryContainerBelt:
+		ai.belt = append(ai.belt, o)
+	case InventoryContainerBody:
+		ai.body = append(ai.body, o)
+	case InventoryContainerHands:
+		ai.hands = append(ai.hands, o)
+	}
 	return nil
 }
 
