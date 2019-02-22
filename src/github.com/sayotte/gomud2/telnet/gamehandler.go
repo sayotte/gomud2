@@ -480,8 +480,20 @@ func (gh *gameHandler) getTakeHandler() gameHandlerCommandHandler {
 			return []byte(fmt.Sprintf("Take what again? I can't find a %q.\n", targetKeyword)), nil
 		}
 
-		if len(gh.actor.Objects()) >= gh.actor.Capacity() {
-			return []byte("You have no room for that in your inventory!\n"), nil
+		//if len(gh.actor.Objects()) >= gh.actor.Capacity() {
+		//	return []byte("You have no room for that in your inventory!\n"), nil
+		//}
+		handCapacity, handMaxItems := gh.actor.Inventory().CapacityBySubcontainer(core.InventoryContainerHands)
+		handObjs := gh.actor.Inventory().ObjectsBySubcontainer(core.InventoryContainerHands)
+		if len(handObjs) >= handMaxItems {
+			return []byte("You don't have enough hands to hold that.\n"), nil
+		}
+		var handBurden int
+		for _, handObj := range handObjs {
+			handBurden += handObj.InventorySlots()
+		}
+		if handBurden+targetObj.InventorySlots() > handCapacity {
+			return []byte("You're carrying too much in your hands to carry another thing.\n"), nil
 		}
 
 		err := targetObj.Move(container, gh.actor, gh.actor, core.ContainerDefaultSubcontainer)
@@ -501,7 +513,7 @@ func (gh *gameHandler) getDropHandler() gameHandlerCommandHandler {
 		}
 
 		targetKeyword := strings.ToLower(params[0])
-		targetObj := keywordObjectMatch(targetKeyword, gh.actor.Objects())
+		targetObj := keywordObjectMatch(targetKeyword, gh.actor.Inventory().ObjectsBySubcontainer(core.InventoryContainerHands))
 		if targetObj == nil {
 			return []byte(fmt.Sprintf("Drop what again? I can't find a %q.\n", targetKeyword)), nil
 		}
@@ -524,7 +536,7 @@ func (gh *gameHandler) getPutHandler() gameHandlerCommandHandler {
 
 		// Decide which object we're putting
 		targetKeyword := strings.ToLower(params[0])
-		targetObj := keywordObjectMatch(targetKeyword, gh.actor.Objects())
+		targetObj := keywordObjectMatch(targetKeyword, gh.actor.Inventory().ObjectsBySubcontainer(core.InventoryContainerHands))
 		if targetObj == nil {
 			return []byte(fmt.Sprintf("Put what, exactly? There's no %q in your inventory.\n", targetKeyword)), nil
 		}
