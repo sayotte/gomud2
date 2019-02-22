@@ -38,6 +38,7 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 	gh.cmdTrie.Add("take", gh.getTakeHandler())
 	gh.cmdTrie.Add("target", gh.getTargetHandler())
 	gh.cmdTrie.Add("slash", gh.getSlashHandler())
+	gh.cmdTrie.Add("kill", gh.getKillHandler())
 	gh.cmdTrie.Add("wear", gh.getWearHandler())
 	gh.cmdTrie.Add("remove", gh.getRemoveHandler())
 
@@ -74,6 +75,13 @@ func (gh *gameHandler) handleEvent(e core.Event, terminalWidth, terminalHeight i
 	case core.EventTypeActorMove:
 		typedE := e.(*core.ActorMoveEvent)
 		out, err := gh.handleEventActorMove(terminalWidth, typedE)
+		return out, gh, err
+	case core.EventTypeActorRemoveFromZone:
+		// print nothing, this is not useful information for the Telnet client
+		return nil, gh, nil
+	case core.EventTypeActorDeath:
+		typedE := e.(*core.ActorDeathEvent)
+		out, err := gh.handleEventActorDeath(terminalWidth, typedE)
 		return out, gh, err
 	case core.EventTypeObjectMove:
 		typedE := e.(*core.ObjectMoveEvent)
@@ -254,6 +262,13 @@ func (gh *gameHandler) handleEventActorMove(terminalWidth int, e *core.ActorMove
 		// someone else's actions
 		return []byte(fmt.Sprintf("%s moves to %s.\n", actorName, to.ShortDescription())), nil
 	}
+}
+
+func (gh *gameHandler) handleEventActorDeath(terminalWidth int, e *core.ActorDeathEvent) ([]byte, error) {
+	if uuid.Equal(e.ActorID, gh.actor.ID()) {
+		return []byte("You died!\n"), nil
+	}
+	return []byte(fmt.Sprintf("%s died!\n", e.ActorName)), nil
 }
 
 func (gh *gameHandler) handleEventObjectMove(terminalWidth int, e *core.ObjectMoveEvent) ([]byte, error) {
@@ -592,6 +607,28 @@ func (gh *gameHandler) getSlashHandler() gameHandlerCommandHandler {
 		err := gh.actor.Slash(targetActor)
 		if err != nil {
 			return []byte("Whoops..."), fmt.Errorf("Actor.Slash(): %s", err)
+		}
+
+		return nil, nil
+	}
+}
+
+func (gh *gameHandler) getKillHandler() gameHandlerCommandHandler {
+	return func(line string, terminalWidth int) ([]byte, error) {
+		var targetActor *core.Actor
+		for _, a := range gh.actor.Location().Actors() {
+			if uuid.Equal(a.ID(), gh.targetID) {
+				targetActor = a
+				break
+			}
+		}
+		if targetActor == nil {
+			return []byte("Target doesn't seem to be in this location...\n"), nil
+		}
+
+		err := targetActor.Die()
+		if err != nil {
+			return []byte("Whoops..."), fmt.Errorf("Actor.Die(): %s", err)
 		}
 
 		return nil, nil

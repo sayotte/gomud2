@@ -323,6 +323,8 @@ func (z *Zone) processCommand(c Command) (interface{}, error) {
 		out, outEvents, err = z.processActorMigrateInCommand(c)
 	case CommandTypeActorMigrateOut:
 		outEvents, err = z.processActorMigrateOutCommand(c)
+	case CommandTypeActorDeath:
+		outEvents, err = z.processActorDeathCommand(c)
 	case CommandTypeLocationAddToZone:
 		out, outEvents, err = z.processLocationAddToZoneCommand(c)
 	case CommandTypeLocationUpdate:
@@ -551,6 +553,26 @@ func (z *Zone) processActorMigrateOutCommand(c Command) ([]Event, error) {
 	}
 	outEvents = append(outEvents, actorEv)
 
+	return outEvents, nil
+}
+
+func (z *Zone) processActorDeathCommand(c Command) ([]Event, error) {
+	cmd := c.(*actorDeathCommand)
+
+	_, found := z.actorsById[cmd.actor.ID()]
+	if !found || cmd.actor.Zone() != z {
+		return nil, errors.New("Actor not in Zone")
+	}
+
+	outEvents := doActorDeath(cmd.actor, z)
+	for _, event := range outEvents {
+		event.SetSequenceNumber(z.nextSequenceId)
+		z.nextSequenceId = event.SequenceNumber() + 1
+		_, err := z.applyEvent(event)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return outEvents, nil
 }
 
@@ -1021,6 +1043,9 @@ func (z *Zone) applyEvent(e Event) (interface{}, error) {
 	case EventTypeActorMigrateOut:
 		typedEvent := e.(*ActorMigrateOutEvent)
 		oList, err = z.applyActorMigrateOutEvent(typedEvent)
+	case EventTypeActorDeath:
+		typedEvent := e.(*ActorDeathEvent)
+		oList, err = z.applyActorDeathEvent(typedEvent)
 	case EventTypeLocationAddToZone:
 		typedEvent := e.(*LocationAddToZoneEvent)
 		out, err = z.applyLocationAddToZoneEvent(typedEvent)
@@ -1178,6 +1203,9 @@ func (z *Zone) applyActorRemoveEvent(e *ActorRemoveFromZoneEvent) (ObserverList,
 	actor.setLocation(nil)
 	actor.setZone(nil)
 	delete(z.actorsById, e.ActorID)
+	for _, o := range actor.Observers() {
+		o.Evict()
+	}
 
 	oList := oldLoc.Observers()
 
@@ -1223,6 +1251,22 @@ func (z *Zone) applyActorMigrateOutEvent(e *ActorMigrateOutEvent) (ObserverList,
 	delete(z.actorsById, actor.ID())
 
 	return oldLoc.Observers(), nil
+}
+
+func (z *Zone) applyActorDeathEvent(e *ActorDeathEvent) (ObserverList, error) {
+	actor, found := z.actorsById[e.ActorID]
+	if !found {
+		return nil, fmt.Errorf("cannot find Actor %q to make dead", e.ActorID)
+	}
+
+	attrs := actor.Attributes()
+	attrs.Physical = 0
+	attrs.Stamina = 0
+	attrs.Focus = 0
+	attrs.Zeal = 0
+	actor.setAttributes(attrs)
+
+	return actor.Location().Observers(), nil
 }
 
 func (z *Zone) applyCombatDodgeEvent(e *CombatDodgeEvent) ObserverList {

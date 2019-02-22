@@ -96,7 +96,19 @@ func (cmc combatMeleeCommand) doSlash() ([]Event, error) {
 		focDmg,
 	)
 
-	return []Event{damageEvent}, nil
+	outEvents := []Event{damageEvent}
+
+	switch {
+	case cmc.target.attributes.Physical-damageEvent.PhysicalDmg <= 0:
+		fallthrough
+	case cmc.target.attributes.Stamina-damageEvent.StaminaDmg <= 0:
+		fallthrough
+	case cmc.target.attributes.Focus-damageEvent.FocusDmg <= 0:
+		deathEvents := doActorDeath(cmc.target, cmc.target.Zone())
+		outEvents = append(outEvents, deathEvents...)
+	}
+
+	return outEvents, nil
 }
 
 func (cmc combatMeleeCommand) checkDodge(attackSkill float64, defender *Actor) bool {

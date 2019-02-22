@@ -219,6 +219,12 @@ func (a *Actor) Slash(target *Actor) error {
 	return err
 }
 
+func (a *Actor) Die() error {
+	c := NewActorDeathCommand(a)
+	_, err := a.syncRequestToZone(c)
+	return err
+}
+
 func (a *Actor) syncRequestToZone(c Command) (interface{}, error) {
 	req := rpc.NewRequest(c)
 	a.zone.requestChan() <- req
@@ -396,6 +402,38 @@ type ActorRemoveFromZoneEvent struct {
 	ActorID uuid.UUID
 }
 
+func NewActorDeathCommand(actor *Actor) *actorDeathCommand {
+	return &actorDeathCommand{
+		commandGeneric{commandType: CommandTypeActorDeath},
+		actor,
+	}
+}
+
+type actorDeathCommand struct {
+	commandGeneric
+	actor *Actor
+}
+
+func NewActorDeathEvent(name string, actorID, zoneID uuid.UUID) *ActorDeathEvent {
+	return &ActorDeathEvent{
+		&eventGeneric{
+			EventTypeNum:      EventTypeActorDeath,
+			TimeStamp:         time.Now(),
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
+		},
+		name,
+		actorID,
+	}
+}
+
+type ActorDeathEvent struct {
+	*eventGeneric
+	ActorName string
+	ActorID   uuid.UUID
+}
+
 func newActorMigrateInCommand(actor *Actor, from, to *Location, oList ObserverList) *actorMigrateInCommand {
 	return &actorMigrateInCommand{
 		commandGeneric{commandType: CommandTypeActorMigrateIn},
@@ -481,4 +519,42 @@ type ActorMigrateOutEvent struct {
 	ActorID           uuid.UUID
 	FromLocID         uuid.UUID
 	ToLocID, ToZoneID uuid.UUID
+}
+
+/////////////////// Reusable code closely related to Actors ///////////////////
+
+func doActorDeath(actor *Actor, zone *Zone) []Event {
+	var outEvents []Event
+
+	// Create the death event itself
+	deathEv := NewActorDeathEvent(actor.Name(), actor.ID(), zone.id)
+	outEvents = append(outEvents, deathEv)
+
+	// Create a corpse to hold the objects previously held by the Actor
+	corpseObjectProto := NewObject(
+		uuid.Nil,
+		actor.Name()+"'s corpse",
+		"The empty husk of what was once a living thing.",
+		[]string{"corpse"},
+		actor.Location(),
+		100,
+		zone,
+		ObjectAttributes{},
+	)
+	corpseObjEv := corpseObjectProto.snapshot(zone.nextSequenceId)
+	outEvents = append(outEvents, corpseObjEv)
+
+	// Relocate all the Actor's objects to the corpse
+	for _, objContTuple := range getObjectContainerTuplesRecursive(actor) {
+		objEv := NewObjectAdminRelocateEvent(objContTuple.obj.ID(), zone.id)
+		objEv.ToObjectContainerID = corpseObjectProto.ID()
+		outEvents = append(outEvents, objEv)
+	}
+
+	// Remove the Actor, as it's supposed to be dead and has been replaced by
+	// a corpse
+	remActorEv := NewActorRemoveFromZoneEvent(actor.ID(), zone.id)
+	outEvents = append(outEvents, remActorEv)
+
+	return outEvents
 }
