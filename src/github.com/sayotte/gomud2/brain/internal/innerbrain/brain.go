@@ -252,6 +252,13 @@ func (b *Brain) handleEventMessage(msg wsapi.Message) {
 			return
 		}
 		b.handleActorMoveEvent(e, eventEnvelope.ZoneID)
+	case wsapi.EventTypeActorDeath:
+		var e wsapi.ActorDeathEventBody
+		err = json.Unmarshal(eventEnvelope.Body, &e)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(ActorDeathEventBody): %s\n", err)
+			return
+		}
 	case wsapi.EventTypeActorMigrateIn:
 		var e wsapi.ActorMigrateInEventBody
 		err = json.Unmarshal(eventEnvelope.Body, &e)
@@ -290,6 +297,18 @@ func (b *Brain) handleActorMoveEvent(e wsapi.ActorMoveEventBody, zoneID uuid.UUI
 			b.memory.AddActorToLocation(zoneID, e.ToLocationID, e.ActorID)
 		}
 	}
+}
+
+func (b *Brain) handleActorDeathEvent(e wsapi.ActorDeathEventBody, zoneID uuid.UUID) {
+	// check: did we die?
+	if uuid.Equal(e.ActorID, b.ActorID) {
+		fmt.Println("BRAIN INFO: our Actor died, shutting down")
+		b.Shutdown()
+		return
+	}
+	// else someone else died
+	_, currentLocID := b.memory.GetCurrentZoneAndLocationID()
+	b.memory.RemoveActorFromLocation(zoneID, currentLocID, e.ActorID)
 }
 
 func (b *Brain) handleActorMigrateInEvent(e wsapi.ActorMigrateInEventBody, zoneID uuid.UUID) {
@@ -346,21 +365,6 @@ func (b *Brain) doAI() {
 	b.executor.executeGoal(newGoal, b, b.memory)
 }
 
-//func (B *Brain) getSensorVal(sensorKey string) (interface{}, error) {
-//	B.wakeupCondLock.Lock()
-//	defer B.wakeupCondLock.Unlock()
-//	for {
-//		if B.stopped() {
-//			return nil, fmt.Errorf("stopped")
-//		}
-//		val, found := B.Memory[sensorKey]
-//		if found {
-//			return val, nil
-//		}
-//		B.wakeupCond.Wait()
-//	}
-//}
-
 /* top-level requirements (in priority order):
 - interrupt current activity to react to events / environment
 ---- e.g. currently in activity "patrol", then someone attacks me
@@ -388,67 +392,5 @@ plan-executors block waiting on callbacks, so that execution can proceed as soon
   a given step has completed, and to allow straight-line programming
 
 how we we interrupt plan-execution when we've chosen a new goal?
-
-*/
-
-/*
-how do sensors make asynchronous query/responses? how does a consideration wait for new information in light of this?
-
-func (B *Brain) mainLoop() {
-  select {
-  case msg := <-incomingMessageChan:
-    err := handleMessage(msg)
-    // ... updates working Memory
-    B.signalAIContinue.Signal()
-  }
-}
-
-func (B *Brain) aiLoop() {
-  for {
-    B.signalAIContinue.L.Lock()
-    B.signalAIContinue.Wait()
-
-    sensorVal := B.getSensorVal()
-    // do other stuff to make decisions and initiate actions ...
-    B.signalAIContinue.L.Unlock()
-  }
-}
-
-func (B *Brain) getSensorVal() interface{} {
-  for {
-    B.wakeupCondLock.Lock()
-    val, staleOrMissing := B.context.Get(sensorKey)
-    if !staleOrMissing {
-      B.wakeupCondLock.Unlock()
-      return val
-    }
-
-	// failing that, request it through the WSAPI, and block
-	// the response message will be received, which will update
-	// our working Memory, and then call our special handler to
-	// unblock us
-	getSensorMsg := wsapi.Message{
-	  // ...
-	}
-    B.sendWSAPIMessage(getSensorMsg)
-
-    B.wakeupCond.Wait()
-  }
-}
-
-
-type myConsideration struct {
-    CurveType int // actually an enum selector
-    curveParams [4]float64
-}
-
-func (mc MyConsideration) Score(ctx Context) float64 {
-    myParam := context.GetParam("myParam")
-    return doCurve(mc.CurveType, mc.curveParams, myParam)
-}
-
-type Context struct {
-
-}
 
 */

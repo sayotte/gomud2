@@ -26,7 +26,7 @@ const (
 	EventTypeObjectRemoveFromZone   = "object-remove-from-zone"
 	EventTypeObjectMove             = "object-move"
 	EventTypeObjectMoveSubcontainer = "object-move-subcontainers"
-	EventTypeObjectAdminRelocate    = "object-admin-relocate" // FIXME no support
+	EventTypeObjectAdminRelocate    = "object-admin-relocate"
 	//EventTypeObjectMigrateIn
 	//EventTypeObjectMigrateOut
 	//EventTypeZoneSetDefaultLocation
