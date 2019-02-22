@@ -3,7 +3,6 @@ package wsapi
 import (
 	"encoding/json"
 	"fmt"
-
 	"github.com/satori/go.uuid"
 
 	"github.com/sayotte/gomud2/core"
@@ -11,17 +10,28 @@ import (
 
 const (
 	EventTypeActorMove           = "actor-move"
+	EventTypeActorAdminRelocate  = "actor-admin-relocate"
 	EventTypeActorAddToZone      = "actor-add-to-zone"
 	EventTypeActorRemoveFromZone = "actor-remove-from-zone"
+	EventTypeActorDeath          = "actor-death"
 	EventTypeActorMigrateIn      = "actor-migrate-in"
 	EventTypeActorMigrateOut     = "actor-migrate-out"
 	//EventTypeLocationAddToZone
+	//EventTypeLocationRemoveFromZone
+	//EventTypeLocationUpdate
 	//EventTypeExitAddToZone
-	EventTypeObjectAddToZone      = "object-add-to-zone"
-	EventTypeObjectRemoveFromZone = "object-remove-from-zone"
-	EventTypeObjectMove           = "object-move"
-	EventTypeCombatMeleeDamage    = "combat-melee-damage"
-	EventTypeCombatDodge          = "combat-dodge"
+	//EventTypeExitUpdate
+	//EventTypeExitRemoveFromZone
+	EventTypeObjectAddToZone        = "object-add-to-zone"
+	EventTypeObjectRemoveFromZone   = "object-remove-from-zone"
+	EventTypeObjectMove             = "object-move"
+	EventTypeObjectMoveSubcontainer = "object-move-subcontainers"
+	EventTypeObjectAdminRelocate    = "object-admin-relocate" // FIXME no support
+	//EventTypeObjectMigrateIn
+	//EventTypeObjectMigrateOut
+	//EventTypeZoneSetDefaultLocation
+	EventTypeCombatMeleeDamage = "combat-melee-damage"
+	EventTypeCombatDodge       = "combat-dodge"
 )
 
 type Event struct {
@@ -49,12 +59,18 @@ func eventFromDomainEvent(from core.Event) (Event, error) {
 	case core.EventTypeActorMove:
 		e.EventType = EventTypeActorMove
 		frommer = &ActorMoveEventBody{}
+	case core.EventTypeActorAdminRelocate:
+		e.EventType = EventTypeActorAdminRelocate
+		frommer = &ActorAdminRelocateEventBody{}
 	case core.EventTypeActorAddToZone:
 		e.EventType = EventTypeActorAddToZone
 		frommer = &ActorAddToZoneEventBody{}
 	case core.EventTypeActorRemoveFromZone:
 		e.EventType = EventTypeActorRemoveFromZone
 		frommer = &ActorRemoveFromZoneEventBody{}
+	case core.EventTypeActorDeath:
+		e.EventType = EventTypeActorDeath
+		frommer = &ActorDeathEventBody{}
 	case core.EventTypeActorMigrateIn:
 		e.EventType = EventTypeActorMigrateIn
 		frommer = &ActorMigrateInEventBody{}
@@ -70,6 +86,12 @@ func eventFromDomainEvent(from core.Event) (Event, error) {
 	case core.EventTypeObjectMove:
 		e.EventType = EventTypeObjectMove
 		frommer = &ObjectMoveEventBody{}
+	case core.EventTypeObjectMoveSubcontainer:
+		e.EventType = EventTypeObjectMoveSubcontainer
+		frommer = &ObjectMoveSubcontainerEventBody{}
+	case core.EventTypeObjectAdminRelocate:
+		e.EventType = EventTypeObjectAdminRelocate
+		frommer = &ObjectAdminRelocateEventBody{}
 	case core.EventTypeCombatMeleeDamage:
 		e.EventType = EventTypeCombatMeleeDamage
 		frommer = &CombatMeleeDamageEventBody{}
@@ -101,6 +123,17 @@ func (ameb *ActorMoveEventBody) populateFromDomain(e core.Event) {
 	ameb.FromLocationID, ameb.ToLocationID, ameb.ActorID = typedEvent.FromToActorIDs()
 }
 
+type ActorAdminRelocateEventBody struct {
+	ActorID      uuid.UUID `json:"actorID"`
+	ToLocationID uuid.UUID `json:"toLocationID"`
+}
+
+func (aarelb *ActorAdminRelocateEventBody) populateFromDomain(e core.Event) {
+	typedEvent := e.(*core.ActorAdminRelocateEvent)
+	aarelb.ActorID = typedEvent.ActorID
+	aarelb.ToLocationID = typedEvent.ToLocationID
+}
+
 type ActorAddToZoneEventBody struct {
 	ActorID            uuid.UUID `json:"actorID"`
 	Name               string    `json:"name"`
@@ -121,6 +154,15 @@ type ActorRemoveFromZoneEventBody struct {
 func (arfzeb *ActorRemoveFromZoneEventBody) populateFromDomain(e core.Event) {
 	typedEvent := e.(*core.ActorRemoveFromZoneEvent)
 	arfzeb.ActorID = typedEvent.ActorID
+}
+
+type ActorDeathEventBody struct {
+	ActorID uuid.UUID `json:"actorID"`
+}
+
+func (adeb *ActorDeathEventBody) populateFromDomain(e core.Event) {
+	typedEvent := e.(*core.ActorDeathEvent)
+	adeb.ActorID = typedEvent.ActorID
 }
 
 type ActorMigrateInEventBody struct {
@@ -206,6 +248,42 @@ func (omeb *ObjectMoveEventBody) populateFromDomain(e core.Event) {
 	omeb.ToLocationContainerID = typedEvent.ToLocationContainerID
 	omeb.ToActorContainerID = typedEvent.ToActorContainerID
 	omeb.ToObjectContainerID = typedEvent.ToObjectContainerID
+}
+
+type ObjectMoveSubcontainerEventBody struct {
+	ObjectID         uuid.UUID `json:"objectID"`
+	FromSubcontainer string    `json:"fromSubcontainer"`
+	ToSubcontainer   string    `json:"toSubcontainer"`
+	ActorID          uuid.UUID `json:"actorID"`
+}
+
+func (omseb *ObjectMoveSubcontainerEventBody) populateFromDomain(e core.Event) {
+	typedEvent := e.(*core.ObjectMoveSubcontainerEvent)
+	*omseb = ObjectMoveSubcontainerEventBody{
+		ObjectID:         typedEvent.ObjectID,
+		FromSubcontainer: typedEvent.FromSubcontainer,
+		ToSubcontainer:   typedEvent.ToSubcontainer,
+		ActorID:          typedEvent.ActorID,
+	}
+}
+
+type ObjectAdminRelocateEventBody struct {
+	ObjectID              uuid.UUID `json:"objectID"`
+	ToLocationContainerID uuid.UUID `json:"toLocationContainerID"`
+	ToActorContainerID    uuid.UUID `json:"toActorContainerID"`
+	ToObjectContainerID   uuid.UUID `json:"toObjectContainerID"`
+	ToSubcontainer        string    `json:"toSubcontainer"`
+}
+
+func (oareb *ObjectAdminRelocateEventBody) populateFromDomain(e core.Event) {
+	from := e.(*core.ObjectAdminRelocateEvent)
+	*oareb = ObjectAdminRelocateEventBody{
+		ObjectID:              from.ObjectID,
+		ToLocationContainerID: from.ToLocationContainerID,
+		ToActorContainerID:    from.ToActorContainerID,
+		ToObjectContainerID:   from.ToObjectContainerID,
+		ToSubcontainer:        from.ToSubcontainer,
+	}
 }
 
 type CombatMeleeDamageEventBody struct {
