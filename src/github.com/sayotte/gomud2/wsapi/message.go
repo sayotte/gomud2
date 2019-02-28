@@ -20,6 +20,10 @@ const (
 	MessageTypeAttachActorComplete           = "actor-attached"
 	MessageTypeMoveActorCommand              = "move-actor"
 	MessageTypeMoveActorComplete             = "move-actor-complete"
+	MessageTypeLookAtOtherActorCommand       = "look-at-other-actor"
+	MessageTypeLookAtOtherActorComplete      = "look-at-other-actor-complete"
+	MessageTypeLookAtObjectCommand           = "look-at-object"
+	MessageTypeLookAtObjectComplete          = "look-at-object-complete"
 	MessageTypeEvent                         = "event"
 	MessageTypeGetCurrentLocationInfoCommand = "get-current-location-info"
 	MessageTypeCurrentLocationInfoComplete   = "current-location-info"
@@ -39,6 +43,14 @@ type CompleteAttachActor struct {
 
 type CommandMoveActor struct {
 	Direction string
+}
+
+type CommandLookAtOtherActor struct {
+	ActorID uuid.UUID `json:"actorID"`
+}
+
+type CommandLookAtObject struct {
+	ObjectID uuid.UUID `json:"objectID"`
 }
 
 type CurrentLocationInfo commands.LocationInfo

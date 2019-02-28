@@ -58,3 +58,67 @@ type LocationInfo struct {
 	Objects          []uuid.UUID
 	Exits            map[string][2]uuid.UUID // direction->ZoneID/LocationID
 }
+
+func LookAtActor(actor *core.Actor) ActorVisibleInfo {
+	aInfo := ActorVisibleInfo{
+		ID:               actor.ID(),
+		Name:             actor.Name(),
+		VisibleInventory: make(map[string][]uuid.UUID, len(core.AllActorInventorySubcontainers)),
+	}
+	for _, subContainerName := range core.AllActorInventorySubcontainers {
+		var contents []uuid.UUID
+		for _, obj := range actor.Inventory().ObjectsBySubcontainer(subContainerName) {
+			contents = append(contents, obj.ID())
+		}
+		aInfo.VisibleInventory[subContainerName] = contents
+	}
+	attrs := actor.Attributes()
+	aInfo.VisibleAttributes = ActorVisibleAttributes{
+		Strength: attrs.Strength,
+		Physical: attrs.Physical,
+		Fitness:  attrs.Fitness,
+		Stamina:  attrs.Stamina,
+		Will:     attrs.Will,
+		Focus:    attrs.Focus,
+		Faith:    attrs.Faith,
+		Zeal:     attrs.Zeal,
+	}
+	return aInfo
+}
+
+type ActorVisibleInfo struct {
+	ID                uuid.UUID
+	Name              string
+	VisibleInventory  map[string][]uuid.UUID
+	VisibleAttributes ActorVisibleAttributes
+}
+
+type ActorVisibleAttributes struct {
+	Strength, Physical int
+	Fitness, Stamina   int
+	Will, Focus        int
+	Faith, Zeal        int
+}
+
+func LookAtObject(obj *core.Object) ObjectVisibleInfo {
+	info := ObjectVisibleInfo{
+		ID:          obj.ID(),
+		Name:        obj.Name(),
+		Description: obj.Description(),
+		Capacity:    obj.InventorySlots(), // FIXME or should it be obj.containerCapacity?
+		Attributes:  obj.Attributes(),
+	}
+	for _, subObj := range obj.Objects() {
+		info.ContainedObjects = append(info.ContainedObjects, subObj.ID())
+	}
+	return info
+}
+
+type ObjectVisibleInfo struct {
+	ID               uuid.UUID
+	Name             string
+	Description      string
+	Capacity         int
+	ContainedObjects []uuid.UUID
+	Attributes       core.ObjectAttributes
+}
