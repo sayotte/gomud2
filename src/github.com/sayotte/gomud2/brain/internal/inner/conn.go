@@ -1,4 +1,4 @@
-package innerbrain
+package inner
 
 import (
 	"encoding/json"
