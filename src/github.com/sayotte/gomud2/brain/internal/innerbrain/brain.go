@@ -425,6 +425,65 @@ func (b *Brain) doAI() {
 	b.executor.executeGoal(newGoal, b, b.memory)
 }
 
+/* invocation timing thoughts:
+- we should be able to re-plan when we have new information
+- executing a plan should go as fast as the MUD will allow
+- if we re-plan and execute in parallel, we may end up with this scenario:
+--- someone hits us as we leave the room; we decide to fight back, but don't see them in the new room
+- if we re-plan and execute in lockstep, we may still end up with this scenario:
+--- we decide to leave the room; someone hits us as we leave the room, but we don't re-evaluate our
+    goal until much later
+- if we /potentially/ re-evaluate our goal for every single input, and we goal/plan and execute in
+  lockstep, I think we /can/ avoid all timing anomalies
+--- by "potentially" I mean that we invoke the code that does planning; it may decide that it's too
+    soon to re-plan, or it may decide that a given event is exceptional
+--- the process map for this is really complex to think about, though...
+- if we merely re-plan after every action we take, and in between take note of exceptional events and
+  leave hints for the planner, we could probably
+
+process (***not object!!!***) map:
+- messageSenderLoop:
+  - selects for messages from other components
+  - sends messages on the wire
+- messageReceiverLoop:
+  - receives messages from the wire
+  - forwards received messages to main
+- messageMainLoop:
+  - selects for:
+    - messages from the messager
+    - planner/executor CODE: callback registrations from the planner/executor
+  - calls planner/executor *code* to update memory based on messages
+  - planner/executor CODE: calls previously registered callbacks after processing matching messages
+- planExecuteLoop:
+  - wakes up on condition variable whenever planner/executor CODE processes a message
+  - loops on planning, then executing
+    - plan may be kept by planner code, or replaced
+    - plan is updated by executor code, and returned for possible re-planning
+
+package/object map:
+- messaging
+  - sends/receives messages on behalf of planner/executor
+- intelligence
+  - absorbs messages from messaging, saving observations in its memory
+    - calls registered callbacks from intelligence.planExecutLoop
+  - plans/executes actions
+    - registers callbacks with intelligence.messageLoop
+  - sends commands/queries to MUD via messaging
+- persistence
+  - stores/retrieves observations persistently for intelligence
+
+how are the above things composed?
+messaging and intelligence are inter-dependent
+  both should depend on interfaces
+    intelligence->messaging for testability
+    messaging->intelligence so we can swap implementations
+intelligence depends on persistence
+  intelligence should depend on an interface, for testability and stubbing
+
+memory-- the semantics of it-- is part of the intelligence implementation
+
+*/
+
 /* top-level requirements (in priority order):
 - interrupt current activity to react to events / environment
 ---- e.g. currently in activity "patrol", then someone attacks me
