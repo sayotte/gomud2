@@ -86,16 +86,51 @@ func (s *Service) getHokeyUtilitySelector() innerbrain.UtilitySelector {
 		B:           0.5,
 		C:           0.0,
 	}
+	stayIfWeapon := innerbrain.UtilityConsideration{
+		Name:        "stay-in-location-with-weapon-on-ground",
+		CurveXParam: "weaponOnGround",
+		XParamRange: [2]float64{0.0, 1.0},
+		M:           1.0,
+		K:           1.0,
+		B:           0.0,
+		C:           0.0,
+	}
 	doNothingSelection := innerbrain.UtilitySelection{
 		Name:           "do-nothing",
 		Weight:         1.0,
-		Considerations: []innerbrain.UtilityConsideration{constantLaziness},
+		Considerations: []innerbrain.UtilityConsideration{constantLaziness, stayIfWeapon},
+	}
+
+	recentlyAttacked := innerbrain.UtilityConsideration{
+		Name:        "attacked-in-last-15-seconds",
+		CurveXParam: "lastAttackedSecondsAgo",
+		XParamRange: [2]float64{0.0, 17.0},
+		CurveType:   "quadratic",
+		M:           -1.0,
+		K:           16,
+		B:           1.0,
+		C:           0.0,
+	}
+	attackerPresent := innerbrain.UtilityConsideration{
+		Name:        "attacker-present",
+		CurveXParam: "lastAttackerInLocation",
+		XParamRange: [2]float64{0.0, 1.0},
+		M:           1.0,
+		K:           1.0,
+		B:           0.0,
+		C:           0.0,
+	}
+	defendSelfSelection := innerbrain.UtilitySelection{
+		Name:           "defend-self",
+		Weight:         1.0,
+		Considerations: []innerbrain.UtilityConsideration{recentlyAttacked, attackerPresent},
 	}
 
 	return innerbrain.UtilitySelector{
 		Selections: []innerbrain.UtilitySelection{
 			moveSelection,
 			doNothingSelection,
+			defendSelfSelection,
 		},
 	}
 }

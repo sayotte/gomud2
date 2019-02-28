@@ -418,7 +418,7 @@ func (b *Brain) aiLoop() {
 func (b *Brain) doAI() {
 	newGoal := b.goalSelector.selectGoal(b.memory)
 	if newGoal != b.currentGoal {
-		//fmt.Printf("BRAIN DEBUG: ===== switching goal from %q -> %q =====\n", b.currentGoal, newGoal)
+		fmt.Printf("BRAIN DEBUG: ===== switching goal from %q -> %q =====\n", b.currentGoal, newGoal)
 		b.currentGoal = newGoal
 	}
 
