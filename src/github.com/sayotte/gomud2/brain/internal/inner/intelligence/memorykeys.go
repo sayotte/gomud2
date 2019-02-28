@@ -1,4 +1,4 @@
-package inner
+package intelligence
 
 const (
 	memoryMyCurrentLocationID   = "my-current-location-id"
