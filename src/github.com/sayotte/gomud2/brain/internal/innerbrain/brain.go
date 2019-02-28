@@ -93,6 +93,7 @@ func (b *Brain) Start() error {
 }
 
 func (b *Brain) Shutdown() {
+	fmt.Println("BRAIN DEBUG: Brain.Shutdown():...")
 	b.stopOnce.Do(func() {
 		_ = b.conn.close()
 		close(b.stopChan)
@@ -209,6 +210,10 @@ func (b *Brain) handleMessage(msg wsapi.Message) {
 	switch msg.Type {
 	case wsapi.MessageTypeCurrentLocationInfoComplete:
 		b.handleCurrentLocInfoMessage(msg)
+	case wsapi.MessageTypeLookAtOtherActorComplete:
+		b.handleLookAtOtherActorMessage(msg)
+	case wsapi.MessageTypeLookAtObjectComplete:
+		b.handleLookAtObjectMessage(msg)
 	case wsapi.MessageTypeEvent:
 		b.handleEventMessage(msg)
 	default:
@@ -222,6 +227,7 @@ func (b *Brain) handleMessage(msg wsapi.Message) {
 }
 
 func (b *Brain) handleCurrentLocInfoMessage(msg wsapi.Message) {
+	fmt.Println("BRAIN DEBUG: handleCurrentLocInfoMessage(): ...")
 	var locInfo commands.LocationInfo
 	err := json.Unmarshal(msg.Payload, &locInfo)
 	if err != nil {
@@ -233,6 +239,30 @@ func (b *Brain) handleCurrentLocInfoMessage(msg wsapi.Message) {
 	b.memory.SetCurrentZoneAndLocationID(locInfo.ZoneID, locInfo.ID)
 }
 
+func (b *Brain) handleLookAtOtherActorMessage(msg wsapi.Message) {
+	fmt.Println("BRAIN DEBUG: handleLookAtOtherActorMessage(): ...")
+	var actorInfo commands.ActorVisibleInfo
+	err := json.Unmarshal(msg.Payload, &actorInfo)
+	if err != nil {
+		fmt.Printf("BRAIN ERROR: json.Unmarshal(actorInfo): %s\n", err)
+		return
+	}
+
+	b.memory.SetActorInfo(actorInfo)
+}
+
+func (b *Brain) handleLookAtObjectMessage(msg wsapi.Message) {
+	fmt.Println("BRAIN DEBUG: handleLookAtObjectMessage(): ...")
+	var objectInfo commands.ObjectVisibleInfo
+	err := json.Unmarshal(msg.Payload, &objectInfo)
+	if err != nil {
+		fmt.Printf("BRAIN ERROR: json.Unmarshal(objectInfo): %s\n", err)
+		return
+	}
+
+	b.memory.SetObjectInfo(objectInfo)
+}
+
 func (b *Brain) handleEventMessage(msg wsapi.Message) {
 	var eventEnvelope wsapi.Event
 	err := json.Unmarshal(msg.Payload, &eventEnvelope)
@@ -241,7 +271,7 @@ func (b *Brain) handleEventMessage(msg wsapi.Message) {
 		return
 	}
 
-	//fmt.Printf("BRAIN DEBUG: event type is %q\n", eventEnvelope.EventType)
+	fmt.Printf("BRAIN DEBUG: event type is %q\n", eventEnvelope.EventType)
 
 	switch eventEnvelope.EventType {
 	case wsapi.EventTypeActorMove:
@@ -344,6 +374,21 @@ func (b *Brain) aiLoop() {
 			ticker.Stop()
 			return
 		}
+
+		//b.memory.lock.RLock()
+		//fmt.Println("\n\nDUMPING MEMORY")
+		//memKeys := make([]string, 0, len(b.memory.localStore))
+		//for k := range b.memory.localStore {
+		//	memKeys = append(memKeys, k)
+		//}
+		//sort.Strings(memKeys)
+		//for _, k := range memKeys {
+		//	v := b.memory.localStore[k]
+		//	fmt.Printf("==%s==\n", k)
+		//	b, _ := json.MarshalIndent(v, "  ", "  ")
+		//	fmt.Println(string(b))
+		//}
+		//b.memory.lock.RUnlock()
 
 		//fmt.Println("BRAIN DEBUG: doing AI stuff!")
 		//start := time.Now()

@@ -5,4 +5,6 @@ const (
 	memoryMyCurrentZoneID       = "my-current-zone-id"
 	memoryLastMovementTimestamp = "last-movement-timestamp"
 	memoryZoneLocInfoMap        = "zone-location-info-map"
+	memoryActorInfoMap          = "actor-info-map"
+	memoryObjectInfoMap         = "object-info-map"
 )

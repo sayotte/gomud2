@@ -33,7 +33,7 @@ func (us UtilitySelection) score(memory *Memory) float64 {
 	var sum float64
 	for _, cons := range us.Considerations {
 		score := cons.score(memory)
-		//fmt.Printf("BRAIN DEBUG: consideration: %q, score %f\n", cons.Name, score)
+		//fmt.Printf("BRAIN DEBUG: selection %q, consideration: %q, score %f\n", us.Name, cons.Name, score)
 		sum += score
 	}
 	return (sum / float64(len(us.Considerations))) * us.Weight
@@ -64,7 +64,17 @@ func (uc UtilityConsideration) score(memory *Memory) float64 {
 	// normalize to 0.0 - 1.0
 	normalized := (param - uc.XParamRange[0]) / (uc.XParamRange[1] - uc.XParamRange[0])
 
-	return uc.M*math.Pow(normalized-uc.C, uc.K) + uc.B
+	switch uc.CurveType {
+	case "":
+		fallthrough
+	case "linear":
+		fallthrough
+	case "quadratic":
+		return uc.M*math.Pow(normalized-uc.C, uc.K) + uc.B
+	default:
+		fmt.Printf("BRAIN ERROR: unrecognized UtilityConsideration.CurveType %q", uc.CurveType)
+		return 0.0
+	}
 }
 
 func (uc UtilityConsideration) getParam(paramName string, memory *Memory) float64 {
@@ -74,6 +84,29 @@ func (uc UtilityConsideration) getParam(paramName string, memory *Memory) float6
 		return memory.GetNumActorsInLocation(currentZoneID, currentLocID) - 1.0 // -1.0 to account for ourselves
 	case "secondsSinceLastMove":
 		return memory.GetSecondsSinceLastMove()
+	case "weaponOnGround":
+		currentZoneID, currentLocID := memory.GetCurrentZoneAndLocationID()
+		locInfo, err := memory.GetLocationInfo(currentZoneID, currentLocID)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: %s\n", err)
+			return 0
+		}
+		for _, objID := range locInfo.Objects {
+			objInfo, err := memory.GetObjectInfo(objID)
+			if err != nil {
+				fmt.Printf("BRAIN ERROR: %s\n", err)
+				return 0
+			}
+			switch {
+			case objInfo.Attributes.BashingDamageMax > 0:
+				fallthrough
+			case objInfo.Attributes.SlashingDamageMax > 0:
+				fallthrough
+			case objInfo.Attributes.StabbingDamageMax > 0:
+				return 1.0
+			}
+		}
+		return 0
 	case "always-1.0":
 		return 1.0
 	default:

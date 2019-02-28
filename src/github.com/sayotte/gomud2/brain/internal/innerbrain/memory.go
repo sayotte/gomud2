@@ -3,9 +3,11 @@ package innerbrain
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/sayotte/gomud2/commands"
 	uuid2 "github.com/sayotte/gomud2/uuid"
 	"github.com/sayotte/gomud2/wsapi"
+	"math"
 	"sync"
 	"time"
 
@@ -48,6 +50,8 @@ func (m *Memory) SetLastMovementTime(t time.Time) {
 	defer m.lock.Unlock()
 	m.localStore[memoryLastMovementTimestamp] = t
 }
+
+// Location data
 
 func (m *Memory) GetCurrentZoneAndLocationID() (uuid.UUID, uuid.UUID) {
 	m.lock.RLock()
@@ -225,4 +229,171 @@ func (m *Memory) AddActorToLocation(zoneID, locID, actorID uuid.UUID) {
 	zoneSubMap[locID] = entry
 	fullMap[zoneID] = zoneSubMap
 	m.localStore[memoryZoneLocInfoMap] = jsonZoneInfoMap(fullMap)
+}
+
+// Actor data
+
+func (m *Memory) GetActorInfo(actorID uuid.UUID) (commands.ActorVisibleInfo, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	getActorInfoMap := func() actorInfoMap {
+		var infoMap actorInfoMap
+		val, found := m.localStore[memoryActorInfoMap]
+		if found {
+			infoMap = val.(actorInfoMap)
+		} else {
+			infoMap = make(actorInfoMap)
+		}
+		return infoMap
+	}
+	infoMap := getActorInfoMap()
+
+	var err error
+	actorInfoEnt, found := infoMap[ActorIDTyp(actorID)]
+	if !found {
+		msgID := uuid2.NewId()
+		waiter := &sync.WaitGroup{}
+		waiter.Add(1)
+
+		callback := func(msg wsapi.Message) {
+			m.lock.RLock()
+			if msg.Type == wsapi.MessageTypeProcessingError {
+				err = errors.New(string(msg.Payload))
+			} else {
+				infoMap = getActorInfoMap()
+				actorInfoEnt = infoMap[ActorIDTyp(actorID)]
+			}
+			waiter.Done()
+		}
+
+		// have to unlock here so that if the brain.mainLoop() is already handling
+		// a message that requires writing to the Memory, it can un-block and then
+		// get around to accepting our callback registration
+		m.lock.RUnlock()
+		m.senderCallbacker.RegisterResponseCallback(msgID, callback)
+
+		cmd := wsapi.CommandLookAtOtherActor{
+			ActorID: actorID,
+		}
+		msgPayload, err := json.Marshal(cmd)
+		if err != nil {
+			return actorInfoEnt.Info, fmt.Errorf("json.Marshal(msgPayload): %s", err)
+		}
+		lookAtActorMsg := wsapi.Message{
+			Type:      wsapi.MessageTypeLookAtOtherActorCommand,
+			MessageID: msgID,
+			Payload:   msgPayload,
+		}
+
+		err = m.senderCallbacker.SendMessage(lookAtActorMsg)
+		if err != nil {
+			return actorInfoEnt.Info, err
+		}
+		waiter.Wait()
+	}
+
+	return actorInfoEnt.Info, err
+}
+
+func (m *Memory) SetActorInfo(info commands.ActorVisibleInfo) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	var infoMap actorInfoMap
+	val, found := m.localStore[memoryActorInfoMap]
+	if found {
+		infoMap = val.(actorInfoMap)
+	} else {
+		infoMap = make(actorInfoMap)
+	}
+
+	infoMap[ActorIDTyp(info.ID)] = actorInfoEntry{
+		Info:      info,
+		Timestamp: time.Now(),
+	}
+	m.localStore[memoryActorInfoMap] = infoMap
+}
+
+// Object data
+
+func (m *Memory) SetObjectInfo(info commands.ObjectVisibleInfo) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	var infoMap objectInfoMap
+	val, found := m.localStore[memoryObjectInfoMap]
+	if found {
+		infoMap = val.(objectInfoMap)
+	} else {
+		infoMap = make(objectInfoMap)
+	}
+
+	infoMap[objectIDTyp(info.ID)] = objectInfoEntry{
+		Info:      info,
+		Timestamp: time.Now(),
+	}
+	m.localStore[memoryObjectInfoMap] = infoMap
+}
+
+func (m *Memory) GetObjectInfo(objectID uuid.UUID) (commands.ObjectVisibleInfo, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	getObjectInfoMap := func() objectInfoMap {
+		var infoMap objectInfoMap
+		val, found := m.localStore[memoryObjectInfoMap]
+		if found {
+			infoMap = val.(objectInfoMap)
+		} else {
+			infoMap = make(objectInfoMap)
+		}
+		return infoMap
+	}
+	infoMap := getObjectInfoMap()
+
+	var err error
+	objectInfoEnt, found := infoMap[objectIDTyp(objectID)]
+	if !found {
+		msgID := uuid2.NewId()
+		waiter := &sync.WaitGroup{}
+		waiter.Add(1)
+
+		callback := func(msg wsapi.Message) {
+			m.lock.RLock()
+			if msg.Type == wsapi.MessageTypeProcessingError {
+				err = errors.New(string(msg.Payload))
+			} else {
+				infoMap = getObjectInfoMap()
+				objectInfoEnt = infoMap[objectIDTyp(objectID)]
+			}
+			waiter.Done()
+		}
+
+		// have to unlock here so that if the brain.mainLoop() is already handling
+		// a message that requires writing to the Memory, it can un-block and then
+		// get around to accepting our callback registration
+		m.lock.RUnlock()
+		m.senderCallbacker.RegisterResponseCallback(msgID, callback)
+
+		cmd := wsapi.CommandLookAtObject{
+			ObjectID: objectID,
+		}
+		msgPayload, err := json.Marshal(cmd)
+		if err != nil {
+			return objectInfoEnt.Info, fmt.Errorf("json.Marshal(msgPayload): %s", err)
+		}
+		lookAtObjectMsg := wsapi.Message{
+			Type:      wsapi.MessageTypeLookAtObjectCommand,
+			MessageID: msgID,
+			Payload:   msgPayload,
+		}
+		err = m.senderCallbacker.SendMessage(lookAtObjectMsg)
+		if err != nil {
+			return objectInfoEnt.Info, err
+		}
+		waiter.Wait()
+	}
+
+	return objectInfoEnt.Info, err
 }
