@@ -51,6 +51,40 @@ func (m *Memory) SetLastMovementTime(t time.Time) {
 	m.localStore[memoryLastMovementTimestamp] = t
 }
 
+func (m *Memory) GetSecondsSinceLastAttacked() float64 {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	val, found := m.localStore[memoryLastAttackedTimestamp]
+	if !found {
+		m.localStore[memoryLastAttackedTimestamp] = time.Time{}
+		return math.MaxFloat64
+	}
+	lastAttackedTS := val.(time.Time)
+	return time.Since(lastAttackedTS).Seconds()
+}
+
+func (m *Memory) SetLastAttackedTime(t time.Time) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.localStore[memoryLastAttackedTimestamp] = t
+}
+
+func (m *Memory) SetLastAttacker(attackerID ActorIDTyp) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.localStore[memoryLastAttackerID] = attackerID
+}
+
+func (m *Memory) GetLastAttacker() ActorIDTyp {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	val, found := m.localStore[memoryLastAttackerID]
+	if !found {
+		return ActorIDTyp(uuid.Nil)
+	}
+	return val.(ActorIDTyp)
+}
+
 // Location data
 
 func (m *Memory) GetCurrentZoneAndLocationID() (uuid.UUID, uuid.UUID) {

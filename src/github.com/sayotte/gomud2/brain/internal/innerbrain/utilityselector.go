@@ -1,7 +1,10 @@
 package innerbrain
 
 import (
+	"fmt"
 	"math"
+
+	"github.com/satori/go.uuid"
 )
 
 type UtilitySelector struct {
@@ -103,6 +106,25 @@ func (uc UtilityConsideration) getParam(paramName string, memory *Memory) float6
 			case objInfo.Attributes.SlashingDamageMax > 0:
 				fallthrough
 			case objInfo.Attributes.StabbingDamageMax > 0:
+				return 1.0
+			}
+		}
+		return 0
+	case "lastAttackedSecondsAgo":
+		return memory.GetSecondsSinceLastAttacked()
+	case "lastAttackerInLocation":
+		lastAttackerID := memory.GetLastAttacker()
+		if uuid.Equal(uuid.UUID(lastAttackerID), uuid.Nil) {
+			return 0
+		}
+		currentZoneID, currentLocID := memory.GetCurrentZoneAndLocationID()
+		locInfo, err := memory.GetLocationInfo(currentZoneID, currentLocID)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: %s\n", err)
+			return 0
+		}
+		for _, actorID := range locInfo.Actors {
+			if uuid.Equal(uuid.UUID(lastAttackerID), actorID) {
 				return 1.0
 			}
 		}

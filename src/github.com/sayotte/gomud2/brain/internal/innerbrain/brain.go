@@ -305,6 +305,14 @@ func (b *Brain) handleEventMessage(msg wsapi.Message) {
 			return
 		}
 		b.handleActorMigrateOutEvent(e, eventEnvelope.ZoneID)
+	case wsapi.EventTypeCombatMeleeDamage:
+		var e wsapi.CombatMeleeDamageEventBody
+		err = json.Unmarshal(eventEnvelope.Body, &e)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(EventTypeCombatMeleeDamage): %s\n", err)
+			return
+		}
+		b.handleCombatMeleeDamageEvent(e)
 	default:
 		//fmt.Printf("BRAIN DEBUG: Brain received event of type %q, no idea what to do with it\n", eventEnvelope.EventType)
 	}
@@ -362,6 +370,13 @@ func (b *Brain) handleActorMigrateOutEvent(e wsapi.ActorMigrateOutEventBody, zon
 	}
 	// someone migrated out of our location
 	b.memory.RemoveActorFromLocation(zoneID, e.FromLocID, e.ActorID)
+}
+
+func (b *Brain) handleCombatMeleeDamageEvent(e wsapi.CombatMeleeDamageEventBody) {
+	if uuid.Equal(e.TargetID, b.ActorID) {
+		b.memory.SetLastAttackedTime(time.Now())
+		b.memory.SetLastAttacker(ActorIDTyp(e.AttackerID))
+	}
 }
 
 func (b *Brain) aiLoop() {
