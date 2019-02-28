@@ -32,7 +32,7 @@ type Object struct {
 	id             uuid.UUID
 	name           string
 	description    string
-	inventorySlots int
+	inventorySlots int // FIXME this is a dupe of containerCapacity, and neither is currently used in all places
 	keywords       []string
 	container      Container
 	zone           *Zone

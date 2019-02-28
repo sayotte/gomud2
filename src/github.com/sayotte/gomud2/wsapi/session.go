@@ -237,6 +237,10 @@ func (s *session) handleMessage(msg Message) {
 		s.handleCommandListActors(msg)
 	case MessageTypeMoveActorCommand:
 		s.handleCommandMoveActor(msg)
+	case MessageTypeLookAtOtherActorCommand:
+		s.handleCommandLookAtOtherActor(msg)
+	case MessageTypeLookAtObjectCommand:
+		s.handleCommandLookAtObject(msg)
 	case MessageTypeGetCurrentLocationInfoCommand:
 		s.handleCommandGetCurrentLocInfo(msg)
 	default:
@@ -245,7 +249,6 @@ func (s *session) handleMessage(msg Message) {
 	}
 }
 
-//
 func (s *session) sendCloseDetachAndStop(sendCloseMsg bool, closeCode int, closeText string) {
 	// Have to wrap this in a sync.Once, because the stopping may cause our
 	// intake channels to fill up as we shutdown (we don't care, we're ignoring
@@ -387,6 +390,65 @@ func (s *session) handleCommandMoveActor(msg Message) {
 	}
 	s.actor = newActor
 	s.sendMessage(MessageTypeMoveActorComplete, nil, msg.MessageID)
+}
+
+func (s *session) handleCommandLookAtOtherActor(msg Message) {
+	var cmd CommandLookAtOtherActor
+	err := json.Unmarshal(msg.Payload, &cmd)
+	if err != nil {
+		fmt.Printf("WSAPI ERROR: json.Unmarshal(): %s\n", err)
+		s.sendCloseDetachAndStop(true, websocket.ClosePolicyViolation, "message JSON data cannot be decoded")
+		return
+	}
+
+	a := s.actor.Zone().ActorByID(cmd.ActorID)
+	if a == nil {
+		errMsg := fmt.Sprintf("Actor with ID %q does not exist", cmd.ActorID)
+		s.sendMessage(MessageTypeProcessingError, errMsg, msg.MessageID)
+		return
+	}
+	if a.Location() != s.actor.Location() {
+		s.sendMessage(MessageTypeProcessingError, "too far away", msg.MessageID)
+		return
+	}
+
+	info := commands.LookAtActor(a)
+	s.sendMessage(
+		MessageTypeLookAtOtherActorComplete,
+		info,
+		msg.MessageID,
+	)
+}
+
+func (s *session) handleCommandLookAtObject(msg Message) {
+	var cmd CommandLookAtObject
+	err := json.Unmarshal(msg.Payload, &cmd)
+	if err != nil {
+		fmt.Printf("WSAPI ERROR: json.Unmarshal(): %s\n", err)
+		s.sendCloseDetachAndStop(true, websocket.ClosePolicyViolation, "message JSON data cannot be decoded")
+		return
+	}
+
+	obj := s.actor.Zone().ObjectByID(cmd.ObjectID)
+	if obj == nil {
+		errMsg := fmt.Sprintf("Object with ID %q does not exist", cmd.ObjectID)
+		s.sendMessage(MessageTypeProcessingError, errMsg, msg.MessageID)
+		return
+	}
+	// Object must either be on the ground, or in the top-level of our Actor's inventory
+	objLoc := obj.Location()
+	objCont := obj.Container()
+	if objLoc != s.actor.Location() || (objCont != s.actor && objCont != objLoc) {
+		s.sendMessage(MessageTypeProcessingError, "too far away / inside a container", msg.MessageID)
+		return
+	}
+
+	info := commands.LookAtObject(obj)
+	s.sendMessage(
+		MessageTypeLookAtObjectComplete,
+		info,
+		msg.MessageID,
+	)
 }
 
 func (s *session) handleCommandGetCurrentLocInfo(msg Message) {

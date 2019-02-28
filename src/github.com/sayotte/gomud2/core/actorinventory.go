@@ -21,6 +21,13 @@ const (
 	InventoryContainerHands = "hands"
 )
 
+var AllActorInventorySubcontainers = []string{
+	InventoryContainerBack,
+	InventoryContainerBelt,
+	InventoryContainerBody,
+	InventoryContainerHands,
+}
+
 var DefaultHumanInventoryConstraints = ActorInventoryConstraints{
 	BackSlots:    1 * ObjectSizeLargeSlots,
 	BackMaxItems: 2,

@@ -93,6 +93,7 @@ func (b *Brain) Start() error {
 }
 
 func (b *Brain) Shutdown() {
+	fmt.Println("BRAIN DEBUG: Brain.Shutdown():...")
 	b.stopOnce.Do(func() {
 		_ = b.conn.close()
 		close(b.stopChan)
@@ -209,6 +210,10 @@ func (b *Brain) handleMessage(msg wsapi.Message) {
 	switch msg.Type {
 	case wsapi.MessageTypeCurrentLocationInfoComplete:
 		b.handleCurrentLocInfoMessage(msg)
+	case wsapi.MessageTypeLookAtOtherActorComplete:
+		b.handleLookAtOtherActorMessage(msg)
+	case wsapi.MessageTypeLookAtObjectComplete:
+		b.handleLookAtObjectMessage(msg)
 	case wsapi.MessageTypeEvent:
 		b.handleEventMessage(msg)
 	default:
@@ -222,6 +227,7 @@ func (b *Brain) handleMessage(msg wsapi.Message) {
 }
 
 func (b *Brain) handleCurrentLocInfoMessage(msg wsapi.Message) {
+	fmt.Println("BRAIN DEBUG: handleCurrentLocInfoMessage(): ...")
 	var locInfo commands.LocationInfo
 	err := json.Unmarshal(msg.Payload, &locInfo)
 	if err != nil {
@@ -233,6 +239,30 @@ func (b *Brain) handleCurrentLocInfoMessage(msg wsapi.Message) {
 	b.memory.SetCurrentZoneAndLocationID(locInfo.ZoneID, locInfo.ID)
 }
 
+func (b *Brain) handleLookAtOtherActorMessage(msg wsapi.Message) {
+	fmt.Println("BRAIN DEBUG: handleLookAtOtherActorMessage(): ...")
+	var actorInfo commands.ActorVisibleInfo
+	err := json.Unmarshal(msg.Payload, &actorInfo)
+	if err != nil {
+		fmt.Printf("BRAIN ERROR: json.Unmarshal(actorInfo): %s\n", err)
+		return
+	}
+
+	b.memory.SetActorInfo(actorInfo)
+}
+
+func (b *Brain) handleLookAtObjectMessage(msg wsapi.Message) {
+	fmt.Println("BRAIN DEBUG: handleLookAtObjectMessage(): ...")
+	var objectInfo commands.ObjectVisibleInfo
+	err := json.Unmarshal(msg.Payload, &objectInfo)
+	if err != nil {
+		fmt.Printf("BRAIN ERROR: json.Unmarshal(objectInfo): %s\n", err)
+		return
+	}
+
+	b.memory.SetObjectInfo(objectInfo)
+}
+
 func (b *Brain) handleEventMessage(msg wsapi.Message) {
 	var eventEnvelope wsapi.Event
 	err := json.Unmarshal(msg.Payload, &eventEnvelope)
@@ -241,7 +271,7 @@ func (b *Brain) handleEventMessage(msg wsapi.Message) {
 		return
 	}
 
-	//fmt.Printf("BRAIN DEBUG: event type is %q\n", eventEnvelope.EventType)
+	fmt.Printf("BRAIN DEBUG: event type is %q\n", eventEnvelope.EventType)
 
 	switch eventEnvelope.EventType {
 	case wsapi.EventTypeActorMove:
@@ -275,6 +305,14 @@ func (b *Brain) handleEventMessage(msg wsapi.Message) {
 			return
 		}
 		b.handleActorMigrateOutEvent(e, eventEnvelope.ZoneID)
+	case wsapi.EventTypeCombatMeleeDamage:
+		var e wsapi.CombatMeleeDamageEventBody
+		err = json.Unmarshal(eventEnvelope.Body, &e)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(EventTypeCombatMeleeDamage): %s\n", err)
+			return
+		}
+		b.handleCombatMeleeDamageEvent(e)
 	default:
 		//fmt.Printf("BRAIN DEBUG: Brain received event of type %q, no idea what to do with it\n", eventEnvelope.EventType)
 	}
@@ -334,6 +372,13 @@ func (b *Brain) handleActorMigrateOutEvent(e wsapi.ActorMigrateOutEventBody, zon
 	b.memory.RemoveActorFromLocation(zoneID, e.FromLocID, e.ActorID)
 }
 
+func (b *Brain) handleCombatMeleeDamageEvent(e wsapi.CombatMeleeDamageEventBody) {
+	if uuid.Equal(e.TargetID, b.ActorID) {
+		b.memory.SetLastAttackedTime(time.Now())
+		b.memory.SetLastAttacker(ActorIDTyp(e.AttackerID))
+	}
+}
+
 func (b *Brain) aiLoop() {
 	minDurationBetweenRuns := time.Millisecond * 2000
 
@@ -344,6 +389,21 @@ func (b *Brain) aiLoop() {
 			ticker.Stop()
 			return
 		}
+
+		//b.memory.lock.RLock()
+		//fmt.Println("\n\nDUMPING MEMORY")
+		//memKeys := make([]string, 0, len(b.memory.localStore))
+		//for k := range b.memory.localStore {
+		//	memKeys = append(memKeys, k)
+		//}
+		//sort.Strings(memKeys)
+		//for _, k := range memKeys {
+		//	v := b.memory.localStore[k]
+		//	fmt.Printf("==%s==\n", k)
+		//	b, _ := json.MarshalIndent(v, "  ", "  ")
+		//	fmt.Println(string(b))
+		//}
+		//b.memory.lock.RUnlock()
 
 		//fmt.Println("BRAIN DEBUG: doing AI stuff!")
 		//start := time.Now()
@@ -358,12 +418,71 @@ func (b *Brain) aiLoop() {
 func (b *Brain) doAI() {
 	newGoal := b.goalSelector.selectGoal(b.memory)
 	if newGoal != b.currentGoal {
-		//fmt.Printf("BRAIN DEBUG: ===== switching goal from %q -> %q =====\n", b.currentGoal, newGoal)
+		fmt.Printf("BRAIN DEBUG: ===== switching goal from %q -> %q =====\n", b.currentGoal, newGoal)
 		b.currentGoal = newGoal
 	}
 
 	b.executor.executeGoal(newGoal, b, b.memory)
 }
+
+/* invocation timing thoughts:
+- we should be able to re-plan when we have new information
+- executing a plan should go as fast as the MUD will allow
+- if we re-plan and execute in parallel, we may end up with this scenario:
+--- someone hits us as we leave the room; we decide to fight back, but don't see them in the new room
+- if we re-plan and execute in lockstep, we may still end up with this scenario:
+--- we decide to leave the room; someone hits us as we leave the room, but we don't re-evaluate our
+    goal until much later
+- if we /potentially/ re-evaluate our goal for every single input, and we goal/plan and execute in
+  lockstep, I think we /can/ avoid all timing anomalies
+--- by "potentially" I mean that we invoke the code that does planning; it may decide that it's too
+    soon to re-plan, or it may decide that a given event is exceptional
+--- the process map for this is really complex to think about, though...
+- if we merely re-plan after every action we take, and in between take note of exceptional events and
+  leave hints for the planner, we could probably
+
+process (***not object!!!***) map:
+- messageSenderLoop:
+  - selects for messages from other components
+  - sends messages on the wire
+- messageReceiverLoop:
+  - receives messages from the wire
+  - forwards received messages to main
+- messageMainLoop:
+  - selects for:
+    - messages from the messager
+    - planner/executor CODE: callback registrations from the planner/executor
+  - calls planner/executor *code* to update memory based on messages
+  - planner/executor CODE: calls previously registered callbacks after processing matching messages
+- planExecuteLoop:
+  - wakes up on condition variable whenever planner/executor CODE processes a message
+  - loops on planning, then executing
+    - plan may be kept by planner code, or replaced
+    - plan is updated by executor code, and returned for possible re-planning
+
+package/object map:
+- messaging
+  - sends/receives messages on behalf of planner/executor
+- intelligence
+  - absorbs messages from messaging, saving observations in its memory
+    - calls registered callbacks from intelligence.planExecutLoop
+  - plans/executes actions
+    - registers callbacks with intelligence.messageLoop
+  - sends commands/queries to MUD via messaging
+- persistence
+  - stores/retrieves observations persistently for intelligence
+
+how are the above things composed?
+messaging and intelligence are inter-dependent
+  both should depend on interfaces
+    intelligence->messaging for testability
+    messaging->intelligence so we can swap implementations
+intelligence depends on persistence
+  intelligence should depend on an interface, for testability and stubbing
+
+memory-- the semantics of it-- is part of the intelligence implementation
+
+*/
 
 /* top-level requirements (in priority order):
 - interrupt current activity to react to events / environment

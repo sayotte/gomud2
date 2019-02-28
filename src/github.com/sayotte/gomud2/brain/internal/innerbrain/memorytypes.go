@@ -71,3 +71,30 @@ type locInfoEntry struct {
 	Info      commands.LocationInfo
 	Timestamp time.Time
 }
+
+type ActorIDTyp uuid.UUID
+
+func (a ActorIDTyp) MarshalJSON() ([]byte, error) {
+	return json.Marshal(uuid.UUID(a))
+}
+
+type actorInfoEntry struct {
+	Info      commands.ActorVisibleInfo
+	Timestamp time.Time
+}
+type actorInfoMap map[ActorIDTyp]actorInfoEntry
+
+func (aim actorInfoMap) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[ActorIDTyp]actorInfoEntry(aim))
+}
+
+type objectIDTyp uuid.UUID
+type objectInfoEntry struct {
+	Info      commands.ObjectVisibleInfo
+	Timestamp time.Time
+}
+type objectInfoMap map[objectIDTyp]objectInfoEntry
+
+func (oim objectInfoMap) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[objectIDTyp]objectInfoEntry(oim))
+}
