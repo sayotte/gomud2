@@ -1,4 +1,4 @@
-package innerbrain
+package intelligence
 
 import (
 	"fmt"
