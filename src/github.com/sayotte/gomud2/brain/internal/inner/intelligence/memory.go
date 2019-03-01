@@ -14,23 +14,20 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-type MessageSenderCallbacker interface {
-	SendMessage(msg wsapi.Message) error
-	RegisterResponseCallback(requestID uuid.UUID, callback func(msg wsapi.Message))
-}
-
-func NewMemory(senderCallbacker MessageSenderCallbacker) *Memory {
+func NewMemory(msgSender MessageSender, intellect *Intellect) *Memory {
 	return &Memory{
-		lock:             &sync.RWMutex{},
-		localStore:       make(map[string]json.Marshaler),
-		senderCallbacker: senderCallbacker,
+		lock:       &sync.RWMutex{},
+		localStore: make(map[string]json.Marshaler),
+		msgSender:  msgSender,
+		intellect:  intellect,
 	}
 }
 
 type Memory struct {
-	lock             *sync.RWMutex
-	localStore       map[string]json.Marshaler
-	senderCallbacker MessageSenderCallbacker
+	lock       *sync.RWMutex
+	localStore map[string]json.Marshaler
+	msgSender  MessageSender
+	intellect  *Intellect
 }
 
 func (m *Memory) GetSecondsSinceLastMove() float64 {
@@ -168,13 +165,13 @@ func (m *Memory) GetLocationInfo(zoneID, locID uuid.UUID) (commands.LocationInfo
 		// a message that requires writing to the Memory, it can un-block and then
 		// get around to accepting our callback registration
 		m.lock.RUnlock()
-		m.senderCallbacker.RegisterResponseCallback(msgID, callback)
+		m.intellect.registerResponseCallback(msgID, callback)
 
 		getLocInfoMsg := wsapi.Message{
 			Type:      wsapi.MessageTypeGetCurrentLocationInfoCommand,
 			MessageID: msgID,
 		}
-		err = m.senderCallbacker.SendMessage(getLocInfoMsg)
+		err = m.msgSender.SendMessage(getLocInfoMsg)
 		if err != nil {
 			return locInfo.Info, err
 		}
@@ -305,7 +302,7 @@ func (m *Memory) GetActorInfo(actorID uuid.UUID) (commands.ActorVisibleInfo, err
 		// a message that requires writing to the Memory, it can un-block and then
 		// get around to accepting our callback registration
 		m.lock.RUnlock()
-		m.senderCallbacker.RegisterResponseCallback(msgID, callback)
+		m.intellect.registerResponseCallback(msgID, callback)
 
 		cmd := wsapi.CommandLookAtOtherActor{
 			ActorID: actorID,
@@ -320,7 +317,7 @@ func (m *Memory) GetActorInfo(actorID uuid.UUID) (commands.ActorVisibleInfo, err
 			Payload:   msgPayload,
 		}
 
-		err = m.senderCallbacker.SendMessage(lookAtActorMsg)
+		err = m.msgSender.SendMessage(lookAtActorMsg)
 		if err != nil {
 			return actorInfoEnt.Info, err
 		}
@@ -408,7 +405,7 @@ func (m *Memory) GetObjectInfo(objectID uuid.UUID) (commands.ObjectVisibleInfo, 
 		// a message that requires writing to the Memory, it can un-block and then
 		// get around to accepting our callback registration
 		m.lock.RUnlock()
-		m.senderCallbacker.RegisterResponseCallback(msgID, callback)
+		m.intellect.registerResponseCallback(msgID, callback)
 
 		cmd := wsapi.CommandLookAtObject{
 			ObjectID: objectID,
@@ -422,7 +419,7 @@ func (m *Memory) GetObjectInfo(objectID uuid.UUID) (commands.ObjectVisibleInfo, 
 			MessageID: msgID,
 			Payload:   msgPayload,
 		}
-		err = m.senderCallbacker.SendMessage(lookAtObjectMsg)
+		err = m.msgSender.SendMessage(lookAtObjectMsg)
 		if err != nil {
 			return objectInfoEnt.Info, err
 		}

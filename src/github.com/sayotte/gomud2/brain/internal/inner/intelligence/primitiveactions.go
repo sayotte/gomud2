@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-func moveSelf(direction string, senderCallbacker MessageSenderCallbacker) (bool, error) {
+func moveSelf(direction string, msgSender MessageSender, intellect *Intellect) (bool, error) {
 	msgId := uuid2.NewId()
 	waiter := &sync.WaitGroup{}
 	waiter.Add(1)
@@ -19,7 +19,7 @@ func moveSelf(direction string, senderCallbacker MessageSenderCallbacker) (bool,
 		}
 		waiter.Done()
 	}
-	senderCallbacker.RegisterResponseCallback(msgId, callback)
+	intellect.registerResponseCallback(msgId, callback)
 
 	cmd := wsapi.CommandMoveActor{Direction: direction}
 	cmdBytes, err := json.Marshal(cmd)
@@ -32,7 +32,7 @@ func moveSelf(direction string, senderCallbacker MessageSenderCallbacker) (bool,
 		Payload:   cmdBytes,
 	}
 	//startTime := time.Now()
-	err = senderCallbacker.SendMessage(msg)
+	err = msgSender.SendMessage(msg)
 	if err != nil {
 		return false, err
 	}

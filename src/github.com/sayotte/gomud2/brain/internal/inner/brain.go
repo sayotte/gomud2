@@ -3,65 +3,33 @@ package inner
 import (
 	"encoding/json"
 	"fmt"
-	"sync"
-	"time"
-
 	"github.com/gorilla/websocket"
 	"github.com/satori/go.uuid"
+	"github.com/sayotte/gomud2/brain/internal/inner/intelligence"
+	"sync"
 
-	"github.com/sayotte/gomud2/commands"
 	"github.com/sayotte/gomud2/wsapi"
 )
 
-const defaultIncomingMessageQueueSize = 10
-
-type callbackRegistration struct {
-	requestID uuid.UUID
-	callback  func(msg wsapi.Message)
-}
-
-func NewBrain(conn Connection, actorID uuid.UUID, selector UtilitySelector, executor TrivialExecutor) *Brain {
+func NewBrain(conn *websocket.Conn, actorID uuid.UUID, brainType string) *Brain {
 	return &Brain{
-		conn:         conn,
-		ActorID:      actorID,
-		goalSelector: selector,
-		executor:     executor,
+		conn:      Connection{WSConn: conn},
+		actorID:   actorID,
+		brainType: brainType,
 	}
 }
 
 type Brain struct {
-	conn    Connection
-	ActorID uuid.UUID
-	// Increasing this allows lower level buffers to clear some messages before
-	// they're ready to be processed. If it's set low, messages will queue at
-	// lower levels, creating back-pressure and eventually causing the server
-	// to block on writing to its own buffers (eww). If it's set high, messages
-	// will queue on our side, potentially allowing us to get very far behind
-	// the rest of the world but not bringing down the server.
-	// That said, if we get that far behind, we may never recover and eventually
-	// block the server anyway, but the connection between those things may be
-	// less obvious.
-	//
-	// Generally speaking, I have no idea what an ideal value for this is, and
-	// it may not even matter... but it's probably important that the server
-	// side have some robust buffering and possibly even block-detecting logic
-	// which, if necessary, starts dropping messages. Hmm... yes.
-	// FIXME change WSAPI code to drop messages rather than block trying to
-	// FIXME send them, so that the server doesn't end up doing deeply weird
-	// FIXME things just because of a slow-draining client
-	IncomingMessageQueueSize int
+	actorID   uuid.UUID
+	brainType string
 
-	memory *Memory
+	intellect *intelligence.Intellect
 
-	goalSelector UtilitySelector
-	currentGoal  string
-	executor     TrivialExecutor
+	conn Connection
 
-	incomingMessageChan      chan wsapi.Message
-	callbackRegistrationChan chan callbackRegistration
-	callbacksMap             map[uuid.UUID]func(msg wsapi.Message)
-	stopChan                 chan struct{}
-	stopOnce                 *sync.Once
+	stopChan chan struct{}
+	stopOnce *sync.Once
+	stopWG   *sync.WaitGroup
 }
 
 func (b *Brain) Start() error {
@@ -70,48 +38,41 @@ func (b *Brain) Start() error {
 		return err
 	}
 
-	if b.IncomingMessageQueueSize == 0 {
-		b.IncomingMessageQueueSize = defaultIncomingMessageQueueSize
-	}
-	b.incomingMessageChan = make(chan wsapi.Message, b.IncomingMessageQueueSize)
-
-	b.memory = NewMemory(b)
-
-	b.callbackRegistrationChan = make(chan callbackRegistration)
-	b.callbacksMap = make(map[uuid.UUID]func(msg wsapi.Message))
+	b.intellect = intelligence.LoadIntellect(b.brainType, b, b.actorID)
 
 	b.stopChan = make(chan struct{})
 	b.stopOnce = &sync.Once{}
 
-	b.memory.SetLastMovementTime(time.Now())
-
-	go b.lowLevelReadLoop()
-	go b.mainLoop()
-	go b.aiLoop()
+	go b.administrativeLoop()
+	go b.readLoop()
+	b.intellect.Start()
 
 	return nil
 }
 
-func (b *Brain) Shutdown() {
-	fmt.Println("BRAIN DEBUG: Brain.Shutdown():...")
+func (b *Brain) Shutdown(sendCloseMessage bool, closeCode int, closeText string) {
 	b.stopOnce.Do(func() {
-		_ = b.conn.close()
+		fmt.Println("BRAIN DEBUG: Brain.Shutdown():...")
+		b.stopWG = &sync.WaitGroup{}
+		b.stopWG.Add(2)
 		close(b.stopChan)
-	})
-}
+		b.intellect.Stop()
 
-func (b *Brain) stopped() bool {
-	select {
-	case <-b.stopChan:
-		return true
-	default:
-		return false
-	}
+		doFinalShutdown := func() {
+			b.intellect.BlockUntilStopped()
+			if sendCloseMessage {
+				b.conn.sendCloseMessage(closeCode, closeText)
+			}
+			b.stopWG.Wait()
+			_ = b.conn.close()
+		}
+		go doFinalShutdown()
+	})
 }
 
 func (b *Brain) attachActorToConn() error {
 	msgBody := wsapi.CommandAttachActor{
-		ActorID: b.ActorID,
+		ActorID: b.actorID,
 	}
 	bodyBytes, err := json.Marshal(msgBody)
 	if err != nil {
@@ -147,282 +108,57 @@ func (b *Brain) SendMessage(msg wsapi.Message) error {
 	return b.conn.sendMessage(msg)
 }
 
-func (b *Brain) RegisterResponseCallback(requestID uuid.UUID, callback func(msg wsapi.Message)) {
-	b.callbackRegistrationChan <- callbackRegistration{
-		requestID: requestID,
-		callback:  callback,
+func (b *Brain) administrativeLoop() {
+	// This loop/goroutine exists only to catch errors from our Intellect, and
+	// perform shutdown of the readLoop goroutine. Because readLoop() might be
+	// blocked on a receive in the meantime, we need this goroutine to catch
+	// the error and send a websocket "close" message, which will end up
+	// causing our peer to close the connection on their side, which will in
+	// turn allow readLoop() to un-block and shutdown.
+	for {
+		select {
+		case <-b.stopChan:
+			b.stopWG.Done()
+			return
+		case err := <-b.intellect.ErrorChan():
+			fmt.Printf("BRAIN ERROR: from Intellect: %s\n", err)
+			b.Shutdown(true, websocket.CloseInternalServerErr, "")
+			continue
+		}
 	}
 }
 
-func (b *Brain) lowLevelReadLoop() {
+func (b *Brain) readLoop() {
 	for {
-		if b.stopped() {
+		select {
+		case <-b.stopChan:
+			b.stopWG.Done()
 			return
+		default:
 		}
 
 		msgType, rcvdBytes, err := b.conn.getLowlevelMessage()
 		if err != nil {
 			fmt.Printf("BRAIN ERROR: %s\n", err)
-			b.Shutdown()
-			return
-		}
-
-		if msgType == websocket.CloseMessage {
-			b.Shutdown()
-			return
+			b.Shutdown(false, 0, "")
+			continue
 		}
 
 		if msgType != websocket.TextMessage {
 			fmt.Printf("BRAIN ERROR: non-TextMessage from WSAPI, type is %d\n", msgType)
-			b.Shutdown()
-			return
+			b.Shutdown(true, websocket.ClosePolicyViolation, fmt.Sprintf("unhandleable message type %d", msgType))
+			continue
 		}
 
 		var rcvdMsg wsapi.Message
 		err = json.Unmarshal(rcvdBytes, &rcvdMsg)
 		if err != nil {
 			fmt.Printf("BRAIN ERROR: json.Unmarshal(): %s\n", err)
-			b.Shutdown()
-			return
+			b.Shutdown(true, websocket.CloseInternalServerErr, "")
+			continue
 		}
-		b.incomingMessageChan <- rcvdMsg
+		b.intellect.HandleMessage(rcvdMsg)
 	}
-}
-
-func (b *Brain) mainLoop() {
-	for {
-		select {
-		case <-b.stopChan:
-			return
-		case msg := <-b.incomingMessageChan:
-			b.handleMessage(msg)
-		case registration := <-b.callbackRegistrationChan:
-			b.callbacksMap[registration.requestID] = registration.callback
-			//for id := range b.callbacksMap {
-			//	fmt.Printf("BRAIN DEBUG: callback registered for %q\n", id)
-			//}
-		}
-	}
-}
-
-func (b *Brain) handleMessage(msg wsapi.Message) {
-	//fmt.Printf("BRAIN DEBUG: handling message of type %q\n", msg.Type)
-	switch msg.Type {
-	case wsapi.MessageTypeCurrentLocationInfoComplete:
-		b.handleCurrentLocInfoMessage(msg)
-	case wsapi.MessageTypeLookAtOtherActorComplete:
-		b.handleLookAtOtherActorMessage(msg)
-	case wsapi.MessageTypeLookAtObjectComplete:
-		b.handleLookAtObjectMessage(msg)
-	case wsapi.MessageTypeEvent:
-		b.handleEventMessage(msg)
-	default:
-		//fmt.Printf("BRAIN WARNING: Brain received message of type %q, no idea what to do with it\n", msg.Type)
-	}
-	callback, found := b.callbacksMap[msg.MessageID]
-	if found {
-		callback(msg)
-		delete(b.callbacksMap, msg.MessageID)
-	}
-}
-
-func (b *Brain) handleCurrentLocInfoMessage(msg wsapi.Message) {
-	fmt.Println("BRAIN DEBUG: handleCurrentLocInfoMessage(): ...")
-	var locInfo commands.LocationInfo
-	err := json.Unmarshal(msg.Payload, &locInfo)
-	if err != nil {
-		fmt.Printf("BRAIN ERROR: json.Unmarshal(locInfo): %s\n", err)
-		return
-	}
-
-	b.memory.SetLocationInfo(locInfo)
-	b.memory.SetCurrentZoneAndLocationID(locInfo.ZoneID, locInfo.ID)
-}
-
-func (b *Brain) handleLookAtOtherActorMessage(msg wsapi.Message) {
-	fmt.Println("BRAIN DEBUG: handleLookAtOtherActorMessage(): ...")
-	var actorInfo commands.ActorVisibleInfo
-	err := json.Unmarshal(msg.Payload, &actorInfo)
-	if err != nil {
-		fmt.Printf("BRAIN ERROR: json.Unmarshal(actorInfo): %s\n", err)
-		return
-	}
-
-	b.memory.SetActorInfo(actorInfo)
-}
-
-func (b *Brain) handleLookAtObjectMessage(msg wsapi.Message) {
-	fmt.Println("BRAIN DEBUG: handleLookAtObjectMessage(): ...")
-	var objectInfo commands.ObjectVisibleInfo
-	err := json.Unmarshal(msg.Payload, &objectInfo)
-	if err != nil {
-		fmt.Printf("BRAIN ERROR: json.Unmarshal(objectInfo): %s\n", err)
-		return
-	}
-
-	b.memory.SetObjectInfo(objectInfo)
-}
-
-func (b *Brain) handleEventMessage(msg wsapi.Message) {
-	var eventEnvelope wsapi.Event
-	err := json.Unmarshal(msg.Payload, &eventEnvelope)
-	if err != nil {
-		fmt.Printf("BRAIN ERROR: json.Unmarshal(eventEnvelope): %s\n", err)
-		return
-	}
-
-	fmt.Printf("BRAIN DEBUG: event type is %q\n", eventEnvelope.EventType)
-
-	switch eventEnvelope.EventType {
-	case wsapi.EventTypeActorMove:
-		var e wsapi.ActorMoveEventBody
-		err = json.Unmarshal(eventEnvelope.Body, &e)
-		if err != nil {
-			fmt.Printf("BRAIN ERROR: json.Unmarshal(ActorMoveEventBody): %s\n", err)
-			return
-		}
-		b.handleActorMoveEvent(e, eventEnvelope.ZoneID)
-	case wsapi.EventTypeActorDeath:
-		var e wsapi.ActorDeathEventBody
-		err = json.Unmarshal(eventEnvelope.Body, &e)
-		if err != nil {
-			fmt.Printf("BRAIN ERROR: json.Unmarshal(ActorDeathEventBody): %s\n", err)
-			return
-		}
-	case wsapi.EventTypeActorMigrateIn:
-		var e wsapi.ActorMigrateInEventBody
-		err = json.Unmarshal(eventEnvelope.Body, &e)
-		if err != nil {
-			fmt.Printf("BRAIN ERROR: json.Unmarshal(ActorMigrateInEventBody): %s\n", err)
-			return
-		}
-		b.handleActorMigrateInEvent(e, eventEnvelope.ZoneID)
-	case wsapi.EventTypeActorMigrateOut:
-		var e wsapi.ActorMigrateOutEventBody
-		err = json.Unmarshal(eventEnvelope.Body, &e)
-		if err != nil {
-			fmt.Printf("BRAIN ERROR: json.Unmarshal(ActorMigrateOutEventBody): %s\n", err)
-			return
-		}
-		b.handleActorMigrateOutEvent(e, eventEnvelope.ZoneID)
-	case wsapi.EventTypeCombatMeleeDamage:
-		var e wsapi.CombatMeleeDamageEventBody
-		err = json.Unmarshal(eventEnvelope.Body, &e)
-		if err != nil {
-			fmt.Printf("BRAIN ERROR: json.Unmarshal(EventTypeCombatMeleeDamage): %s\n", err)
-			return
-		}
-		b.handleCombatMeleeDamageEvent(e)
-	default:
-		//fmt.Printf("BRAIN DEBUG: Brain received event of type %q, no idea what to do with it\n", eventEnvelope.EventType)
-	}
-}
-
-func (b *Brain) handleActorMoveEvent(e wsapi.ActorMoveEventBody, zoneID uuid.UUID) {
-	if uuid.Equal(e.ActorID, b.ActorID) {
-		// we moved to a new location
-		b.memory.SetLastMovementTime(time.Now())
-		b.memory.SetCurrentZoneAndLocationID(zoneID, e.ToLocationID)
-		b.memory.ClearLocationInfo()
-	} else {
-		_, currentLocID := b.memory.GetCurrentZoneAndLocationID()
-		switch {
-		case uuid.Equal(currentLocID, e.FromLocationID):
-			// someone left our location
-			b.memory.RemoveActorFromLocation(zoneID, e.ToLocationID, e.ActorID)
-		case uuid.Equal(currentLocID, e.ToLocationID):
-			// someone arrived at our location
-			b.memory.AddActorToLocation(zoneID, e.ToLocationID, e.ActorID)
-		}
-	}
-}
-
-func (b *Brain) handleActorDeathEvent(e wsapi.ActorDeathEventBody, zoneID uuid.UUID) {
-	// check: did we die?
-	if uuid.Equal(e.ActorID, b.ActorID) {
-		fmt.Println("BRAIN INFO: our Actor died, shutting down")
-		b.Shutdown()
-		return
-	}
-	// else someone else died
-	_, currentLocID := b.memory.GetCurrentZoneAndLocationID()
-	b.memory.RemoveActorFromLocation(zoneID, currentLocID, e.ActorID)
-}
-
-func (b *Brain) handleActorMigrateInEvent(e wsapi.ActorMigrateInEventBody, zoneID uuid.UUID) {
-	if uuid.Equal(e.ActorID, b.ActorID) {
-		// we migrated to a new zone/location
-		// we moved to a new location
-		b.memory.SetLastMovementTime(time.Now())
-		b.memory.SetCurrentZoneAndLocationID(zoneID, e.ToLocID)
-		b.memory.ClearLocationInfo()
-	} else {
-		// someone migrated in to our location
-		b.memory.AddActorToLocation(zoneID, e.ToLocID, e.ActorID)
-	}
-}
-
-func (b *Brain) handleActorMigrateOutEvent(e wsapi.ActorMigrateOutEventBody, zoneID uuid.UUID) {
-	if uuid.Equal(e.ActorID, b.ActorID) {
-		// this is weird... we shouldn't witness our own migrate-out event
-		fmt.Println("BRAIN WARNING: seeing our own ActorMigrateOutEvent?")
-		return
-	}
-	// someone migrated out of our location
-	b.memory.RemoveActorFromLocation(zoneID, e.FromLocID, e.ActorID)
-}
-
-func (b *Brain) handleCombatMeleeDamageEvent(e wsapi.CombatMeleeDamageEventBody) {
-	if uuid.Equal(e.TargetID, b.ActorID) {
-		b.memory.SetLastAttackedTime(time.Now())
-		b.memory.SetLastAttacker(ActorIDTyp(e.AttackerID))
-	}
-}
-
-func (b *Brain) aiLoop() {
-	minDurationBetweenRuns := time.Millisecond * 2000
-
-	ticker := time.NewTicker(minDurationBetweenRuns)
-
-	for {
-		if b.stopped() {
-			ticker.Stop()
-			return
-		}
-
-		//b.memory.lock.RLock()
-		//fmt.Println("\n\nDUMPING MEMORY")
-		//memKeys := make([]string, 0, len(b.memory.localStore))
-		//for k := range b.memory.localStore {
-		//	memKeys = append(memKeys, k)
-		//}
-		//sort.Strings(memKeys)
-		//for _, k := range memKeys {
-		//	v := b.memory.localStore[k]
-		//	fmt.Printf("==%s==\n", k)
-		//	b, _ := json.MarshalIndent(v, "  ", "  ")
-		//	fmt.Println(string(b))
-		//}
-		//b.memory.lock.RUnlock()
-
-		//fmt.Println("BRAIN DEBUG: doing AI stuff!")
-		//start := time.Now()
-		b.doAI()
-		//runtime := time.Now().Sub(start)
-		//fmt.Printf("BRAIN DEBUG: --- did AI stuff in %s ---\n", runtime)
-
-		<-ticker.C
-	}
-}
-
-func (b *Brain) doAI() {
-	newGoal := b.goalSelector.selectGoal(b.memory)
-	if newGoal != b.currentGoal {
-		fmt.Printf("BRAIN DEBUG: ===== switching goal from %q -> %q =====\n", b.currentGoal, newGoal)
-		b.currentGoal = newGoal
-	}
-
-	b.executor.executeGoal(newGoal, b, b.memory)
 }
 
 /* invocation timing thoughts:

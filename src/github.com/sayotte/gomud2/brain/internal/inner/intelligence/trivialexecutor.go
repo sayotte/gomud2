@@ -6,18 +6,18 @@ import (
 
 type TrivialExecutor struct{}
 
-func (te TrivialExecutor) executeGoal(goalName string, senderCallbacker MessageSenderCallbacker, memory *Memory) {
+func (te TrivialExecutor) executeGoal(goalName string, msgSender MessageSender, intellect *Intellect, memory *Memory) {
 	switch goalName {
 	case "do-nothing":
 		return
 	case "move-to-emptier-location":
-		te.moveToAnyLocation(senderCallbacker, memory)
+		te.moveToAnyLocation(msgSender, intellect, memory)
 	default:
 		fmt.Printf("BRAIN WARNING: don't know how to execute goal %q\n", goalName)
 	}
 }
 
-func (te TrivialExecutor) moveToAnyLocation(senderCallbacker MessageSenderCallbacker, memory *Memory) {
+func (te TrivialExecutor) moveToAnyLocation(msgSender MessageSender, intellect *Intellect, memory *Memory) {
 	//fmt.Println("BRAIN DEBUG: trying to move to *any* other location")
 
 	currentZoneID, currentLocID := memory.GetCurrentZoneAndLocationID()
@@ -27,7 +27,7 @@ func (te TrivialExecutor) moveToAnyLocation(senderCallbacker MessageSenderCallba
 		return
 	}
 	for k := range locInfo.Exits {
-		success, err := moveSelf(k, senderCallbacker)
+		success, err := moveSelf(k, msgSender, intellect)
 		if err != nil {
 			fmt.Printf("BRAIN ERROR: %s\n", err)
 			return
