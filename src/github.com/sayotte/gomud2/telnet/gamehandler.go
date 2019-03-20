@@ -103,6 +103,10 @@ func (gh *gameHandler) handleEvent(e core.Event, terminalWidth, terminalHeight i
 		typedE := e.(*core.CombatDodgeEvent)
 		out, err := gh.handleEventCombatDodge(terminalWidth, typedE)
 		return out, gh, err
+	case core.EventTypeActorSpeak:
+		typedE := e.(*core.ActorSpeakEvent)
+		out := gh.handleEventActorSpeak(terminalWidth, typedE)
+		return out, gh, nil
 	default:
 		return []byte(fmt.Sprintf("session: observed event of type %T\n", e)), gh, nil
 	}
@@ -427,6 +431,18 @@ func (gh *gameHandler) handleEventCombatDodge(terminalWidth int, e *core.CombatD
 
 	out := fmt.Sprintf("%s dodges %s %s.\n", targetName, attackerName, e.DamageType)
 	return []byte(wordwrap.WrapString(out, uint(terminalWidth))), nil
+}
+
+func (gh *gameHandler) handleEventActorSpeak(terminalWidth int, e *core.ActorSpeakEvent) []byte {
+	var preamble string
+	if uuid.Equal(e.ActorID, gh.actor.ID()) {
+		preamble = "You say"
+	} else {
+		preamble = fmt.Sprintf("%s says", e.ActorName)
+	}
+	line := fmt.Sprintf("%s %q.\n", preamble, e.Speech)
+	out := wordwrap.WrapString(line, uint(terminalWidth))
+	return []byte(out)
 }
 
 func (gh *gameHandler) getTakeHandler() gameHandlerCommandHandler {
