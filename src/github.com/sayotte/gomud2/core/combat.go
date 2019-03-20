@@ -82,9 +82,9 @@ func (cmc combatMeleeCommand) doSlash() ([]Event, error) {
 	totalDmg := scaledBaseDmg + physBonus + focBonus
 
 	// distribute damage 3:1:1 over phys:stam:focus
-	physDmg := int(math.Round(totalDmg * 0.60))
-	stamDmg := int(math.Round(totalDmg * 0.20))
-	focDmg := int(math.Round(totalDmg * 0.20))
+	physDmg := int(math.Ceil(totalDmg * 0.60))
+	stamDmg := int(math.Ceil(totalDmg * 0.20))
+	focDmg := int(math.Ceil(totalDmg * 0.20))
 
 	damageEvent := NewCombatMeleeDamageEvent(
 		CombatMeleeDamageTypeSlash,
