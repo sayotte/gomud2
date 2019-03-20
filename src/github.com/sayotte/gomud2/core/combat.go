@@ -54,6 +54,8 @@ func (cmc combatMeleeCommand) Do() ([]Event, error) {
 	switch cmc.damageType {
 	case CombatMeleeDamageTypeSlash:
 		return cmc.doSlash()
+	case CombatMeleeDamageTypeBite:
+		return cmc.doBite()
 	default:
 		return nil, fmt.Errorf("don't know how to compute damage type %q", cmc.damageType)
 	}
@@ -89,6 +91,45 @@ func (cmc combatMeleeCommand) doSlash() ([]Event, error) {
 
 	damageEvent := NewCombatMeleeDamageEvent(
 		CombatMeleeDamageTypeSlash,
+		cmc.attacker.ID(),
+		cmc.target.ID(),
+		cmc.attacker.Zone().ID(),
+		cmc.attacker.Name(),
+		cmc.target.Name(),
+		physDmg,
+		stamDmg,
+		focDmg,
+	)
+
+	return cmc.addDeathEventIfNeeded(damageEvent), nil
+}
+
+func (cmc combatMeleeCommand) doBite() ([]Event, error) {
+	if cmc.checkDodge(cmc.attacker.Skills().Biting, cmc.target) {
+		dodgeEvent := NewCombatDodgeEvent(
+			CombatMeleeDamageTypeBite,
+			cmc.attacker.Name(),
+			cmc.target.Name(),
+			cmc.attacker.ID(),
+			cmc.target.ID(),
+			cmc.attacker.Zone().ID(),
+		)
+		return []Event{dodgeEvent}, nil
+	}
+
+	// calculate damage after bonuses etc.
+	minBaseDmg := cmc.attacker.Attributes().NaturalBiteMin
+	maxBaseDmg := cmc.attacker.Attributes().NaturalBiteMax
+	baseDmgRange := maxBaseDmg - minBaseDmg
+	totalDmg := (rollFloat64(cmc.attacker.Zone().Rand()) * baseDmgRange) + minBaseDmg
+
+	// distribute damage 3:1:1 over phys:stam:focus
+	physDmg := int(math.Ceil(totalDmg * 0.60))
+	stamDmg := int(math.Ceil(totalDmg * 0.20))
+	focDmg := int(math.Ceil(totalDmg * 0.20))
+
+	damageEvent := NewCombatMeleeDamageEvent(
+		CombatMeleeDamageTypeBite,
 		cmc.attacker.ID(),
 		cmc.target.ID(),
 		cmc.attacker.Zone().ID(),

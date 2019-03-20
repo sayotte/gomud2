@@ -211,10 +211,15 @@ func (a *Actor) AdminRelocate(to *Location) error {
 }
 
 func (a *Actor) Slash(target *Actor) error {
-	//if target.Location() != a.location {
-	//	return fmt.Errorf("target not in same Location")
-	//}
-	dmgCmd := newCombatMeleeCommand(a, target, CombatMeleeDamageTypeSlash)
+	return a.meleeGeneric(target, CombatMeleeDamageTypeSlash)
+}
+
+func (a *Actor) Bite(target *Actor) error {
+	return a.meleeGeneric(target, CombatMeleeDamageTypeBite)
+}
+
+func (a *Actor) meleeGeneric(target *Actor, dmgType string) error {
+	dmgCmd := newCombatMeleeCommand(a, target, dmgType)
 	_, err := a.syncRequestToZone(dmgCmd)
 	return err
 }
