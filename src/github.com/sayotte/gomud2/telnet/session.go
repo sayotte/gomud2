@@ -34,6 +34,7 @@ func (s *session) SendEvent(e core.Event) {
 	case s.eventChan <- e:
 	default:
 		fmt.Println("TELNET ERROR: handler event-queue overflowed, terminating connection\n")
+		s.currentHandler.deinit()
 		// FIXME this kill-message is never seen by the client
 		s.bufferedConn.Send([]byte("Whoops, couldn't keep up with the noise!\n"))
 		s.Stop()
