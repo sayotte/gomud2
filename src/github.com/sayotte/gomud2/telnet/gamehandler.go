@@ -41,6 +41,7 @@ func (gh *gameHandler) init(terminalWidth, terminalHeight int) []byte {
 	gh.cmdTrie.Add("kill", gh.getKillHandler())
 	gh.cmdTrie.Add("wear", gh.getWearHandler())
 	gh.cmdTrie.Add("remove", gh.getRemoveHandler())
+	gh.cmdTrie.Add("say", gh.getSayHandler())
 
 	gh.cmdTrie.Add(core.ExitDirectionNorth, gameHandlerCommandHandler(func(line string, terminalWidth int) ([]byte, error) {
 		return gh.handleCommandMoveGeneric(terminalWidth, core.ExitDirectionNorth)
@@ -730,6 +731,16 @@ func (gh *gameHandler) getRemoveHandler() gameHandlerCommandHandler {
 			return []byte("Whoops..."), err
 		}
 
+		return nil, nil
+	}
+}
+
+func (gh *gameHandler) getSayHandler() gameHandlerCommandHandler {
+	return func(line string, terminalWidth int) ([]byte, error) {
+		err := gh.actor.Speak(line)
+		if err != nil {
+			return []byte("Whoops..."), err
+		}
 		return nil, nil
 	}
 }
