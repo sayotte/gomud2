@@ -51,6 +51,10 @@ type combatMeleeCommand struct {
 }
 
 func (cmc combatMeleeCommand) Do() ([]Event, error) {
+	if cmc.attacker.Location() != cmc.target.Location() {
+		return nil, errors.New("attacker and target not in the same Location")
+	}
+
 	switch cmc.damageType {
 	case CombatMeleeDamageTypeSlash:
 		return cmc.doSlash()
