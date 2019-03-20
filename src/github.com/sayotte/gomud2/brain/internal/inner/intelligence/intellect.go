@@ -16,20 +16,14 @@ func LoadIntellect(brainType string, msgSender MessageSender, actorID uuid.UUID)
 	return &Intellect{
 		actorID:   actorID,
 		msgSender: msgSender,
-		// FIXME we should be using "brainType" to create our brain, rather than
-		// FIXME statically always setting up exactly the same one
-		goalSelector: getStockUtilitySelector(),
 	}
 }
 
 type Intellect struct {
 	actorID uuid.UUID
 
-	memory *Memory
-
-	goalSelector UtilitySelector
-	currentGoal  string
-	executor     TrivialExecutor
+	memory  *Memory
+	planner *planner
 
 	msgSender MessageSender
 
@@ -45,6 +39,13 @@ type Intellect struct {
 func (i *Intellect) Start() {
 	i.memory = NewMemory(i.msgSender, i)
 	i.memory.SetLastMovementTime(time.Now())
+
+	i.planner = &planner{
+		actorID:         i.actorID,
+		memory:          i.memory,
+		goalSelector:    getStockUtilitySelector(),
+		minTimeToRegoal: time.Second / 8,
+	}
 
 	i.callbacksMap = make(map[uuid.UUID]func(msg wsapi.Message))
 	i.callbacksMapMutex = &sync.Mutex{}
@@ -284,6 +285,13 @@ func (i *Intellect) aiLoop() {
 
 	ticker := time.NewTicker(minDurationBetweenRuns)
 
+	var plan executionPlan
+	// set initial non-nil value for executionPlan to avoid a panic
+	plan = &trivialPlan{
+		goalName: "initial-plan",
+		memory:   i.memory,
+	}
+
 	for {
 		select {
 		case <-i.stopChan:
@@ -292,32 +300,8 @@ func (i *Intellect) aiLoop() {
 		default:
 		}
 
-		//i.memory.lock.RLock()
-		//fmt.Println("\n\nDUMPING MEMORY")
-		//memKeys := make([]string, 0, len(i.memory.localStore))
-		//for k := range i.memory.localStore {
-		//	memKeys = append(memKeys, k)
-		//}
-		//sort.Strings(memKeys)
-		//for _, k := range memKeys {
-		//	v := i.memory.localStore[k]
-		//	fmt.Printf("==%s==\n", k)
-		//	i, _ := json.MarshalIndent(v, "  ", "  ")
-		//	fmt.Println(string(i))
-		//}
-		//i.memory.lock.RUnlock()
-
-		//fmt.Println("BRAIN DEBUG: doing AI stuff!")
-		//start := time.Now()
-		newGoal := i.goalSelector.selectGoal(i.memory)
-		if newGoal != i.currentGoal {
-			fmt.Printf("BRAIN DEBUG: ===== switching goal from %q -> %q =====\n", i.currentGoal, newGoal)
-			i.currentGoal = newGoal
-		}
-
-		i.executor.executeGoal(newGoal, i.msgSender, i, i.memory)
-		//runtime := time.Now().Sub(start)
-		//fmt.Printf("BRAIN DEBUG: --- did AI stuff in %s ---\n", runtime)
+		plan := i.planner.generatePlan(plan)
+		plan.executeStep(i.msgSender, i)
 
 		<-ticker.C
 	}
