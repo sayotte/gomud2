@@ -10,6 +10,7 @@ type combatMeleeDamageEvent struct {
 	DamageType                        string
 	AttackerID                        uuid.UUID
 	TargetID                          uuid.UUID
+	AttackerName, TargetName          string
 	PhysicalDmg, StaminaDmg, FocusDmg int
 }
 
@@ -19,6 +20,8 @@ func (cmde combatMeleeDamageEvent) ToDomain() core.Event {
 		cmde.AttackerID,
 		cmde.TargetID,
 		cmde.header.AggregateId,
+		cmde.AttackerName,
+		cmde.TargetName,
 		cmde.PhysicalDmg,
 		cmde.StaminaDmg,
 		cmde.FocusDmg,

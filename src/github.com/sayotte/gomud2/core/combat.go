@@ -60,7 +60,7 @@ func (cmc combatMeleeCommand) Do() ([]Event, error) {
 
 func (cmc combatMeleeCommand) doSlash() ([]Event, error) {
 	if cmc.checkDodge(cmc.attacker.Skills().Slashing, cmc.target) {
-		dodgeEvent := NewCombatDodgeEvent(CombatMeleeDamageTypeSlash, cmc.attacker.ID(), cmc.target.ID(), cmc.attacker.Zone().ID())
+		dodgeEvent := NewCombatDodgeEvent(CombatMeleeDamageTypeSlash, cmc.attacker.Name(), cmc.target.Name(), cmc.attacker.ID(), cmc.target.ID(), cmc.attacker.Zone().ID())
 		return []Event{dodgeEvent}, nil
 	}
 
@@ -91,6 +91,8 @@ func (cmc combatMeleeCommand) doSlash() ([]Event, error) {
 		cmc.attacker.ID(),
 		cmc.target.ID(),
 		cmc.attacker.Zone().ID(),
+		cmc.attacker.Name(),
+		cmc.target.Name(),
 		physDmg,
 		stamDmg,
 		focDmg,
@@ -143,7 +145,7 @@ func (cmc combatMeleeCommand) checkDodge(attackSkill float64, defender *Actor) b
 	return false
 }
 
-func NewCombatMeleeDamageEvent(dmgTyp string, attackerID, targetID, zoneID uuid.UUID, physDmg, stamDmg, focDmg int) *CombatMeleeDamageEvent {
+func NewCombatMeleeDamageEvent(dmgTyp string, attackerID, targetID, zoneID uuid.UUID, attackerName, targetName string, physDmg, stamDmg, focDmg int) *CombatMeleeDamageEvent {
 	return &CombatMeleeDamageEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeCombatMeleeDamage,
@@ -152,12 +154,14 @@ func NewCombatMeleeDamageEvent(dmgTyp string, attackerID, targetID, zoneID uuid.
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,
 		},
-		DamageType:  dmgTyp,
-		AttackerID:  attackerID,
-		TargetID:    targetID,
-		PhysicalDmg: physDmg,
-		StaminaDmg:  stamDmg,
-		FocusDmg:    focDmg,
+		DamageType:   dmgTyp,
+		AttackerID:   attackerID,
+		TargetID:     targetID,
+		AttackerName: attackerName,
+		TargetName:   targetName,
+		PhysicalDmg:  physDmg,
+		StaminaDmg:   stamDmg,
+		FocusDmg:     focDmg,
 	}
 }
 
@@ -166,10 +170,11 @@ type CombatMeleeDamageEvent struct {
 	DamageType                        string
 	AttackerID                        uuid.UUID
 	TargetID                          uuid.UUID
+	AttackerName, TargetName          string
 	PhysicalDmg, StaminaDmg, FocusDmg int
 }
 
-func NewCombatDodgeEvent(dmgType string, attackerID, targetID, zoneID uuid.UUID) *CombatDodgeEvent {
+func NewCombatDodgeEvent(dmgType, attackerName, targetName string, attackerID, targetID, zoneID uuid.UUID) *CombatDodgeEvent {
 	return &CombatDodgeEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeCombatDodge,
@@ -178,15 +183,18 @@ func NewCombatDodgeEvent(dmgType string, attackerID, targetID, zoneID uuid.UUID)
 			AggregateID:       zoneID,
 			ShouldPersistBool: false,
 		},
-		DamageType: dmgType,
-		AttackerID: attackerID,
-		TargetID:   targetID,
+		DamageType:   dmgType,
+		AttackerName: attackerName,
+		TargetName:   targetName,
+		AttackerID:   attackerID,
+		TargetID:     targetID,
 	}
 }
 
 type CombatDodgeEvent struct {
 	*eventGeneric
-	DamageType string
-	AttackerID uuid.UUID
-	TargetID   uuid.UUID
+	DamageType               string
+	AttackerID               uuid.UUID
+	TargetID                 uuid.UUID
+	AttackerName, TargetName string
 }
