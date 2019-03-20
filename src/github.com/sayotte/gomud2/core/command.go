@@ -12,6 +12,7 @@ const (
 	CommandTypeActorDeath
 	CommandTypeActorMigrateIn
 	CommandTypeActorMigrateOut
+	CommandTypeActorSpeak
 	CommandTypeLocationAddToZone
 	CommandTypeLocationUpdate
 	CommandTypeLocationRemoveFromZone
