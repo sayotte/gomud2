@@ -206,6 +206,22 @@ func (i *Intellect) handleEventMessage(msg wsapi.Message) {
 			return
 		}
 		i.handleActorMigrateOutEvent(e, eventEnvelope.ZoneID)
+	case wsapi.EventTypeObjectAddToZone:
+		var e wsapi.ObjectAddToZoneEventBody
+		err = json.Unmarshal(eventEnvelope.Body, &e)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(ObjectAddToZoneEventBody): %s\n", err)
+			return
+		}
+		i.handleObjectAddToZoneEvent(e, eventEnvelope.ZoneID)
+	case wsapi.EventTypeObjectMove:
+		var e wsapi.ObjectMoveEventBody
+		err = json.Unmarshal(eventEnvelope.Body, &e)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(ObjectMoveEventBody): %s\n", err)
+			return
+		}
+		i.handleObjectMoveEvent(e, eventEnvelope.ZoneID)
 	case wsapi.EventTypeCombatMeleeDamage:
 		var e wsapi.CombatMeleeDamageEventBody
 		err = json.Unmarshal(eventEnvelope.Body, &e)
@@ -271,6 +287,41 @@ func (i *Intellect) handleActorMigrateOutEvent(e wsapi.ActorMigrateOutEventBody,
 	}
 	// someone migrated out of our location
 	i.memory.RemoveActorFromLocation(zoneID, e.FromLocID, e.ActorID)
+}
+
+func (i *Intellect) handleObjectAddToZoneEvent(e wsapi.ObjectAddToZoneEventBody, zoneID uuid.UUID) {
+	// Actual object info can't be safely pulled from this goroutine, since
+	// we'll end up blocking waiting for a callback from ourselves. It will
+	// be pulled just-in-time when it's needed anyway.
+
+	switch {
+	case !uuid.Equal(e.LocationContainerID, uuid.Nil):
+		i.memory.AddObjectToLocation(zoneID, e.LocationContainerID, e.ObjectID)
+	case !uuid.Equal(e.ActorContainerID, uuid.Nil):
+		// FIXME implement ActorVisibleInfo inventory
+	case !uuid.Equal(e.ObjectContainerID, uuid.Nil):
+		i.memory.AddObjectToObject(e.ObjectID, e.ObjectContainerID)
+	}
+}
+
+func (i *Intellect) handleObjectMoveEvent(e wsapi.ObjectMoveEventBody, zoneID uuid.UUID) {
+	switch {
+	case !uuid.Equal(e.FromLocationContainerID, uuid.Nil):
+		i.memory.RemoveObjectFromLocation(zoneID, e.FromLocationContainerID, e.ObjectID)
+	case !uuid.Equal(e.FromActorContainerID, uuid.Nil):
+		// FIXME implement ActorVisibleInfo inventory
+	case !uuid.Equal(e.FromObjectContainerID, uuid.Nil):
+		i.memory.RemoveObjectFromObject(e.ObjectID, e.FromObjectContainerID)
+	}
+
+	switch {
+	case !uuid.Equal(e.ToLocationContainerID, uuid.Nil):
+		i.memory.AddObjectToLocation(zoneID, e.ToLocationContainerID, e.ObjectID)
+	case !uuid.Equal(e.ToActorContainerID, uuid.Nil):
+		// FIXME implement ActorVisibleInfo inventory
+	case !uuid.Equal(e.ToObjectContainerID, uuid.Nil):
+		i.memory.AddObjectToObject(e.ObjectID, e.ToObjectContainerID)
+	}
 }
 
 func (i *Intellect) handleCombatMeleeDamageEvent(e wsapi.CombatMeleeDamageEventBody) {

@@ -262,6 +262,54 @@ func (m *Memory) AddActorToLocation(zoneID, locID, actorID uuid.UUID) {
 	m.localStore[memoryZoneLocInfoMap] = jsonZoneInfoMap(fullMap)
 }
 
+func (m *Memory) RemoveObjectFromLocation(zoneID, locID, objectID uuid.UUID) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	val, found := m.localStore[memoryZoneLocInfoMap]
+	if !found {
+		return
+	}
+	fullMap := map[uuid.UUID]map[uuid.UUID]locInfoEntry(val.(jsonZoneInfoMap))
+	zoneSubMap, found := fullMap[zoneID]
+	if !found {
+		return
+	}
+	entry, found := zoneSubMap[locID]
+	if !found {
+		return
+	}
+	entry.Info.Objects = uuid2.UUIDList(entry.Info.Objects).Remove(objectID)
+
+	zoneSubMap[locID] = entry
+	fullMap[zoneID] = zoneSubMap
+	m.localStore[memoryZoneLocInfoMap] = jsonZoneInfoMap(fullMap)
+}
+
+func (m *Memory) AddObjectToLocation(zoneID, locID, objectID uuid.UUID) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	val, found := m.localStore[memoryZoneLocInfoMap]
+	if !found {
+		return
+	}
+	fullMap := map[uuid.UUID]map[uuid.UUID]locInfoEntry(val.(jsonZoneInfoMap))
+	zoneSubMap, found := fullMap[zoneID]
+	if !found {
+		return
+	}
+	entry, found := zoneSubMap[locID]
+	if !found {
+		return
+	}
+	entry.Info.Objects = append(entry.Info.Objects, objectID)
+
+	zoneSubMap[locID] = entry
+	fullMap[zoneID] = zoneSubMap
+	m.localStore[memoryZoneLocInfoMap] = jsonZoneInfoMap(fullMap)
+}
+
 // Actor data
 
 func (m *Memory) GetActorInfo(actorID uuid.UUID) (commands.ActorVisibleInfo, error) {
@@ -427,6 +475,50 @@ func (m *Memory) GetObjectInfo(objectID uuid.UUID) (commands.ObjectVisibleInfo, 
 	}
 
 	return objectInfoEnt.Info, err
+}
+
+func (m *Memory) RemoveObjectFromObject(objectID, fromObjID uuid.UUID) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	val, found := m.localStore[memoryObjectInfoMap]
+	if !found {
+		return
+	}
+	infoMap := val.(objectInfoMap)
+
+	objectInfoEnt, found := infoMap[objectIDTyp(fromObjID)]
+	if !found {
+		return
+	}
+
+	objList := objectInfoEnt.Info.ContainedObjects
+	objList = uuid2.UUIDList(objList).Remove(objectID)
+
+	objectInfoEnt.Info.ContainedObjects = objList
+	infoMap[objectIDTyp(fromObjID)] = objectInfoEnt
+}
+
+func (m *Memory) AddObjectToObject(objectID, toObjID uuid.UUID) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	val, found := m.localStore[memoryObjectInfoMap]
+	if !found {
+		return
+	}
+	infoMap := val.(objectInfoMap)
+
+	objectInfoEnt, found := infoMap[objectIDTyp(toObjID)]
+	if !found {
+		return
+	}
+
+	objList := objectInfoEnt.Info.ContainedObjects
+	objList = uuid2.UUIDList(objList).Remove(objectID)
+
+	objectInfoEnt.Info.ContainedObjects = objList
+	infoMap[objectIDTyp(toObjID)] = objectInfoEnt
 }
 
 // Derived queries
