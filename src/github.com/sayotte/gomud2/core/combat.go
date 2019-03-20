@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"github.com/satori/go.uuid"
 	"math"
@@ -98,19 +99,7 @@ func (cmc combatMeleeCommand) doSlash() ([]Event, error) {
 		focDmg,
 	)
 
-	outEvents := []Event{damageEvent}
-
-	switch {
-	case cmc.target.attributes.Physical-damageEvent.PhysicalDmg <= 0:
-		fallthrough
-	case cmc.target.attributes.Stamina-damageEvent.StaminaDmg <= 0:
-		fallthrough
-	case cmc.target.attributes.Focus-damageEvent.FocusDmg <= 0:
-		deathEvents := doActorDeath(cmc.target, cmc.target.Zone())
-		outEvents = append(outEvents, deathEvents...)
-	}
-
-	return outEvents, nil
+	return cmc.addDeathEventIfNeeded(damageEvent), nil
 }
 
 func (cmc combatMeleeCommand) checkDodge(attackSkill float64, defender *Actor) bool {
@@ -143,6 +132,22 @@ func (cmc combatMeleeCommand) checkDodge(attackSkill float64, defender *Actor) b
 		}
 	}
 	return false
+}
+
+func (cmc combatMeleeCommand) addDeathEventIfNeeded(damageEvent *CombatMeleeDamageEvent) []Event {
+	outEvents := []Event{damageEvent}
+
+	switch {
+	case cmc.target.attributes.Physical-damageEvent.PhysicalDmg <= 0:
+		fallthrough
+	case cmc.target.attributes.Stamina-damageEvent.StaminaDmg <= 0:
+		fallthrough
+	case cmc.target.attributes.Focus-damageEvent.FocusDmg <= 0:
+		deathEvents := doActorDeath(cmc.target, cmc.target.Zone())
+		outEvents = append(outEvents, deathEvents...)
+	}
+
+	return outEvents
 }
 
 func NewCombatMeleeDamageEvent(dmgTyp string, attackerID, targetID, zoneID uuid.UUID, attackerName, targetName string, physDmg, stamDmg, focDmg int) *CombatMeleeDamageEvent {
