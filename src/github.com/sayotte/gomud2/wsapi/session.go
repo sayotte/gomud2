@@ -241,6 +241,8 @@ func (s *session) handleMessage(msg Message) {
 		s.handleCommandLookAtOtherActor(msg)
 	case MessageTypeLookAtObjectCommand:
 		s.handleCommandLookAtObject(msg)
+	case MessageTypeMoveObjectCommand:
+		s.handleCommandMoveObject(msg)
 	case MessageTypeGetCurrentLocationInfoCommand:
 		s.handleCommandGetCurrentLocInfo(msg)
 	default:
@@ -449,6 +451,59 @@ func (s *session) handleCommandLookAtObject(msg Message) {
 		info,
 		msg.MessageID,
 	)
+}
+
+func (s *session) handleCommandMoveObject(msg Message) {
+	var cmd CommandMoveObject
+	err := json.Unmarshal(msg.Payload, &cmd)
+	if err != nil {
+		fmt.Printf("WSAPI ERROR: json.Unmarshal(): %s\n", err)
+		s.sendCloseDetachAndStop(true, websocket.ClosePolicyViolation, "message JSON data cannot be decoded")
+		return
+	}
+
+	obj := s.actor.Zone().ObjectByID(cmd.ObjectID)
+	if obj == nil {
+		errMsg := fmt.Sprintf("Object with ID %q does not exist", cmd.ObjectID)
+		s.sendMessage(MessageTypeProcessingError, errMsg, msg.MessageID)
+		return
+	}
+
+	var fromContainer, toContainer core.Container
+	switch {
+	case !uuid.Equal(cmd.FromLocationID, uuid.Nil):
+		fromContainer = s.actor.Zone().LocationByID(cmd.FromLocationID)
+	case !uuid.Equal(cmd.FromActorID, uuid.Nil):
+		fromContainer = s.actor.Zone().ActorByID(cmd.FromActorID)
+	case !uuid.Equal(cmd.FromObjectID, uuid.Nil):
+		fromContainer = s.actor.Zone().ObjectByID(cmd.FromObjectID)
+	}
+	if fromContainer == nil {
+		errMsg := "invalid from-container"
+		s.sendMessage(MessageTypeProcessingError, errMsg, msg.MessageID)
+		return
+	}
+	switch {
+	case !uuid.Equal(cmd.ToLocationID, uuid.Nil):
+		toContainer = s.actor.Zone().LocationByID(cmd.ToLocationID)
+	case !uuid.Equal(cmd.ToActorID, uuid.Nil):
+		toContainer = s.actor.Zone().ActorByID(cmd.ToActorID)
+	case !uuid.Equal(cmd.ToObjectID, uuid.Nil):
+		toContainer = s.actor.Zone().ObjectByID(cmd.ToObjectID)
+	}
+	if toContainer == nil {
+		errMsg := "invalid to-container"
+		s.sendMessage(MessageTypeProcessingError, errMsg, msg.MessageID)
+		return
+	}
+
+	err = obj.Move(fromContainer, toContainer, s.actor, cmd.ToSubcontainer)
+	if err != nil {
+		fmt.Printf("WSAPI ERROR: %s\n", err)
+		s.sendCloseDetachAndStop(true, websocket.CloseInternalServerErr, "")
+		return
+	}
+	s.sendMessage(MessageTypeMoveObjectComplete, nil, msg.MessageID)
 }
 
 func (s *session) handleCommandGetCurrentLocInfo(msg Message) {

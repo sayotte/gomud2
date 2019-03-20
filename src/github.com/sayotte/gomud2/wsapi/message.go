@@ -24,6 +24,9 @@ const (
 	MessageTypeLookAtOtherActorComplete      = "look-at-other-actor-complete"
 	MessageTypeLookAtObjectCommand           = "look-at-object"
 	MessageTypeLookAtObjectComplete          = "look-at-object-complete"
+	MessageTypeMoveObjectCommand             = "move-object"
+	MessageTypeMoveObjectComplete            = "move-object-complete"
+	MessageTypeMoveObjectSubcontainer        = "move-object-subcontainer"
 	MessageTypeEvent                         = "event"
 	MessageTypeGetCurrentLocationInfoCommand = "get-current-location-info"
 	MessageTypeCurrentLocationInfoComplete   = "current-location-info"
@@ -51,6 +54,17 @@ type CommandLookAtOtherActor struct {
 
 type CommandLookAtObject struct {
 	ObjectID uuid.UUID `json:"objectID"`
+}
+
+type CommandMoveObject struct {
+	ObjectID       uuid.UUID `json:"objectID"`
+	FromLocationID uuid.UUID
+	FromActorID    uuid.UUID
+	FromObjectID   uuid.UUID
+	ToLocationID   uuid.UUID
+	ToActorID      uuid.UUID
+	ToObjectID     uuid.UUID
+	ToSubcontainer string
 }
 
 type CurrentLocationInfo commands.LocationInfo
