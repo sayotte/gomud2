@@ -12,7 +12,10 @@ import (
 	myuuid "github.com/sayotte/gomud2/uuid"
 )
 
-var actorMoveDelay = time.Millisecond * 500
+var (
+	actorMoveDelay  = time.Millisecond * 500
+	ActorMeleeDelay = time.Millisecond * 1000
+)
 
 func NewActor(id uuid.UUID, name, brainType string, location *Location, zone *Zone, attrs AttributeSet, skills Skillset, inventoryConstraints ActorInventoryConstraints) *Actor {
 	newID := id
@@ -211,11 +214,21 @@ func (a *Actor) AdminRelocate(to *Location) error {
 }
 
 func (a *Actor) Slash(target *Actor) error {
-	//if target.Location() != a.location {
-	//	return fmt.Errorf("target not in same Location")
-	//}
-	dmgCmd := newCombatMeleeCommand(a, target, CombatMeleeDamageTypeSlash)
+	return a.meleeGeneric(target, CombatMeleeDamageTypeSlash)
+}
+
+func (a *Actor) Bite(target *Actor) error {
+	return a.meleeGeneric(target, CombatMeleeDamageTypeBite)
+}
+
+func (a *Actor) meleeGeneric(target *Actor, dmgType string) error {
+	dmgCmd := newCombatMeleeCommand(a, target, dmgType)
 	_, err := a.syncRequestToZone(dmgCmd)
+
+	if err == nil {
+		a.nextDelayedActionStart = time.Now().Add(ActorMeleeDelay)
+	}
+
 	return err
 }
 

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"github.com/satori/go.uuid"
 	"math"
@@ -50,9 +51,15 @@ type combatMeleeCommand struct {
 }
 
 func (cmc combatMeleeCommand) Do() ([]Event, error) {
+	if cmc.attacker.Location() != cmc.target.Location() {
+		return nil, errors.New("attacker and target not in the same Location")
+	}
+
 	switch cmc.damageType {
 	case CombatMeleeDamageTypeSlash:
 		return cmc.doSlash()
+	case CombatMeleeDamageTypeBite:
+		return cmc.doBite()
 	default:
 		return nil, fmt.Errorf("don't know how to compute damage type %q", cmc.damageType)
 	}
@@ -60,13 +67,13 @@ func (cmc combatMeleeCommand) Do() ([]Event, error) {
 
 func (cmc combatMeleeCommand) doSlash() ([]Event, error) {
 	if cmc.checkDodge(cmc.attacker.Skills().Slashing, cmc.target) {
-		dodgeEvent := NewCombatDodgeEvent(CombatMeleeDamageTypeSlash, cmc.attacker.ID(), cmc.target.ID(), cmc.attacker.Zone().ID())
+		dodgeEvent := NewCombatDodgeEvent(CombatMeleeDamageTypeSlash, cmc.attacker.Name(), cmc.target.Name(), cmc.attacker.ID(), cmc.target.ID(), cmc.attacker.Zone().ID())
 		return []Event{dodgeEvent}, nil
 	}
 
 	// find weapon in attacker's hands with highest slashing damage cap; use
 	// that for damage range
-	var weaponMinBaseDmg, weaponMaxBaseDmg float64
+	weaponMinBaseDmg, weaponMaxBaseDmg := cmc.attacker.attributes.NaturalSlashMin, cmc.attacker.attributes.NaturalSlashMax
 	for _, obj := range cmc.attacker.Inventory().ObjectsBySubcontainer(InventoryContainerHands) {
 		attrs := obj.Attributes()
 		if attrs.SlashingDamageMax > weaponMaxBaseDmg {
@@ -82,33 +89,62 @@ func (cmc combatMeleeCommand) doSlash() ([]Event, error) {
 	totalDmg := scaledBaseDmg + physBonus + focBonus
 
 	// distribute damage 3:1:1 over phys:stam:focus
-	physDmg := int(math.Round(totalDmg * 0.60))
-	stamDmg := int(math.Round(totalDmg * 0.20))
-	focDmg := int(math.Round(totalDmg * 0.20))
+	physDmg := int(math.Ceil(totalDmg * 0.60))
+	stamDmg := int(math.Ceil(totalDmg * 0.20))
+	focDmg := int(math.Ceil(totalDmg * 0.20))
 
 	damageEvent := NewCombatMeleeDamageEvent(
 		CombatMeleeDamageTypeSlash,
 		cmc.attacker.ID(),
 		cmc.target.ID(),
 		cmc.attacker.Zone().ID(),
+		cmc.attacker.Name(),
+		cmc.target.Name(),
 		physDmg,
 		stamDmg,
 		focDmg,
 	)
 
-	outEvents := []Event{damageEvent}
+	return cmc.addDeathEventIfNeeded(damageEvent), nil
+}
 
-	switch {
-	case cmc.target.attributes.Physical-damageEvent.PhysicalDmg <= 0:
-		fallthrough
-	case cmc.target.attributes.Stamina-damageEvent.StaminaDmg <= 0:
-		fallthrough
-	case cmc.target.attributes.Focus-damageEvent.FocusDmg <= 0:
-		deathEvents := doActorDeath(cmc.target, cmc.target.Zone())
-		outEvents = append(outEvents, deathEvents...)
+func (cmc combatMeleeCommand) doBite() ([]Event, error) {
+	if cmc.checkDodge(cmc.attacker.Skills().Biting, cmc.target) {
+		dodgeEvent := NewCombatDodgeEvent(
+			CombatMeleeDamageTypeBite,
+			cmc.attacker.Name(),
+			cmc.target.Name(),
+			cmc.attacker.ID(),
+			cmc.target.ID(),
+			cmc.attacker.Zone().ID(),
+		)
+		return []Event{dodgeEvent}, nil
 	}
 
-	return outEvents, nil
+	// calculate damage after bonuses etc.
+	minBaseDmg := cmc.attacker.Attributes().NaturalBiteMin
+	maxBaseDmg := cmc.attacker.Attributes().NaturalBiteMax
+	baseDmgRange := maxBaseDmg - minBaseDmg
+	totalDmg := (rollFloat64(cmc.attacker.Zone().Rand()) * baseDmgRange) + minBaseDmg
+
+	// distribute damage 3:1:1 over phys:stam:focus
+	physDmg := int(math.Ceil(totalDmg * 0.60))
+	stamDmg := int(math.Ceil(totalDmg * 0.20))
+	focDmg := int(math.Ceil(totalDmg * 0.20))
+
+	damageEvent := NewCombatMeleeDamageEvent(
+		CombatMeleeDamageTypeBite,
+		cmc.attacker.ID(),
+		cmc.target.ID(),
+		cmc.attacker.Zone().ID(),
+		cmc.attacker.Name(),
+		cmc.target.Name(),
+		physDmg,
+		stamDmg,
+		focDmg,
+	)
+
+	return cmc.addDeathEventIfNeeded(damageEvent), nil
 }
 
 func (cmc combatMeleeCommand) checkDodge(attackSkill float64, defender *Actor) bool {
@@ -143,7 +179,23 @@ func (cmc combatMeleeCommand) checkDodge(attackSkill float64, defender *Actor) b
 	return false
 }
 
-func NewCombatMeleeDamageEvent(dmgTyp string, attackerID, targetID, zoneID uuid.UUID, physDmg, stamDmg, focDmg int) *CombatMeleeDamageEvent {
+func (cmc combatMeleeCommand) addDeathEventIfNeeded(damageEvent *CombatMeleeDamageEvent) []Event {
+	outEvents := []Event{damageEvent}
+
+	switch {
+	case cmc.target.attributes.Physical-damageEvent.PhysicalDmg <= 0:
+		fallthrough
+	case cmc.target.attributes.Stamina-damageEvent.StaminaDmg <= 0:
+		fallthrough
+	case cmc.target.attributes.Focus-damageEvent.FocusDmg <= 0:
+		deathEvents := doActorDeath(cmc.target, cmc.target.Zone())
+		outEvents = append(outEvents, deathEvents...)
+	}
+
+	return outEvents
+}
+
+func NewCombatMeleeDamageEvent(dmgTyp string, attackerID, targetID, zoneID uuid.UUID, attackerName, targetName string, physDmg, stamDmg, focDmg int) *CombatMeleeDamageEvent {
 	return &CombatMeleeDamageEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeCombatMeleeDamage,
@@ -152,12 +204,14 @@ func NewCombatMeleeDamageEvent(dmgTyp string, attackerID, targetID, zoneID uuid.
 			AggregateID:       zoneID,
 			ShouldPersistBool: true,
 		},
-		DamageType:  dmgTyp,
-		AttackerID:  attackerID,
-		TargetID:    targetID,
-		PhysicalDmg: physDmg,
-		StaminaDmg:  stamDmg,
-		FocusDmg:    focDmg,
+		DamageType:   dmgTyp,
+		AttackerID:   attackerID,
+		TargetID:     targetID,
+		AttackerName: attackerName,
+		TargetName:   targetName,
+		PhysicalDmg:  physDmg,
+		StaminaDmg:   stamDmg,
+		FocusDmg:     focDmg,
 	}
 }
 
@@ -166,10 +220,11 @@ type CombatMeleeDamageEvent struct {
 	DamageType                        string
 	AttackerID                        uuid.UUID
 	TargetID                          uuid.UUID
+	AttackerName, TargetName          string
 	PhysicalDmg, StaminaDmg, FocusDmg int
 }
 
-func NewCombatDodgeEvent(dmgType string, attackerID, targetID, zoneID uuid.UUID) *CombatDodgeEvent {
+func NewCombatDodgeEvent(dmgType, attackerName, targetName string, attackerID, targetID, zoneID uuid.UUID) *CombatDodgeEvent {
 	return &CombatDodgeEvent{
 		eventGeneric: &eventGeneric{
 			EventTypeNum:      EventTypeCombatDodge,
@@ -178,15 +233,18 @@ func NewCombatDodgeEvent(dmgType string, attackerID, targetID, zoneID uuid.UUID)
 			AggregateID:       zoneID,
 			ShouldPersistBool: false,
 		},
-		DamageType: dmgType,
-		AttackerID: attackerID,
-		TargetID:   targetID,
+		DamageType:   dmgType,
+		AttackerName: attackerName,
+		TargetName:   targetName,
+		AttackerID:   attackerID,
+		TargetID:     targetID,
 	}
 }
 
 type CombatDodgeEvent struct {
 	*eventGeneric
-	DamageType string
-	AttackerID uuid.UUID
-	TargetID   uuid.UUID
+	DamageType               string
+	AttackerID               uuid.UUID
+	TargetID                 uuid.UUID
+	AttackerName, TargetName string
 }

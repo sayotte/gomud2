@@ -190,19 +190,37 @@ func initStartingWorld(worldConfigFile string) error {
 		panic(err)
 	}
 
-	objPrim := core.NewObject(
+	//napkinPrim := core.NewObject(
+	//	gouuid.Nil,
+	//	"a crumpled up napkin",
+	//	"This was once the sort of napkin that bartenders put down so your drink doesn't leave a wet ring on the bar. Now it's crumpled into a ball.",
+	//	[]string{"napkin"},
+	//	loc1,
+	//	0,
+	//	z,
+	//	core.ObjectAttributes{
+	//		BashingDamageMax: 1.0,
+	//	},
+	//)
+	//_, err = z.AddObject(napkinPrim, loc1)
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	swordPrim := core.NewObject(
 		gouuid.Nil,
-		"a crumpled up napkin",
+		"a sword",
 		"This was once the sort of napkin that bartenders put down so your drink doesn't leave a wet ring on the bar. Now it's crumpled into a ball.",
-		[]string{"napkin"},
+		[]string{"sword"},
 		loc1,
 		0,
 		z,
 		core.ObjectAttributes{
-			BashingDamageMax: 1.0,
+			SlashingDamageMin: 3.0,
+			SlashingDamageMax: 5.0,
 		},
 	)
-	_, err = z.AddObject(objPrim, loc1)
+	_, err = z.AddObject(swordPrim, loc1)
 	if err != nil {
 		panic(err)
 	}
@@ -216,7 +234,7 @@ func initStartingWorld(worldConfigFile string) error {
 		20,
 		z,
 		core.ObjectAttributes{
-			SlashingDamageMax: 3.0,
+			SlashingDamageMax: 2.0,
 		},
 	)
 	_, err = z.AddObject(bagPrim, loc1)
@@ -307,21 +325,23 @@ func initStartingWorld(worldConfigFile string) error {
 
 	spawnSpec := spawnreap.SpawnSpecification{
 		ActorProto: spawnreap.ActorPrototype{
-			Name:      "a rabbit",
+			Name:      "a man",
 			BrainType: "crowd-averse-wanderer",
 			Attributes: core.AttributeSet{
-				Strength:    2,
-				StrengthCap: 5,
-				Fitness:     10,
-				FitnessCap:  25,
-				Will:        2,
-				WillCap:     5,
-				Faith:       0,
-				Faithcap:    0,
-				Physical:    2,
-				Stamina:     10,
-				Focus:       2,
-				Zeal:        0,
+				Strength:       5,
+				StrengthCap:    10,
+				Fitness:        10,
+				FitnessCap:     25,
+				Will:           2,
+				WillCap:        5,
+				Faith:          0,
+				Faithcap:       0,
+				Physical:       2,
+				Stamina:        10,
+				Focus:          2,
+				Zeal:           0,
+				NaturalBiteMin: 1.0,
+				NaturalBiteMax: 2.0,
 			},
 			Skills: core.Skillset{
 				Biting:     10,
@@ -329,6 +349,7 @@ func initStartingWorld(worldConfigFile string) error {
 				Dodging:    10,
 				DodgingCap: 25,
 			},
+			InventoryConstraints: core.DefaultHumanInventoryConstraints,
 		},
 		MaxCount:           1,
 		MaxSpawnAtOneTime:  1,

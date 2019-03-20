@@ -325,7 +325,7 @@ func (gh *gameHandler) handleEventObjectMove(terminalWidth int, e *core.ObjectMo
 			// actor -> container
 			intoWhat := resolveObjNameByID(e.ToObjectContainerID, zone)
 			out = fmt.Sprintf("%s puts %s into %s.\n", who, what, intoWhat)
-		case !uuid.Equal(e.FromActorContainerID, uuid.Nil):
+		case !uuid.Equal(e.FromObjectContainerID, uuid.Nil):
 			// container -> actor
 			fromWhat := resolveObjNameByID(e.FromObjectContainerID, zone)
 			out = fmt.Sprintf("%s takes %s from %s.\n", who, what, fromWhat)
@@ -383,28 +383,17 @@ func (gh *gameHandler) handleEventObjectMoveSubcontainer(terminalWidth int, e *c
 }
 
 func (gh *gameHandler) handleEventCombatMeleeDamage(terminalWidth int, e *core.CombatMeleeDamageEvent) ([]byte, error) {
-	attackerName := "Someone's"
+	var attackerName, targetName string
 	if uuid.Equal(e.AttackerID, gh.actor.ID()) {
 		attackerName = "Your"
 	} else {
-		for _, actor := range gh.actor.Location().Actors() {
-			if uuid.Equal(e.AttackerID, actor.ID()) {
-				attackerName = fmt.Sprintf("%s's", actor.Name())
-				break
-			}
-		}
+		attackerName = fmt.Sprintf("%s's", e.AttackerName)
 	}
 
-	targetName := "someone"
 	if uuid.Equal(e.TargetID, gh.actor.ID()) {
 		targetName = "you"
 	} else {
-		for _, actor := range gh.actor.Location().Actors() {
-			if uuid.Equal(e.TargetID, actor.ID()) {
-				targetName = actor.Name()
-				break
-			}
-		}
+		targetName = e.TargetName
 	}
 
 	out := fmt.Sprintf("%s %s wounds %s.\n", attackerName, e.DamageType, targetName)

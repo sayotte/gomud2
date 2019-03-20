@@ -20,7 +20,7 @@ func getStockUtilitySelector() UtilitySelector {
 		C:           0.0,
 	}
 	moveSelection := UtilitySelection{
-		Name:           "move-to-emptier-location",
+		Name:           planGoalMoveToEmptyLocation,
 		Weight:         1.0,
 		Considerations: []UtilityConsideration{crowdedness, timeSpentIdling},
 	}
@@ -34,19 +34,19 @@ func getStockUtilitySelector() UtilitySelector {
 		B:           0.5,
 		C:           0.0,
 	}
-	stayIfWeapon := UtilityConsideration{
-		Name:        "stay-in-location-with-weapon-on-ground",
-		CurveXParam: "weaponOnGround",
-		XParamRange: [2]float64{0.0, 1.0},
-		M:           1.0,
-		K:           1.0,
-		B:           0.0,
-		C:           0.0,
-	}
+	//stayIfWeapon := UtilityConsideration{
+	//	Name:        "stay-in-location-with-weapon-on-ground",
+	//	CurveXParam: "weaponOnGround",
+	//	XParamRange: [2]float64{0.0, 1.0},
+	//	M:           1.0,
+	//	K:           1.0,
+	//	B:           0.0,
+	//	C:           0.0,
+	//}
 	doNothingSelection := UtilitySelection{
-		Name:           "do-nothing",
+		Name:           planGoalDoNothing,
 		Weight:         1.0,
-		Considerations: []UtilityConsideration{constantLaziness, stayIfWeapon},
+		Considerations: []UtilityConsideration{constantLaziness}, //, stayIfWeapon},
 	}
 
 	recentlyAttacked := UtilityConsideration{
@@ -69,7 +69,7 @@ func getStockUtilitySelector() UtilitySelector {
 		C:           0.0,
 	}
 	defendSelfSelection := UtilitySelection{
-		Name:           "defend-self",
+		Name:           planGoalDefendSelf,
 		Weight:         1.0,
 		Considerations: []UtilityConsideration{recentlyAttacked, attackerPresent},
 	}

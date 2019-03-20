@@ -2,42 +2,80 @@ package intelligence
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"sync"
+
+	"github.com/satori/go.uuid"
+
 	uuid2 "github.com/sayotte/gomud2/uuid"
 	"github.com/sayotte/gomud2/wsapi"
-	"sync"
 )
 
 func moveSelf(direction string, msgSender MessageSender, intellect *Intellect) (bool, error) {
-	msgId := uuid2.NewId()
-	waiter := &sync.WaitGroup{}
-	waiter.Add(1)
-	var success bool
-	callback := func(msg wsapi.Message) {
-		if msg.Type == wsapi.MessageTypeMoveActorComplete {
-			success = true
-		}
-		waiter.Done()
-	}
-	intellect.registerResponseCallback(msgId, callback)
-
 	cmd := wsapi.CommandMoveActor{Direction: direction}
-	cmdBytes, err := json.Marshal(cmd)
-	if err != nil {
-		return false, fmt.Errorf("json.Marshal(CommandMoveActor): %s", err)
-	}
-	msg := wsapi.Message{
-		Type:      wsapi.MessageTypeMoveActorCommand,
-		MessageID: msgId,
-		Payload:   cmdBytes,
-	}
-	//startTime := time.Now()
-	err = msgSender.SendMessage(msg)
+	err := sendSyncMessage(wsapi.MessageTypeMoveActorCommand, cmd, msgSender, intellect)
 	if err != nil {
 		return false, err
 	}
+	return true, nil
+}
+
+func moveObject(
+	objID, fromLocID, fromActorID, fromObjID, toLocID, toActorID, toObjID uuid.UUID,
+	toSubcontainer string,
+	msgSender MessageSender,
+	intellect *Intellect,
+) error {
+	cmd := wsapi.CommandMoveObject{
+		ObjectID:       objID,
+		FromLocationID: fromLocID,
+		FromActorID:    fromActorID,
+		FromObjectID:   fromObjID,
+		ToLocationID:   toLocID,
+		ToActorID:      toActorID,
+		ToObjectID:     toObjID,
+		ToSubcontainer: toSubcontainer,
+	}
+	return sendSyncMessage(wsapi.MessageTypeMoveObjectCommand, cmd, msgSender, intellect)
+}
+
+func melee(meleeType string, targetID uuid.UUID, msgSender MessageSender, intellect *Intellect) error {
+	cmd := wsapi.CommandMeleeCombat{
+		AttackType: meleeType,
+		TargetID:   targetID,
+	}
+	return sendSyncMessage(wsapi.MessageTypeMeleeCombatCommand, cmd, msgSender, intellect)
+}
+
+func sendSyncMessage(msgType string, payload interface{}, msgSender MessageSender, intellect *Intellect) error {
+	msgID := uuid2.NewId()
+	waiter := &sync.WaitGroup{}
+	waiter.Add(1)
+	var err error
+	callback := func(msg wsapi.Message) {
+		if msg.Type == wsapi.MessageTypeProcessingError {
+			err = errors.New(string(msg.Payload))
+		}
+		waiter.Done()
+	}
+	intellect.registerResponseCallback(msgID, callback)
+
+	msgPayload, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("json.Marshal: %s", err)
+	}
+	msg := wsapi.Message{
+		Type:      msgType,
+		MessageID: msgID,
+		Payload:   msgPayload,
+	}
+
+	err = msgSender.SendMessage(msg)
+	if err != nil {
+		return err
+	}
 
 	waiter.Wait()
-	//fmt.Printf("BRAIN DEBUG: round-trip to move to new location took %s\n", time.Now().Sub(startTime))
-	return success, nil
+	return nil
 }

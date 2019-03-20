@@ -16,20 +16,14 @@ func LoadIntellect(brainType string, msgSender MessageSender, actorID uuid.UUID)
 	return &Intellect{
 		actorID:   actorID,
 		msgSender: msgSender,
-		// FIXME we should be using "brainType" to create our brain, rather than
-		// FIXME statically always setting up exactly the same one
-		goalSelector: getStockUtilitySelector(),
 	}
 }
 
 type Intellect struct {
 	actorID uuid.UUID
 
-	memory *Memory
-
-	goalSelector UtilitySelector
-	currentGoal  string
-	executor     TrivialExecutor
+	memory  *Memory
+	planner *planner
 
 	msgSender MessageSender
 
@@ -45,6 +39,13 @@ type Intellect struct {
 func (i *Intellect) Start() {
 	i.memory = NewMemory(i.msgSender, i)
 	i.memory.SetLastMovementTime(time.Now())
+
+	i.planner = &planner{
+		actorID:         i.actorID,
+		memory:          i.memory,
+		goalSelector:    getStockUtilitySelector(),
+		minTimeToRegoal: time.Second / 8,
+	}
 
 	i.callbacksMap = make(map[uuid.UUID]func(msg wsapi.Message))
 	i.callbacksMapMutex = &sync.Mutex{}
@@ -174,6 +175,22 @@ func (i *Intellect) handleEventMessage(msg wsapi.Message) {
 	fmt.Printf("BRAIN DEBUG: event type is %q\n", eventEnvelope.EventType)
 
 	switch eventEnvelope.EventType {
+	case wsapi.EventTypeActorAddToZone:
+		var e wsapi.ActorAddToZoneEventBody
+		err = json.Unmarshal(eventEnvelope.Body, &e)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(ActorAddToZoneEventBody): %s\n", err)
+			return
+		}
+		i.handleActorAddToZoneEvent(e, eventEnvelope.ZoneID)
+	case wsapi.EventTypeActorRemoveFromZone:
+		var e wsapi.ActorRemoveFromZoneEventBody
+		err = json.Unmarshal(eventEnvelope.Body, &e)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(ActorRemoveFromZoneEventBody): %s\n", err)
+			return
+		}
+		i.handleActorRemoveFromZoneEvent(e, eventEnvelope.ZoneID)
 	case wsapi.EventTypeActorMove:
 		var e wsapi.ActorMoveEventBody
 		err = json.Unmarshal(eventEnvelope.Body, &e)
@@ -189,6 +206,7 @@ func (i *Intellect) handleEventMessage(msg wsapi.Message) {
 			fmt.Printf("BRAIN ERROR: json.Unmarshal(ActorDeathEventBody): %s\n", err)
 			return
 		}
+		i.handleActorDeathEvent(e, eventEnvelope.ZoneID)
 	case wsapi.EventTypeActorMigrateIn:
 		var e wsapi.ActorMigrateInEventBody
 		err = json.Unmarshal(eventEnvelope.Body, &e)
@@ -205,17 +223,43 @@ func (i *Intellect) handleEventMessage(msg wsapi.Message) {
 			return
 		}
 		i.handleActorMigrateOutEvent(e, eventEnvelope.ZoneID)
+	case wsapi.EventTypeObjectAddToZone:
+		var e wsapi.ObjectAddToZoneEventBody
+		err = json.Unmarshal(eventEnvelope.Body, &e)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(ObjectAddToZoneEventBody): %s\n", err)
+			return
+		}
+		i.handleObjectAddToZoneEvent(e, eventEnvelope.ZoneID)
+	case wsapi.EventTypeObjectMove:
+		var e wsapi.ObjectMoveEventBody
+		err = json.Unmarshal(eventEnvelope.Body, &e)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(ObjectMoveEventBody): %s\n", err)
+			return
+		}
+		i.handleObjectMoveEvent(e, eventEnvelope.ZoneID)
 	case wsapi.EventTypeCombatMeleeDamage:
 		var e wsapi.CombatMeleeDamageEventBody
 		err = json.Unmarshal(eventEnvelope.Body, &e)
 		if err != nil {
-			fmt.Printf("BRAIN ERROR: json.Unmarshal(EventTypeCombatMeleeDamage): %s\n", err)
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(CombatMeleeDamageEventBody): %s\n", err)
 			return
 		}
 		i.handleCombatMeleeDamageEvent(e)
 	default:
-		//fmt.Printf("BRAIN DEBUG: Brain received event of type %q, no idea what to do with it\n", eventEnvelope.EventType)
+		fmt.Printf("BRAIN DEBUG: Brain received event of type %q, no idea what to do with it\n", eventEnvelope.EventType)
 	}
+}
+
+func (i *Intellect) handleActorAddToZoneEvent(e wsapi.ActorAddToZoneEventBody, zoneID uuid.UUID) {
+	_, currentLocID := i.memory.GetCurrentZoneAndLocationID()
+	i.memory.AddActorToLocation(zoneID, currentLocID, e.ActorID)
+}
+
+func (i *Intellect) handleActorRemoveFromZoneEvent(e wsapi.ActorRemoveFromZoneEventBody, zoneID uuid.UUID) {
+	_, currentLocID := i.memory.GetCurrentZoneAndLocationID()
+	i.memory.RemoveActorFromLocation(zoneID, currentLocID, e.ActorID)
 }
 
 func (i *Intellect) handleActorMoveEvent(e wsapi.ActorMoveEventBody, zoneID uuid.UUID) {
@@ -272,6 +316,41 @@ func (i *Intellect) handleActorMigrateOutEvent(e wsapi.ActorMigrateOutEventBody,
 	i.memory.RemoveActorFromLocation(zoneID, e.FromLocID, e.ActorID)
 }
 
+func (i *Intellect) handleObjectAddToZoneEvent(e wsapi.ObjectAddToZoneEventBody, zoneID uuid.UUID) {
+	// Actual object info can't be safely pulled from this goroutine, since
+	// we'll end up blocking waiting for a callback from ourselves. It will
+	// be pulled just-in-time when it's needed anyway.
+
+	switch {
+	case !uuid.Equal(e.LocationContainerID, uuid.Nil):
+		i.memory.AddObjectToLocation(zoneID, e.LocationContainerID, e.ObjectID)
+	case !uuid.Equal(e.ActorContainerID, uuid.Nil):
+		// FIXME implement ActorVisibleInfo inventory
+	case !uuid.Equal(e.ObjectContainerID, uuid.Nil):
+		i.memory.AddObjectToObject(e.ObjectID, e.ObjectContainerID)
+	}
+}
+
+func (i *Intellect) handleObjectMoveEvent(e wsapi.ObjectMoveEventBody, zoneID uuid.UUID) {
+	switch {
+	case !uuid.Equal(e.FromLocationContainerID, uuid.Nil):
+		i.memory.RemoveObjectFromLocation(zoneID, e.FromLocationContainerID, e.ObjectID)
+	case !uuid.Equal(e.FromActorContainerID, uuid.Nil):
+		// FIXME implement ActorVisibleInfo inventory
+	case !uuid.Equal(e.FromObjectContainerID, uuid.Nil):
+		i.memory.RemoveObjectFromObject(e.ObjectID, e.FromObjectContainerID)
+	}
+
+	switch {
+	case !uuid.Equal(e.ToLocationContainerID, uuid.Nil):
+		i.memory.AddObjectToLocation(zoneID, e.ToLocationContainerID, e.ObjectID)
+	case !uuid.Equal(e.ToActorContainerID, uuid.Nil):
+		// FIXME implement ActorVisibleInfo inventory
+	case !uuid.Equal(e.ToObjectContainerID, uuid.Nil):
+		i.memory.AddObjectToObject(e.ObjectID, e.ToObjectContainerID)
+	}
+}
+
 func (i *Intellect) handleCombatMeleeDamageEvent(e wsapi.CombatMeleeDamageEventBody) {
 	if uuid.Equal(e.TargetID, i.actorID) {
 		i.memory.SetLastAttackedTime(time.Now())
@@ -284,6 +363,13 @@ func (i *Intellect) aiLoop() {
 
 	ticker := time.NewTicker(minDurationBetweenRuns)
 
+	var plan executionPlan
+	// set initial non-nil value for executionPlan to avoid a panic
+	plan = &trivialPlan{
+		goalName: "initial-plan",
+		memory:   i.memory,
+	}
+
 	for {
 		select {
 		case <-i.stopChan:
@@ -292,32 +378,8 @@ func (i *Intellect) aiLoop() {
 		default:
 		}
 
-		//i.memory.lock.RLock()
-		//fmt.Println("\n\nDUMPING MEMORY")
-		//memKeys := make([]string, 0, len(i.memory.localStore))
-		//for k := range i.memory.localStore {
-		//	memKeys = append(memKeys, k)
-		//}
-		//sort.Strings(memKeys)
-		//for _, k := range memKeys {
-		//	v := i.memory.localStore[k]
-		//	fmt.Printf("==%s==\n", k)
-		//	i, _ := json.MarshalIndent(v, "  ", "  ")
-		//	fmt.Println(string(i))
-		//}
-		//i.memory.lock.RUnlock()
-
-		//fmt.Println("BRAIN DEBUG: doing AI stuff!")
-		//start := time.Now()
-		newGoal := i.goalSelector.selectGoal(i.memory)
-		if newGoal != i.currentGoal {
-			fmt.Printf("BRAIN DEBUG: ===== switching goal from %q -> %q =====\n", i.currentGoal, newGoal)
-			i.currentGoal = newGoal
-		}
-
-		i.executor.executeGoal(newGoal, i.msgSender, i, i.memory)
-		//runtime := time.Now().Sub(start)
-		//fmt.Printf("BRAIN DEBUG: --- did AI stuff in %s ---\n", runtime)
+		plan := i.planner.generatePlan(plan)
+		plan.executeStep(i.msgSender, i)
 
 		<-ticker.C
 	}

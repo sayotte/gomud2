@@ -74,14 +74,16 @@ func LookAtActor(actor *core.Actor) ActorVisibleInfo {
 	}
 	attrs := actor.Attributes()
 	aInfo.VisibleAttributes = ActorVisibleAttributes{
-		Strength: attrs.Strength,
-		Physical: attrs.Physical,
-		Fitness:  attrs.Fitness,
-		Stamina:  attrs.Stamina,
-		Will:     attrs.Will,
-		Focus:    attrs.Focus,
-		Faith:    attrs.Faith,
-		Zeal:     attrs.Zeal,
+		Strength:       attrs.Strength,
+		Physical:       attrs.Physical,
+		Fitness:        attrs.Fitness,
+		Stamina:        attrs.Stamina,
+		Will:           attrs.Will,
+		Focus:          attrs.Focus,
+		Faith:          attrs.Faith,
+		Zeal:           attrs.Zeal,
+		NaturalBiteMin: attrs.NaturalBiteMin,
+		NaturalBiteMax: attrs.NaturalBiteMax,
 	}
 	return aInfo
 }
@@ -94,10 +96,12 @@ type ActorVisibleInfo struct {
 }
 
 type ActorVisibleAttributes struct {
-	Strength, Physical int
-	Fitness, Stamina   int
-	Will, Focus        int
-	Faith, Zeal        int
+	Strength, Physical               int
+	Fitness, Stamina                 int
+	Will, Focus                      int
+	Faith, Zeal                      int
+	NaturalBiteMin, NaturalBiteMax   float64
+	NaturalSlashMin, NaturalSlashMax float64
 }
 
 func LookAtObject(obj *core.Object) ObjectVisibleInfo {
