@@ -245,6 +245,8 @@ func (s *session) handleMessage(msg Message) {
 		s.handleCommandMoveObject(msg)
 	case MessageTypeGetCurrentLocationInfoCommand:
 		s.handleCommandGetCurrentLocInfo(msg)
+	case MessageTypeMeleeCombatCommand:
+		s.handleCommandMeleeCombat(msg)
 	default:
 		fmt.Printf("WSAPI ERROR: session received message of type %q\n", msg.Type)
 		s.sendCloseDetachAndStop(true, websocket.CloseProtocolError, fmt.Sprintf("unhandleable API message type %q", msg.Type))
@@ -504,6 +506,40 @@ func (s *session) handleCommandMoveObject(msg Message) {
 		return
 	}
 	s.sendMessage(MessageTypeMoveObjectComplete, nil, msg.MessageID)
+}
+
+func (s *session) handleCommandMeleeCombat(msg Message) {
+	var cmd CommandMeleeCombat
+	err := json.Unmarshal(msg.Payload, &cmd)
+	if err != nil {
+		fmt.Printf("WSAPI ERROR: json.Unmarshal(): %s\n", err)
+		s.sendCloseDetachAndStop(true, websocket.ClosePolicyViolation, "message JSON data cannot be decoded")
+		return
+	}
+
+	target := s.actor.Zone().ActorByID(cmd.TargetID)
+	if target == nil {
+		errMsg := fmt.Sprintf("Actor with ID %q does not exist", cmd.TargetID)
+		s.sendMessage(MessageTypeProcessingError, errMsg, msg.MessageID)
+		return
+	}
+
+	switch cmd.AttackType {
+	case core.CombatMeleeDamageTypeSlash:
+		err = s.actor.Slash(target)
+	case core.CombatMeleeDamageTypeBite:
+		err = s.actor.Bite(target)
+	default:
+		errMsg := fmt.Sprintf("Invalid attack type %q", cmd.AttackType)
+		s.sendMessage(MessageTypeProcessingError, errMsg, msg.MessageID)
+		return
+	}
+	if err != nil {
+		fmt.Printf("WSAPI ERROR: %s\n", err)
+		s.sendCloseDetachAndStop(true, websocket.CloseInternalServerErr, "")
+		return
+	}
+	s.sendMessage(MessageTypeMeleeCombatComplete, nil, msg.MessageID)
 }
 
 func (s *session) handleCommandGetCurrentLocInfo(msg Message) {

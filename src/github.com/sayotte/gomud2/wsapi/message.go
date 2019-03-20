@@ -24,6 +24,8 @@ const (
 	MessageTypeLookAtOtherActorComplete      = "look-at-other-actor-complete"
 	MessageTypeLookAtObjectCommand           = "look-at-object"
 	MessageTypeLookAtObjectComplete          = "look-at-object-complete"
+	MessageTypeMeleeCombatCommand            = "combat-melee"
+	MessageTypeMeleeCombatComplete           = "combat-melee-complete"
 	MessageTypeMoveObjectCommand             = "move-object"
 	MessageTypeMoveObjectComplete            = "move-object-complete"
 	MessageTypeMoveObjectSubcontainer        = "move-object-subcontainer"
@@ -65,6 +67,11 @@ type CommandMoveObject struct {
 	ToActorID      uuid.UUID
 	ToObjectID     uuid.UUID
 	ToSubcontainer string
+}
+
+type CommandMeleeCombat struct {
+	AttackType string    `json:"attackType"`
+	TargetID   uuid.UUID `json:"targetID"`
 }
 
 type CurrentLocationInfo commands.LocationInfo
