@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
+
+	"github.com/satori/go.uuid"
+
 	uuid2 "github.com/sayotte/gomud2/uuid"
 	"github.com/sayotte/gomud2/wsapi"
-	"sync"
 )
 
 func moveSelf(direction string, msgSender MessageSender, intellect *Intellect) (bool, error) {
@@ -16,6 +19,25 @@ func moveSelf(direction string, msgSender MessageSender, intellect *Intellect) (
 		return false, err
 	}
 	return true, nil
+}
+
+func moveObject(
+	objID, fromLocID, fromActorID, fromObjID, toLocID, toActorID, toObjID uuid.UUID,
+	toSubcontainer string,
+	msgSender MessageSender,
+	intellect *Intellect,
+) error {
+	cmd := wsapi.CommandMoveObject{
+		ObjectID:       objID,
+		FromLocationID: fromLocID,
+		FromActorID:    fromActorID,
+		FromObjectID:   fromObjID,
+		ToLocationID:   toLocID,
+		ToActorID:      toActorID,
+		ToObjectID:     toObjID,
+		ToSubcontainer: toSubcontainer,
+	}
+	return sendSyncMessage(wsapi.MessageTypeMoveObjectCommand, cmd, msgSender, intellect)
 }
 
 func sendSyncMessage(msgType string, payload interface{}, msgSender MessageSender, intellect *Intellect) error {
