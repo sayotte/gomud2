@@ -40,6 +40,14 @@ func moveObject(
 	return sendSyncMessage(wsapi.MessageTypeMoveObjectCommand, cmd, msgSender, intellect)
 }
 
+func melee(meleeType string, targetID uuid.UUID, msgSender MessageSender, intellect *Intellect) error {
+	cmd := wsapi.CommandMeleeCombat{
+		AttackType: meleeType,
+		TargetID:   targetID,
+	}
+	return sendSyncMessage(wsapi.MessageTypeMeleeCombatCommand, cmd, msgSender, intellect)
+}
+
 func sendSyncMessage(msgType string, payload interface{}, msgSender MessageSender, intellect *Intellect) error {
 	msgID := uuid2.NewId()
 	waiter := &sync.WaitGroup{}
