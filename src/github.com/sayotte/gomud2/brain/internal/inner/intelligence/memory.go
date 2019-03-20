@@ -428,3 +428,30 @@ func (m *Memory) GetObjectInfo(objectID uuid.UUID) (commands.ObjectVisibleInfo, 
 
 	return objectInfoEnt.Info, err
 }
+
+// Derived queries
+
+func (m *Memory) IsWeaponOnGround() bool {
+	currentZoneID, currentLocID := m.GetCurrentZoneAndLocationID()
+	locInfo, err := m.GetLocationInfo(currentZoneID, currentLocID)
+	if err != nil {
+		fmt.Printf("BRAIN ERROR: %s\n", err)
+		return false
+	}
+	for _, objID := range locInfo.Objects {
+		objInfo, err := m.GetObjectInfo(objID)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: %s\n", err)
+			return false
+		}
+		switch {
+		case objInfo.Attributes.BashingDamageMax > 0:
+			fallthrough
+		case objInfo.Attributes.SlashingDamageMax > 0:
+			fallthrough
+		case objInfo.Attributes.StabbingDamageMax > 0:
+			return true
+		}
+	}
+	return false
+}

@@ -88,26 +88,8 @@ func (uc UtilityConsideration) getParam(paramName string, memory *Memory) float6
 	case "secondsSinceLastMove":
 		return memory.GetSecondsSinceLastMove()
 	case "weaponOnGround":
-		currentZoneID, currentLocID := memory.GetCurrentZoneAndLocationID()
-		locInfo, err := memory.GetLocationInfo(currentZoneID, currentLocID)
-		if err != nil {
-			fmt.Printf("BRAIN ERROR: %s\n", err)
-			return 0
-		}
-		for _, objID := range locInfo.Objects {
-			objInfo, err := memory.GetObjectInfo(objID)
-			if err != nil {
-				fmt.Printf("BRAIN ERROR: %s\n", err)
-				return 0
-			}
-			switch {
-			case objInfo.Attributes.BashingDamageMax > 0:
-				fallthrough
-			case objInfo.Attributes.SlashingDamageMax > 0:
-				fallthrough
-			case objInfo.Attributes.StabbingDamageMax > 0:
-				return 1.0
-			}
+		if memory.IsWeaponOnGround() {
+			return 1.0
 		}
 		return 0
 	case "lastAttackedSecondsAgo":
