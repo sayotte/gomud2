@@ -439,10 +439,31 @@ func (s *session) handleCommandLookAtObject(msg Message) {
 		s.sendMessage(MessageTypeProcessingError, errMsg, msg.MessageID)
 		return
 	}
-	// Object must either be on the ground, or in the top-level of our Actor's inventory
+	// Object must be located in one of:
+	// - on the ground in the same Location as our Actor
+	// - in top-level of a container on the ground in the same Location as our Actor
+	// - in our Actor's inventory
+	// - in top-level of a container in our Actor's inventory
+	// Anything else-- e.g. peeking into a container in another Actor's inventory--
+	// should not work.
 	objLoc := obj.Location()
 	objCont := obj.Container()
-	if objLoc != s.actor.Location() || (objCont != s.actor && objCont != objLoc) {
+
+	containerIsThisActor := objCont == s.actor
+
+	containerIsLocation := objLoc == objCont
+	locationContainerIsActorLocation := objLoc == s.actor.Location()
+
+	containerObj, containerIsObject := objCont.(*core.Object)
+	var containerObjIsOnGround, containerObjIsInInventory bool
+	if containerIsObject {
+		containerObjIsOnGround = containerObj.Container() == s.actor.Location()
+		containerObjIsInInventory = containerObj.Container() == s.actor
+	}
+
+	if !containerIsThisActor &&
+		((containerIsLocation && !locationContainerIsActorLocation) ||
+			(containerIsObject && !containerObjIsOnGround && !containerObjIsInInventory)) {
 		s.sendMessage(MessageTypeProcessingError, "too far away / inside a container", msg.MessageID)
 		return
 	}
