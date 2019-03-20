@@ -175,6 +175,22 @@ func (i *Intellect) handleEventMessage(msg wsapi.Message) {
 	fmt.Printf("BRAIN DEBUG: event type is %q\n", eventEnvelope.EventType)
 
 	switch eventEnvelope.EventType {
+	case wsapi.EventTypeActorAddToZone:
+		var e wsapi.ActorAddToZoneEventBody
+		err = json.Unmarshal(eventEnvelope.Body, &e)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(ActorAddToZoneEventBody): %s\n", err)
+			return
+		}
+		i.handleActorAddToZoneEvent(e, eventEnvelope.ZoneID)
+	case wsapi.EventTypeActorRemoveFromZone:
+		var e wsapi.ActorRemoveFromZoneEventBody
+		err = json.Unmarshal(eventEnvelope.Body, &e)
+		if err != nil {
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(ActorRemoveFromZoneEventBody): %s\n", err)
+			return
+		}
+		i.handleActorRemoveFromZoneEvent(e, eventEnvelope.ZoneID)
 	case wsapi.EventTypeActorMove:
 		var e wsapi.ActorMoveEventBody
 		err = json.Unmarshal(eventEnvelope.Body, &e)
@@ -190,6 +206,7 @@ func (i *Intellect) handleEventMessage(msg wsapi.Message) {
 			fmt.Printf("BRAIN ERROR: json.Unmarshal(ActorDeathEventBody): %s\n", err)
 			return
 		}
+		i.handleActorDeathEvent(e, eventEnvelope.ZoneID)
 	case wsapi.EventTypeActorMigrateIn:
 		var e wsapi.ActorMigrateInEventBody
 		err = json.Unmarshal(eventEnvelope.Body, &e)
@@ -226,13 +243,23 @@ func (i *Intellect) handleEventMessage(msg wsapi.Message) {
 		var e wsapi.CombatMeleeDamageEventBody
 		err = json.Unmarshal(eventEnvelope.Body, &e)
 		if err != nil {
-			fmt.Printf("BRAIN ERROR: json.Unmarshal(EventTypeCombatMeleeDamage): %s\n", err)
+			fmt.Printf("BRAIN ERROR: json.Unmarshal(CombatMeleeDamageEventBody): %s\n", err)
 			return
 		}
 		i.handleCombatMeleeDamageEvent(e)
 	default:
-		//fmt.Printf("BRAIN DEBUG: Brain received event of type %q, no idea what to do with it\n", eventEnvelope.EventType)
+		fmt.Printf("BRAIN DEBUG: Brain received event of type %q, no idea what to do with it\n", eventEnvelope.EventType)
 	}
+}
+
+func (i *Intellect) handleActorAddToZoneEvent(e wsapi.ActorAddToZoneEventBody, zoneID uuid.UUID) {
+	_, currentLocID := i.memory.GetCurrentZoneAndLocationID()
+	i.memory.AddActorToLocation(zoneID, currentLocID, e.ActorID)
+}
+
+func (i *Intellect) handleActorRemoveFromZoneEvent(e wsapi.ActorRemoveFromZoneEventBody, zoneID uuid.UUID) {
+	_, currentLocID := i.memory.GetCurrentZoneAndLocationID()
+	i.memory.RemoveActorFromLocation(zoneID, currentLocID, e.ActorID)
 }
 
 func (i *Intellect) handleActorMoveEvent(e wsapi.ActorMoveEventBody, zoneID uuid.UUID) {
