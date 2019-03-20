@@ -20,7 +20,7 @@ func getStockUtilitySelector() UtilitySelector {
 		C:           0.0,
 	}
 	moveSelection := UtilitySelection{
-		Name:           "move-to-emptier-location",
+		Name:           planGoalMoveToEmptyLocation,
 		Weight:         1.0,
 		Considerations: []UtilityConsideration{crowdedness, timeSpentIdling},
 	}
@@ -44,7 +44,7 @@ func getStockUtilitySelector() UtilitySelector {
 		C:           0.0,
 	}
 	doNothingSelection := UtilitySelection{
-		Name:           "do-nothing",
+		Name:           planGoalDoNothing,
 		Weight:         1.0,
 		Considerations: []UtilityConsideration{constantLaziness, stayIfWeapon},
 	}
@@ -69,7 +69,7 @@ func getStockUtilitySelector() UtilitySelector {
 		C:           0.0,
 	}
 	defendSelfSelection := UtilitySelection{
-		Name:           "defend-self",
+		Name:           planGoalDefendSelf,
 		Weight:         1.0,
 		Considerations: []UtilityConsideration{recentlyAttacked, attackerPresent},
 	}
