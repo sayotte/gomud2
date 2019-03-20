@@ -325,7 +325,7 @@ func (gh *gameHandler) handleEventObjectMove(terminalWidth int, e *core.ObjectMo
 			// actor -> container
 			intoWhat := resolveObjNameByID(e.ToObjectContainerID, zone)
 			out = fmt.Sprintf("%s puts %s into %s.\n", who, what, intoWhat)
-		case !uuid.Equal(e.FromActorContainerID, uuid.Nil):
+		case !uuid.Equal(e.FromObjectContainerID, uuid.Nil):
 			// container -> actor
 			fromWhat := resolveObjNameByID(e.FromObjectContainerID, zone)
 			out = fmt.Sprintf("%s takes %s from %s.\n", who, what, fromWhat)
