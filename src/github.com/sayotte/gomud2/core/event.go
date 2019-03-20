@@ -13,6 +13,7 @@ const (
 	EventTypeActorDeath
 	EventTypeActorMigrateIn
 	EventTypeActorMigrateOut
+	EventTypeActorSpeak
 	EventTypeLocationAddToZone
 	EventTypeLocationRemoveFromZone
 	EventTypeLocationUpdate

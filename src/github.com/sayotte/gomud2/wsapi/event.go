@@ -16,6 +16,7 @@ const (
 	EventTypeActorDeath          = "actor-death"
 	EventTypeActorMigrateIn      = "actor-migrate-in"
 	EventTypeActorMigrateOut     = "actor-migrate-out"
+	EventTypeActorSpeak          = "actor-speak"
 	//EventTypeLocationAddToZone
 	//EventTypeLocationRemoveFromZone
 	//EventTypeLocationUpdate
@@ -71,6 +72,9 @@ func eventFromDomainEvent(from core.Event) (Event, error) {
 	case core.EventTypeActorDeath:
 		e.EventType = EventTypeActorDeath
 		frommer = &ActorDeathEventBody{}
+	case core.EventTypeActorSpeak:
+		e.EventType = EventTypeActorSpeak
+		frommer = &ActorSpeakEventBody{}
 	case core.EventTypeActorMigrateIn:
 		e.EventType = EventTypeActorMigrateIn
 		frommer = &ActorMigrateInEventBody{}
@@ -198,6 +202,19 @@ func (amoeb *ActorMigrateOutEventBody) populateFromDomain(e core.Event) {
 		FromLocID: from.FromLocID,
 		ToZoneID:  from.ToZoneID,
 		ToLocID:   from.ToLocID,
+	}
+}
+
+type ActorSpeakEventBody struct {
+	ActorID uuid.UUID `json:"actorID"`
+	Speech  string
+}
+
+func (aseb *ActorSpeakEventBody) populateFromDomain(e core.Event) {
+	from := e.(*core.ActorSpeakEvent)
+	*aseb = ActorSpeakEventBody{
+		ActorID: from.ActorID,
+		Speech:  from.Speech,
 	}
 }
 

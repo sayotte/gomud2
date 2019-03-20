@@ -325,6 +325,8 @@ func (z *Zone) processCommand(c Command) (interface{}, error) {
 		outEvents, err = z.processActorMigrateOutCommand(c)
 	case CommandTypeActorDeath:
 		outEvents, err = z.processActorDeathCommand(c)
+	case CommandTypeActorSpeak:
+		outEvents, err = z.processActorSpeakCommand(c)
 	case CommandTypeLocationAddToZone:
 		out, outEvents, err = z.processLocationAddToZoneCommand(c)
 	case CommandTypeLocationUpdate:
@@ -578,6 +580,29 @@ func (z *Zone) processActorDeathCommand(c Command) ([]Event, error) {
 		}
 	}
 	return outEvents, nil
+}
+
+func (z *Zone) processActorSpeakCommand(c Command) ([]Event, error) {
+	cmd := c.(*actorSpeakCommand)
+
+	_, found := z.actorsById[cmd.actor.ID()]
+	if !found || cmd.actor.Zone() != z {
+		return nil, errors.New("Actor not in Zone")
+	}
+
+	speakEv := NewActorSpeakEvent(
+		cmd.actor.Name(),
+		cmd.speech,
+		cmd.actor.ID(),
+		z.ID(),
+	)
+	speakEv.SetSequenceNumber(z.nextSequenceId)
+	z.nextSequenceId = speakEv.SequenceNumber() + 1
+	_, err := z.applyEvent(speakEv)
+	if err != nil {
+		return nil, err
+	}
+	return []Event{speakEv}, nil
 }
 
 func (z *Zone) processLocationAddToZoneCommand(c Command) (interface{}, []Event, error) {
@@ -1051,6 +1076,9 @@ func (z *Zone) applyEvent(e Event) (interface{}, error) {
 	case EventTypeActorDeath:
 		typedEvent := e.(*ActorDeathEvent)
 		oList, err = z.applyActorDeathEvent(typedEvent)
+	case EventTypeActorSpeak:
+		typedEvent := e.(*ActorSpeakEvent)
+		oList, err = z.applyActorSpeakEvent(typedEvent)
 	case EventTypeLocationAddToZone:
 		typedEvent := e.(*LocationAddToZoneEvent)
 		out, err = z.applyLocationAddToZoneEvent(typedEvent)
@@ -1270,6 +1298,15 @@ func (z *Zone) applyActorDeathEvent(e *ActorDeathEvent) (ObserverList, error) {
 	attrs.Focus = 0
 	attrs.Zeal = 0
 	actor.setAttributes(attrs)
+
+	return actor.Location().Observers(), nil
+}
+
+func (z *Zone) applyActorSpeakEvent(e *ActorSpeakEvent) (ObserverList, error) {
+	actor, found := z.actorsById[e.ActorID]
+	if !found {
+		return nil, fmt.Errorf("cannot find Actor %q to make dead", e.ActorID)
+	}
 
 	return actor.Location().Observers(), nil
 }

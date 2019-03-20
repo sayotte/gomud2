@@ -238,6 +238,12 @@ func (a *Actor) Die() error {
 	return err
 }
 
+func (a *Actor) Speak(speech string) error {
+	c := NewActorSpeakCommand(a, speech)
+	_, err := a.syncRequestToZone(c)
+	return err
+}
+
 func (a *Actor) syncRequestToZone(c Command) (interface{}, error) {
 	req := rpc.NewRequest(c)
 	a.zone.requestChan() <- req
@@ -532,6 +538,42 @@ type ActorMigrateOutEvent struct {
 	ActorID           uuid.UUID
 	FromLocID         uuid.UUID
 	ToLocID, ToZoneID uuid.UUID
+}
+
+func NewActorSpeakCommand(actor *Actor, speech string) *actorSpeakCommand {
+	return &actorSpeakCommand{
+		commandGeneric{commandType: CommandTypeActorSpeak},
+		actor,
+		speech,
+	}
+}
+
+type actorSpeakCommand struct {
+	commandGeneric
+	actor  *Actor
+	speech string
+}
+
+func NewActorSpeakEvent(name, speech string, actorID, zoneID uuid.UUID) *ActorSpeakEvent {
+	return &ActorSpeakEvent{
+		&eventGeneric{
+			EventTypeNum:      EventTypeActorSpeak,
+			TimeStamp:         time.Now(),
+			VersionNum:        1,
+			AggregateID:       zoneID,
+			ShouldPersistBool: true,
+		},
+		name,
+		actorID,
+		speech,
+	}
+}
+
+type ActorSpeakEvent struct {
+	*eventGeneric
+	ActorName string
+	ActorID   uuid.UUID
+	Speech    string
 }
 
 /////////////////// Reusable code closely related to Actors ///////////////////
