@@ -267,3 +267,35 @@ func (amoe actorMigrateOutEvent) Header() eventHeader {
 func (amoe *actorMigrateOutEvent) SetHeader(h eventHeader) {
 	amoe.header = h
 }
+
+type actorSpeakEvent struct {
+	header    eventHeader
+	ActorID   uuid.UUID
+	ActorName string
+	Speech    string
+}
+
+func (ase *actorSpeakEvent) FromDomain(e core.Event) {
+	from := e.(*core.ActorSpeakEvent)
+	*ase = actorSpeakEvent{
+		header:    eventHeaderFromDomainEvent(from),
+		ActorID:   from.ActorID,
+		ActorName: from.ActorName,
+		Speech:    from.Speech,
+	}
+}
+
+func (ase actorSpeakEvent) ToDomain() core.Event {
+	e := core.NewActorSpeakEvent(ase.ActorName, ase.Speech, ase.ActorID, ase.header.AggregateId)
+	e.SetSequenceNumber(ase.header.SequenceNumber)
+	e.SetTimestamp(ase.header.Timestamp)
+	return e
+}
+
+func (ase actorSpeakEvent) Header() eventHeader {
+	return ase.header
+}
+
+func (ase *actorSpeakEvent) SetHeader(h eventHeader) {
+	ase.header = h
+}
