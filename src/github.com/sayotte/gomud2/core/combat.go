@@ -66,7 +66,7 @@ func (cmc combatMeleeCommand) doSlash() ([]Event, error) {
 
 	// find weapon in attacker's hands with highest slashing damage cap; use
 	// that for damage range
-	var weaponMinBaseDmg, weaponMaxBaseDmg float64
+	weaponMinBaseDmg, weaponMaxBaseDmg := cmc.attacker.attributes.NaturalSlashMin, cmc.attacker.attributes.NaturalSlashMax
 	for _, obj := range cmc.attacker.Inventory().ObjectsBySubcontainer(InventoryContainerHands) {
 		attrs := obj.Attributes()
 		if attrs.SlashingDamageMax > weaponMaxBaseDmg {

@@ -9,4 +9,6 @@ type AttributeSet struct {
 	Faith, Faithcap       int
 	// derived attributes
 	Physical, Stamina, Focus, Zeal int
+	// natural combat stats
+	NaturalSlashMin, NaturalSlashMax float64
 }
